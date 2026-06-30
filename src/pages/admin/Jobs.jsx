@@ -97,7 +97,7 @@ export default function AdminJobs() {
   ]
 
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       <PageHeader
         title="Jobs"
         subtitle="Manage active job sites"

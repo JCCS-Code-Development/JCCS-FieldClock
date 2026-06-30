@@ -81,7 +81,7 @@ export default function WorkOrders() {
   const done = workOrders.filter((w) => w.status === 'completed' || w.status === 'cancelled')
 
   return (
-    <div className="px-4 pt-6 pb-6 flex flex-col gap-4 max-w-lg mx-auto">
+    <div className="px-4 pt-6 pb-6 flex flex-col gap-4 w-full">
       <div>
         <button onClick={() => navigate('/jobs')} className="text-brand-500 text-sm mb-3">← Jobs</button>
         <div className="flex items-center justify-between">

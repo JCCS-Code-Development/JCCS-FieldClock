@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import StatsCard from '../../components/admin/StatsCard'
 import Badge from '../../components/ui/Badge'
 import Spinner from '../../components/ui/Spinner'
+import ClockToggle from '../../components/employee/ClockToggle'
 import { getStatus } from '../../api/timeclock'
+import { useTimeclockStore } from '../../store/timeclockStore'
 import { getPending } from '../../api/approvals'
 import { listJobs } from '../../api/jobs'
 import { getWorkOrderReview } from '../../api/reports'
@@ -12,6 +14,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ clockedIn: [], pendingApprovals: 0, activeJobs: 0, pendingReview: 0 })
+  const { setTimeclockData } = useTimeclockStore()
 
   useEffect(() => {
     Promise.all([
@@ -20,6 +23,12 @@ export default function AdminDashboard() {
       listJobs({ status: 'active' }).catch(() => ({ jobs: [] })),
       getWorkOrderReview({ review_status: 'pending_review' }).catch(() => ({ work_orders: [] })),
     ]).then(([status, approvals, jobs, woReview]) => {
+      setTimeclockData({
+        statusLabel:  status.statusLabel  ?? null,
+        currentEntry: status.currentEntry ?? null,
+        activeJob:    status.activeJob    ?? null,
+        dayStarted:   status.dayStarted   ?? false,
+      })
       setStats({
         clockedIn: status.active_employees ?? [],
         pendingApprovals: approvals.entries?.length ?? 0,
@@ -37,10 +46,16 @@ export default function AdminDashboard() {
   if (loading) return <div className="flex justify-center py-24"><Spinner size="lg" /></div>
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl">
+    <div className="flex flex-col gap-6 w-full">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-sm text-gray-500 mt-0.5">Today's overview</p>
+      </div>
+
+      {/* Admin clock in/out */}
+      <div className="bg-white rounded-2xl border border-gray-100 px-4">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-4 pb-1">Your Clock</p>
+        <ClockToggle />
       </div>
 
       <div className="grid grid-cols-2 gap-3">

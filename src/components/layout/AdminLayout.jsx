@@ -11,7 +11,6 @@ const NAV = [
   { to: '/admin/employees', label: 'Employees',    icon: '👷' },
   { to: '/admin/timesheets', label: 'Timesheets',  icon: '⏱' },
   { to: '/admin/payroll',   label: 'Payroll',      icon: '💵' },
-  { to: '/admin/invoices',  label: 'Invoices',     icon: '🧾' },
   { to: '/admin/reports',   label: 'Reports',      icon: '📈' },
 ]
 
@@ -108,7 +107,7 @@ export default function AdminLayout() {
           <span className="font-bold">FieldClock Admin</span>
           <div className="w-8" />
         </header>
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 w-full">
           <Outlet />
         </main>
       </div>

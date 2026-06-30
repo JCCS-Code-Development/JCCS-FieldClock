@@ -21,7 +21,7 @@ export default function JobList() {
   useEffect(() => { load() }, [])
 
   return (
-    <div className="px-4 pt-6 pb-4 flex flex-col gap-4 max-w-lg mx-auto">
+    <div className="px-4 pt-6 pb-4 flex flex-col gap-4 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">My Jobs</h1>
         <button onClick={load} className="text-sm text-brand-500 hover:underline">Refresh</button>

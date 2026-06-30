@@ -74,7 +74,7 @@ export default function AdminWorkOrders() {
   ]
 
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       <PageHeader title="Work Orders" subtitle="Review field-created and manage all work orders" />
 
       <div className="flex gap-1 mb-5 bg-gray-100 rounded-xl p-1 w-fit">

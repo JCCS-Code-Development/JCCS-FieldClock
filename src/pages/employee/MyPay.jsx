@@ -31,7 +31,7 @@ export default function MyPay() {
   }, [selectedPeriod])
 
   return (
-    <div className="px-4 pt-6 pb-6 flex flex-col gap-4 max-w-lg mx-auto">
+    <div className="px-4 pt-6 pb-6 flex flex-col gap-4 w-full">
       <h1 className="text-xl font-bold text-gray-900">My Pay</h1>
 
       {/* Period selector */}

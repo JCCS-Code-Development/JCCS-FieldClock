@@ -86,7 +86,7 @@ export default function AdminTimesheets() {
   ]
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       <PageHeader title="Timesheets" subtitle="Review and approve employee time entries" />
 
       {/* Filters */}

@@ -31,7 +31,7 @@ export default function AdminReports() {
   const totals = data?.totals ?? {}
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <PageHeader title="Labor Cost Reports" subtitle="True labor cost by job, employee, or category" />
 
       {/* Controls */}

@@ -20,7 +20,6 @@ import AdminWorkOrders from './pages/admin/AdminWorkOrders'
 import AdminEmployees from './pages/admin/Employees'
 import AdminTimesheets from './pages/admin/Timesheets'
 import AdminPayroll from './pages/admin/Payroll'
-import AdminInvoices from './pages/admin/Invoices'
 import AdminReports from './pages/admin/Reports'
 
 export default function App() {
@@ -50,7 +49,6 @@ export default function App() {
             <Route path="/admin/employees" element={<AdminEmployees />} />
             <Route path="/admin/timesheets" element={<AdminTimesheets />} />
             <Route path="/admin/payroll" element={<AdminPayroll />} />
-            <Route path="/admin/invoices" element={<AdminInvoices />} />
             <Route path="/admin/reports" element={<AdminReports />} />
           </Route>
         </Route>

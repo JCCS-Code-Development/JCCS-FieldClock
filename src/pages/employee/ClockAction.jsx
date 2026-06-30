@@ -77,7 +77,7 @@ export default function ClockAction() {
     : 'Select the job you are heading to'
 
   return (
-    <div className="px-4 pt-6 pb-6 flex flex-col gap-4 max-w-lg mx-auto">
+    <div className="px-4 pt-6 pb-6 flex flex-col gap-4 w-full">
       <div>
         <button onClick={() => navigate(-1)} className="text-brand-500 text-sm mb-3">← Back</button>
         <h1 className="text-xl font-bold text-gray-900">{title}</h1>
