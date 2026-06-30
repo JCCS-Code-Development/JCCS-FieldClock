@@ -1,0 +1,6 @@
+# Allow image files to be served; deny PHP execution
+Options -Indexes
+<FilesMatch "\.php$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
