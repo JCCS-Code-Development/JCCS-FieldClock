@@ -1,0 +1,5 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/vm3xrrup9tqw/public_html/fieldclock
+    - /bin/cp -Rf api/. $DEPLOYPATH/api/
