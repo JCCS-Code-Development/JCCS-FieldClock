@@ -114,7 +114,7 @@ export default function AdminPayroll() {
         subtitle="Review pay by period"
         actions={
           <Button variant="secondary" onClick={openGasReview}>
-            ⛽ Review Gas Allowances
+            Review Gas Allowances
           </Button>
         }
       />

@@ -59,13 +59,17 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <StatsCard label="Clocked In" value={stats.clockedIn.length} icon="👷" color="green" />
-        <StatsCard label="Pending Approvals" value={stats.pendingApprovals} icon="⏱" color="amber"
-          onClick={() => navigate('/admin/timesheets')} />
-        <StatsCard label="Active Jobs" value={stats.activeJobs} icon="📍" color="blue"
-          onClick={() => navigate('/admin/jobs')} />
-        <StatsCard label="WO Pending Review" value={stats.pendingReview} icon="📋" color="purple"
-          onClick={() => navigate('/admin/work-orders')} />
+        <StatsCard label="Clocked In" value={stats.clockedIn.length} color="green"
+          icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>} />
+        <StatsCard label="Change Requests" value={stats.pendingApprovals} color="amber"
+          onClick={() => navigate('/admin/timesheets')}
+          icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 7v5l3.5 3.5"/></svg>} />
+        <StatsCard label="Active Jobs" value={stats.activeJobs} color="blue"
+          onClick={() => navigate('/admin/jobs')}
+          icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>} />
+        <StatsCard label="Reports" value="" color="green"
+          onClick={() => navigate('/admin/reports')}
+          icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M18 20V10M12 20V4M6 20v-6"/></svg>} />
       </div>
 
       {stats.clockedIn.length > 0 && (

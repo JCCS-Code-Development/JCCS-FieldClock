@@ -1,0 +1,141 @@
+{
+  "nav": {
+    "clock": "Reloj",
+    "jobs": "Trabajos",
+    "myPay": "Mi Pago",
+    "dashboard": "Panel",
+    "employees": "Empleados",
+    "timesheets": "Hojas de Tiempo",
+    "payroll": "Nómina",
+    "reports": "Reportes",
+    "signOut": "Cerrar Sesión",
+    "fieldclock": "FieldClock"
+  },
+  "role": {
+    "admin": "Administrador",
+    "employee": "Empleado"
+  },
+  "lang": {
+    "switchTo": "English",
+    "current": "ES"
+  },
+  "offline": "Sin conexión — acciones de reloj no disponibles",
+  "home": {
+    "welcome": "¡Bienvenido, {{name}}!",
+    "slogan": "Selecciona un sitio de trabajo y toca para comenzar tu turno.",
+    "clockIn": "Registrar Entrada",
+    "clockOut": "Registrar Salida",
+    "todaysTotal": "Total de Hoy",
+    "todaysActivity": "Actividad de Hoy",
+    "noActivity": "Sin actividad hoy",
+    "changeStatus": "Cambiar Estado",
+    "clockedInAt": "Registrado en",
+    "selectLocation": "Seleccionar ubicación",
+    "selectJobSite": "— Selecciona un sitio de trabajo —",
+    "notListed": "¿No está en la lista? Ingresar manualmente →",
+    "typeSiteName": "Escribe el nombre del sitio…",
+    "gpsCapture": "GPS: {{coords}}",
+    "gpsUnavailable": "GPS no disponible — la ubicación no se registrará.",
+    "locationUnavailable": "Ubicación no disponible",
+    "locating": "Localizando…",
+    "loadingLocations": "Cargando ubicaciones cercanas…",
+    "offline": "Sin conexión — acciones no disponibles.",
+    "noLocation": "Selecciona una ubicación o escribe el nombre del sitio.",
+    "clockInError": "No se pudo registrar. Intenta de nuevo.",
+    "now": "ahora",
+    "unknown": "Ubicación desconocida"
+  },
+  "status": {
+    "working": "Trabajando",
+    "lunch": "Almuerzo",
+    "material_run": "Búsqueda de Material",
+    "waiting": "Esperando",
+    "traveling": "Viajando",
+    "done": "Finalizado"
+  },
+  "jobs": {
+    "title": "Mis Trabajos",
+    "refresh": "Actualizar",
+    "noJobs": "Sin trabajos activos asignados.",
+    "loadError": "No se pudieron cargar los trabajos."
+  },
+  "pay": {
+    "title": "Mi Pago",
+    "thisWeek": "Esta Semana",
+    "lastWeek": "Semana Pasada",
+    "noData": "Sin datos de pago para este período.",
+    "noEntries": "Sin entradas para este período.",
+    "noRequests": "Sin solicitudes de corrección.",
+    "hoursSummary": "Resumen de Horas",
+    "approvedHours": "Horas Aprobadas",
+    "regularHours": "Horas Regulares",
+    "overtimeHours": "Horas Extra",
+    "breakdown": "Desglose de Pago",
+    "basePay": "Pago Base",
+    "gasAllowance": "Subsidio de Gasolina",
+    "estimatedTotal": "Total Estimado",
+    "w2Notice": "Empleado W-2 — nómina procesada por ADP",
+    "1099Notice": "Contratista 1099 — cheque semanal emitido tras revisión",
+    "inProgress": "En progreso",
+    "requestCorrection": "Solicitar Corrección",
+    "pendingReview": "En revisión",
+    "adminNote": "Nota del administrador",
+    "tabs": {
+      "summary": "Resumen de Pago",
+      "log": "Registro de Tiempo",
+      "requests": "Mis Solicitudes"
+    },
+    "status": {
+      "pending": "Pendiente",
+      "approved": "Aprobado",
+      "rejected": "Rechazado"
+    },
+    "correction": {
+      "title": "Solicitar Corrección de Tiempo",
+      "originalEntry": "Entrada original",
+      "start": "Inicio",
+      "end": "Fin",
+      "correctedStart": "Inicio Corregido (opcional)",
+      "correctedEnd": "Fin Corregido (opcional)",
+      "reason": "Motivo",
+      "reasonPlaceholder": "Explica qué ocurrió y cuál debería ser el tiempo correcto…",
+      "reasonRequired": "Por favor explica por qué se necesita una corrección.",
+      "timeRequired": "Ingresa al menos una nueva hora de inicio o fin.",
+      "submit": "Enviar Solicitud",
+      "submitError": "No se pudo enviar. Intenta de nuevo."
+    }
+  },
+  "auth": {
+    "title": "JCCS FieldClock",
+    "subtitle": "Inicia sesión en tu cuenta",
+    "identifier": "Correo o Número de Teléfono",
+    "identifierPlaceholder": "tu@correo.com o (555) 000-0000",
+    "password": "Contraseña",
+    "passwordPlaceholder": "••••••••",
+    "signIn": "Iniciar Sesión",
+    "noAccess": "¿No tienes acceso? Contacta a tu administrador.",
+    "identifierRequired": "Ingresa tu correo o número de teléfono.",
+    "loginFailed": "Error al iniciar sesión. Intenta de nuevo.",
+    "setup": {
+      "title": "Crea tu contraseña",
+      "subtitle": "Es tu primera vez iniciando sesión.",
+      "newPassword": "Nueva Contraseña",
+      "newPasswordPlaceholder": "Al menos 6 caracteres",
+      "confirmPassword": "Confirmar Contraseña",
+      "confirmPasswordPlaceholder": "Repite tu contraseña",
+      "submit": "Establecer Contraseña e Iniciar Sesión",
+      "tooShort": "La contraseña debe tener al menos 6 caracteres.",
+      "mismatch": "Las contraseñas no coinciden.",
+      "failed": "No se pudo establecer la contraseña. Intenta de nuevo."
+    }
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "loading": "Cargando…",
+    "error": "Algo salió mal.",
+    "start": "Inicio",
+    "end": "Fin",
+    "admin": "Administrador"
+  }
+}

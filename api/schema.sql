@@ -187,6 +187,25 @@ CREATE TABLE `invoices` (
   CONSTRAINT `fk_inv_wo`  FOREIGN KEY (`work_order_id`) REFERENCES `work_orders` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE `time_change_requests` (
+  `id`               INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  `entry_id`         INT UNSIGNED  NOT NULL,
+  `requested_by`     INT UNSIGNED  NOT NULL,
+  `requested_start`  DATETIME      NULL DEFAULT NULL,
+  `requested_end`    DATETIME      NULL DEFAULT NULL,
+  `reason`           TEXT          NOT NULL,
+  `status`           ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  `reviewed_by`      INT UNSIGNED  NULL DEFAULT NULL,
+  `reviewed_at`      TIMESTAMP     NULL DEFAULT NULL,
+  `review_note`      VARCHAR(255)  NULL DEFAULT NULL,
+  `created_at`       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `entry_id` (`entry_id`),
+  KEY `requested_by` (`requested_by`),
+  CONSTRAINT `fk_tcr_entry` FOREIGN KEY (`entry_id`)     REFERENCES `time_entries` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_tcr_user`  FOREIGN KEY (`requested_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Seed: first admin account (update phone/name before importing)

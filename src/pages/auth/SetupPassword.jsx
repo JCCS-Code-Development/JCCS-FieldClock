@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import { setPassword } from '../../api/auth'
@@ -10,11 +11,12 @@ export default function SetupPassword() {
   const location  = useLocation()
   const userId    = location.state?.userId
   const { login } = useAuthStore()
+  const { t } = useTranslation()
 
-  const [password, setPass]     = useState('')
-  const [confirm, setConfirm]   = useState('')
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
+  const [password, setPass]   = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [error, setError]     = useState('')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (!userId) navigate('/login', { replace: true })
@@ -22,8 +24,8 @@ export default function SetupPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return }
-    if (password !== confirm) { setError('Passwords do not match.'); return }
+    if (password.length < 6) { setError(t('auth.setup.tooShort')); return }
+    if (password !== confirm) { setError(t('auth.setup.mismatch')); return }
     setLoading(true)
     setError('')
     try {
@@ -31,7 +33,7 @@ export default function SetupPassword() {
       login(data.user, data.token, data.refreshToken)
       navigate(data.user.role === 'admin' ? '/admin' : '/', { replace: true })
     } catch (err) {
-      setError(err?.response?.data?.error ?? 'Could not set password. Try again.')
+      setError(err?.response?.data?.error ?? t('auth.setup.failed'))
     } finally {
       setLoading(false)
     }
@@ -41,31 +43,32 @@ export default function SetupPassword() {
     <div className="min-h-svh flex flex-col items-center justify-center bg-brand-900 px-6">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <p className="text-4xl mb-2">🔑</p>
-          <h1 className="text-2xl font-bold text-white">Create your password</h1>
-          <p className="text-brand-100 text-sm mt-1">You're logging in for the first time.</p>
+          <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-14 w-auto mx-auto mb-4"
+            style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
+          <h1 className="text-2xl font-bold text-white">{t('auth.setup.title')}</h1>
+          <p className="text-brand-100/70 text-sm mt-1">{t('auth.setup.subtitle')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 shadow-xl flex flex-col gap-4">
           <Input
-            label="New Password"
+            label={t('auth.setup.newPassword')}
             type="password"
-            placeholder="At least 6 characters"
+            placeholder={t('auth.setup.newPasswordPlaceholder')}
             value={password}
             onChange={(e) => setPass(e.target.value)}
             autoComplete="new-password"
           />
           <Input
-            label="Confirm Password"
+            label={t('auth.setup.confirmPassword')}
             type="password"
-            placeholder="Repeat your password"
+            placeholder={t('auth.setup.confirmPasswordPlaceholder')}
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             error={error}
             autoComplete="new-password"
           />
           <Button type="submit" fullWidth size="lg" loading={loading}>
-            Set Password & Sign In
+            {t('auth.setup.submit')}
           </Button>
         </form>
       </div>

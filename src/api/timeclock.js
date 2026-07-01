@@ -29,3 +29,12 @@ export const dayEnd = (payload) =>
 
 export const getEntries = (params) =>
   client.get('/timeclock/entries.php', { params }).then((r) => r.data)
+
+export const getChangeRequests = (params) =>
+  client.get('/timeclock/change-requests.php', { params }).then((r) => r.data)
+
+export const createChangeRequest = (data) =>
+  client.post('/timeclock/change-requests.php', data).then((r) => r.data)
+
+export const reviewChangeRequest = (data) =>
+  client.post('/timeclock/review-change.php', data).then((r) => r.data)

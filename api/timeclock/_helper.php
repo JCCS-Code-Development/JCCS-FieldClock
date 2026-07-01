@@ -11,12 +11,12 @@ function closeOpenEntry(PDO $pdo, int $userId, ?float $lat, ?float $lng): ?int {
 }
 
 // Open a new entry and return full timeclock status payload
-function openEntry(PDO $pdo, int $userId, ?int $jobId, string $statusLabel, string $costCategory, ?float $lat, ?float $lng, ?float $accuracy, ?bool $withinRadius = null): array {
+function openEntry(PDO $pdo, int $userId, ?int $jobId, string $statusLabel, string $costCategory, ?float $lat, ?float $lng, ?float $accuracy, ?bool $withinRadius = null, ?string $notes = null): array {
     $stmt = $pdo->prepare(
-        'INSERT INTO time_entries (user_id, job_id, status_label, cost_category, start_time, start_lat, start_lng, gps_accuracy, within_radius)
-         VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?)'
+        'INSERT INTO time_entries (user_id, job_id, status_label, cost_category, start_time, start_lat, start_lng, gps_accuracy, within_radius, approval_status, notes)
+         VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)'
     );
-    $stmt->execute([$userId, $jobId, $statusLabel, $costCategory, $lat, $lng, $accuracy, $withinRadius]);
+    $stmt->execute([$userId, $jobId, $statusLabel, $costCategory, $lat, $lng, $accuracy, $withinRadius, 'approved', $notes]);
     $newId = $pdo->lastInsertId();
 
     $entry = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');

@@ -1,0 +1,141 @@
+{
+  "nav": {
+    "clock": "Clock",
+    "jobs": "Jobs",
+    "myPay": "My Pay",
+    "dashboard": "Dashboard",
+    "employees": "Employees",
+    "timesheets": "Timesheets",
+    "payroll": "Payroll",
+    "reports": "Reports",
+    "signOut": "Sign Out",
+    "fieldclock": "FieldClock"
+  },
+  "role": {
+    "admin": "Admin",
+    "employee": "Employee"
+  },
+  "lang": {
+    "switchTo": "Español",
+    "current": "EN"
+  },
+  "offline": "No internet connection — clock actions unavailable",
+  "home": {
+    "welcome": "Welcome, {{name}}!",
+    "slogan": "Select a job site and tap to start your shift.",
+    "clockIn": "Clock In",
+    "clockOut": "Clock Out",
+    "todaysTotal": "Today's Total",
+    "todaysActivity": "Today's Activity",
+    "noActivity": "No activity yet today",
+    "changeStatus": "Change Status",
+    "clockedInAt": "Clocked in at",
+    "selectLocation": "Select location",
+    "selectJobSite": "— Select a job site —",
+    "notListed": "Not listed? Enter manually →",
+    "typeSiteName": "Type the job site name…",
+    "gpsCapture": "GPS captured: {{coords}}",
+    "gpsUnavailable": "GPS unavailable — location will not be recorded.",
+    "locationUnavailable": "Location unavailable",
+    "locating": "Locating…",
+    "loadingLocations": "Loading nearby locations…",
+    "offline": "You're offline — clock actions unavailable.",
+    "noLocation": "Select a location or type the job site name below.",
+    "clockInError": "Could not clock in. Try again.",
+    "now": "now",
+    "unknown": "Unknown location"
+  },
+  "status": {
+    "working": "Working",
+    "lunch": "Lunch",
+    "material_run": "Material Run",
+    "waiting": "Waiting",
+    "traveling": "Traveling",
+    "done": "Done"
+  },
+  "jobs": {
+    "title": "My Jobs",
+    "refresh": "Refresh",
+    "noJobs": "No active jobs assigned.",
+    "loadError": "Could not load jobs."
+  },
+  "pay": {
+    "title": "My Pay",
+    "thisWeek": "This Week",
+    "lastWeek": "Last Week",
+    "noData": "No pay data for this period.",
+    "noEntries": "No time entries for this period.",
+    "noRequests": "No correction requests yet.",
+    "hoursSummary": "Hours Summary",
+    "approvedHours": "Approved Hours",
+    "regularHours": "Regular Hours",
+    "overtimeHours": "Overtime Hours",
+    "breakdown": "Pay Breakdown",
+    "basePay": "Base Pay",
+    "gasAllowance": "Gas Allowance",
+    "estimatedTotal": "Estimated Total",
+    "w2Notice": "W-2 Employee — payroll processed through ADP",
+    "1099Notice": "1099 Contractor — weekly check issued after review",
+    "inProgress": "In progress",
+    "requestCorrection": "Request Correction",
+    "pendingReview": "Pending review",
+    "adminNote": "Admin note",
+    "tabs": {
+      "summary": "Pay Summary",
+      "log": "Time Log",
+      "requests": "My Requests"
+    },
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "correction": {
+      "title": "Request Time Correction",
+      "originalEntry": "Original entry",
+      "start": "Start",
+      "end": "End",
+      "correctedStart": "Corrected Start (optional)",
+      "correctedEnd": "Corrected End (optional)",
+      "reason": "Reason",
+      "reasonPlaceholder": "Explain what happened and what the correct time should be…",
+      "reasonRequired": "Please explain why a correction is needed.",
+      "timeRequired": "Enter at least a new start or end time.",
+      "submit": "Submit Request",
+      "submitError": "Could not submit. Try again."
+    }
+  },
+  "auth": {
+    "title": "JCCS FieldClock",
+    "subtitle": "Sign in to your account",
+    "identifier": "Email or Phone Number",
+    "identifierPlaceholder": "you@example.com or (555) 000-0000",
+    "password": "Password",
+    "passwordPlaceholder": "••••••••",
+    "signIn": "Sign In",
+    "noAccess": "Don't have access? Contact your administrator.",
+    "identifierRequired": "Enter your email or phone number.",
+    "loginFailed": "Login failed. Try again.",
+    "setup": {
+      "title": "Create your password",
+      "subtitle": "You're logging in for the first time.",
+      "newPassword": "New Password",
+      "newPasswordPlaceholder": "At least 6 characters",
+      "confirmPassword": "Confirm Password",
+      "confirmPasswordPlaceholder": "Repeat your password",
+      "submit": "Set Password & Sign In",
+      "tooShort": "Password must be at least 6 characters.",
+      "mismatch": "Passwords do not match.",
+      "failed": "Could not set password. Try again."
+    }
+  },
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "loading": "Loading…",
+    "error": "Something went wrong.",
+    "start": "Start",
+    "end": "End",
+    "admin": "Admin"
+  }
+}
