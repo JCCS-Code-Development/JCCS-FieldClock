@@ -8,6 +8,7 @@ import { getSummary, getBreakdown, listAdjustments, createAdjustment, updateAdju
 import { listEmployees } from '../../api/employees'
 import { listInvoices, updateInvoiceStatus, getDownloadUrl } from '../../api/contractor'
 import { getPeriodLoanTotals } from '../../api/loans'
+import PayPieChart from '../../components/ui/PayPieChart'
 import { formatCurrency, formatHours, formatDate } from '../../utils/format'
 import { format, startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 
@@ -469,7 +470,25 @@ export default function AdminPayroll() {
       {/* Drill-down */}
       <Modal isOpen={!!drillDown} onClose={() => setDrillDown(null)} title={`${drillDown?.name} — ${p.label}`} size="lg">
         {!breakdown ? <div className="flex justify-center py-8"><Spinner /></div> : (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
+
+            {/* Pay breakdown chart */}
+            {drillDown && (() => {
+              const uid  = drillDown.user_id
+              const gas  = gasByUser[uid]   ?? 0
+              const bon  = bonusByUser[uid] ?? 0
+              const loan = loanDeductions[uid] ?? 0
+              const base = drillDown.base_gross ?? 0
+              if (gas === 0 && bon === 0 && loan === 0) return null
+              return (
+                <div className="bg-gray-50 rounded-2xl p-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Pay Breakdown</p>
+                  <PayPieChart base={base} gas={gas} bonus={bon} loan={loan} />
+                </div>
+              )
+            })()}
+
+            {/* Time entry breakdown by day */}
             {Object.entries(breakdown).length === 0 && <p className="text-gray-400 text-center py-4">No entries for this period.</p>}
             {Object.entries(breakdown).map(([date, entries]) => (
               <div key={date} className="bg-gray-50 rounded-xl p-4">

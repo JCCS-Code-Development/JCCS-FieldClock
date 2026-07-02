@@ -33,10 +33,11 @@ const ClockWaitIcon = () => (
   </svg>
 )
 
+import { useTranslation } from 'react-i18next'
 import { useTimeclockStore } from '../../store/timeclockStore'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useGPS } from '../../hooks/useGPS'
-import { dayStart, dayEnd, setWorking, setLunch, setMaterialRun, setWaiting } from '../../api/timeclock'
+import { getStatus, dayStart, dayEnd, setWorking, setLunch, setMaterialRun, setWaiting } from '../../api/timeclock'
 import { getNearbyJobs, listJobs } from '../../api/jobs'
 import Spinner from '../ui/Spinner'
 
@@ -82,10 +83,17 @@ async function reverseGeocode(lat, lng) {
 
 export default function ClockToggle() {
   const { statusLabel, currentEntry, activeJob, dayStarted, setTimeclockData } = useTimeclockStore()
+
+  // Sync with server on mount so button always reflects actual DB state
+  useEffect(() => {
+    getStatus().then((data) => setTimeclockData(data)).catch(() => {})
+  }, [])
   const isOnline = useOnlineStatus()
   const { position, loading: gpsLoading, getPosition } = useGPS()
 
+  const { t } = useTranslation()
   const [loading, setLoading]       = useState(false)
+  const [error, setError]           = useState('')
   const [jobs, setJobs]             = useState([])
   const [selectedJobId, setSelectedJobId] = useState('')
   const [locationLabel, setLocationLabel] = useState(null)
@@ -126,6 +134,7 @@ export default function ClockToggle() {
   const handleToggle = async () => {
     if (!isOnline) return
     setLoading(true)
+    setError('')
     try {
       if (!isClockedIn) {
         const data = await dayStart({ job_id: selectedJobId ? parseInt(selectedJobId) : null })
@@ -134,6 +143,8 @@ export default function ClockToggle() {
         const data = await dayEnd({})
         setTimeclockData({ statusLabel: 'done', currentEntry: data.currentEntry, activeJob: null, dayStarted: true })
       }
+    } catch (err) {
+      setError(err?.response?.data?.error ?? t(isClockedIn ? 'home.clockOutFailed' : 'home.clockInFailed'))
     } finally {
       setLoading(false)
     }
@@ -160,17 +171,17 @@ export default function ClockToggle() {
       {/* Location indicator */}
       <div className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 min-h-5">
         {gpsLoading
-          ? <><Spinner size="sm" /><span>Finding location…</span></>
+          ? <><Spinner size="sm" /><span>{t('home.findingLocation')}</span></>
           : locationLabel
             ? <><span className="text-base">📍</span><span className="font-medium text-gray-700">{locationLabel}</span></>
-            : <span className="text-gray-400">📍 Location unavailable</span>
+            : <span className="text-gray-400">📍 {t('home.locationUnavailable')}</span>
         }
       </div>
 
       {/* Job / Location selector */}
       <div className="w-full max-w-sm">
         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-1.5">
-          {isClockedIn ? 'Current Location' : 'Select Location'}
+          {isClockedIn ? t('home.currentLocation') : t('home.selectLocation')}
         </label>
         <div className="relative">
           <select
@@ -179,7 +190,7 @@ export default function ClockToggle() {
             disabled={isClockedIn || loadingJobs}
             className="w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3 pr-10 text-sm font-medium text-gray-800 outline-none focus:border-brand-500 disabled:opacity-60 appearance-none"
           >
-            <option value="">— No specific location —</option>
+            <option value="">{t('home.noSpecificLocation')}</option>
             {jobs.map((j) => (
               <option key={j.id} value={j.id}>
                 {j.name}{j.distance_meters != null ? ` (${j.distance_meters < 1000 ? Math.round(j.distance_meters) + 'm' : (j.distance_meters/1000).toFixed(1) + 'km'})` : ''}
@@ -188,7 +199,7 @@ export default function ClockToggle() {
           </select>
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">▾</span>
         </div>
-        {loadingJobs && <p className="text-xs text-gray-400 mt-1">Loading nearby locations…</p>}
+        {loadingJobs && <p className="text-xs text-gray-400 mt-1">{t('home.loadingLocations')}</p>}
       </div>
 
       {/* Live timer */}
@@ -199,7 +210,7 @@ export default function ClockToggle() {
       {/* Status badge */}
       {config && statusLabel !== 'done' && (
         <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold ${config.text} bg-current/5 border border-current/20`}>
-          <span className={`w-2 h-2 rounded-full ${config.color} animate-pulse`} />
+          <span className={`w-2 h-2 rounded-full ${config.color} animate-[pulse_3s_ease-in-out_infinite]`} />
           {config.label}
           {activeJob && <span className="opacity-60">· {activeJob.name}</span>}
         </span>
@@ -211,8 +222,8 @@ export default function ClockToggle() {
         disabled={loading || !isOnline}
         className={`w-40 h-40 rounded-full flex flex-col items-center justify-center gap-2 text-white font-bold text-lg shadow-xl transition-all active:scale-95 disabled:opacity-50
           ${isClockedIn
-            ? 'bg-red-500 hover:bg-red-600 ring-8 ring-red-200'
-            : 'bg-green-500 hover:bg-green-600 ring-8 ring-green-200'
+            ? 'bg-red-500 hover:bg-red-600 ring-4 ring-red-200'
+            : 'bg-green-500 hover:bg-green-600 ring-4 ring-green-200'
           }`}
       >
         {loading ? <Spinner size="md" /> : (
@@ -226,14 +237,14 @@ export default function ClockToggle() {
       {/* Status selectors — only when clocked in */}
       {isClockedIn && statusLabel !== 'done' && (
         <div className="w-full max-w-sm">
-          <p className="text-xs text-gray-400 text-center mb-3 uppercase tracking-wide font-medium">Change Status</p>
+          <p className="text-xs text-gray-400 text-center mb-3 uppercase tracking-wide font-medium">{t('home.changeStatus')}</p>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { key: 'working',      label: 'Working',      icon: <WrenchIcon /> },
-              { key: 'lunch',        label: 'Lunch',        icon: <ForkIcon /> },
-              { key: 'material_run', label: 'Material Run', icon: <TruckIcon /> },
-              { key: 'waiting',      label: 'Waiting',      icon: <ClockWaitIcon /> },
-            ].map(({ key, label, icon }) => (
+              { key: 'working',      icon: <WrenchIcon /> },
+              { key: 'lunch',        icon: <ForkIcon /> },
+              { key: 'material_run', icon: <TruckIcon /> },
+              { key: 'waiting',      icon: <ClockWaitIcon /> },
+            ].map(({ key, icon }) => (
               <button
                 key={key}
                 onClick={() => handleStatus(key)}
@@ -244,15 +255,19 @@ export default function ClockToggle() {
                     : 'text-gray-600 border-gray-200 hover:border-gray-300 bg-white'
                   }`}
               >
-                {icon} {label}
+                {icon} {t(`status.${key}`)}
               </button>
             ))}
           </div>
         </div>
       )}
 
+      {error && (
+        <p className="text-sm text-red-600 font-semibold text-center max-w-xs">{error}</p>
+      )}
+
       {!isOnline && (
-        <p className="text-sm text-amber-600 font-medium">You must be online to clock in or out.</p>
+        <p className="text-sm text-amber-600 font-medium">{t('home.mustBeOnline')}</p>
       )}
     </div>
   )

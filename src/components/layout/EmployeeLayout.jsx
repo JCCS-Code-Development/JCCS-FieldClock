@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import OfflineBanner from '../OfflineBanner'
+import PendingDocsBanner from '../PendingDocsBanner'
 import LangSwitcher from '../ui/LangSwitcher'
 import { useTimeclockStore } from '../../store/timeclockStore'
 import { useAuthStore } from '../../store/authStore'
@@ -33,6 +34,11 @@ const PayIcon = ({ className = 'w-5 h-5' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <rect x="2" y="5" width="20" height="14" rx="2"/>
     <path strokeLinecap="round" d="M2 10h20M6 15h4M14 15h4"/>
+  </svg>
+)
+const DocsIcon = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
   </svg>
 )
 const LogoutIcon = () => (
@@ -91,9 +97,10 @@ function SidebarInner({ user, statusLabel, dotColor, onLogout, onNavClick, t }) 
 
       {/* Nav */}
       <nav className="flex-1 py-3 overflow-y-auto">
-        <NavItem to="/"       icon={ClockIcon} label={t('nav.clock')}  end onClick={onNavClick} />
-        <NavItem to="/jobs"   icon={JobsIcon}  label={t('nav.jobs')}       onClick={onNavClick} />
-        <NavItem to="/my-pay" icon={PayIcon}   label={t('nav.myPay')}      onClick={onNavClick} />
+        <NavItem to="/"         icon={ClockIcon} label={t('nav.clock')}      end onClick={onNavClick} />
+        <NavItem to="/jobs"     icon={JobsIcon}  label={t('nav.jobs')}          onClick={onNavClick} />
+        <NavItem to="/my-pay"   icon={PayIcon}   label={t('nav.myPay')}         onClick={onNavClick} />
+        <NavItem to="/my-docs"  icon={DocsIcon}  label={t('nav.myDocuments')}   onClick={onNavClick} />
       </nav>
 
       {/* Lang + Logout */}
@@ -154,9 +161,10 @@ export default function EmployeeLayout() {
               <p className="text-brand-400/70 text-xs">{t('role.employee')}</p>
             </div>
             <nav className="flex-1 py-3 overflow-y-auto">
-              <NavItem to="/"       icon={ClockIcon} label={t('nav.clock')}  end onClick={close} />
-              <NavItem to="/jobs"   icon={JobsIcon}  label={t('nav.jobs')}       onClick={close} />
-              <NavItem to="/my-pay" icon={PayIcon}   label={t('nav.myPay')}      onClick={close} />
+              <NavItem to="/"         icon={ClockIcon} label={t('nav.clock')}    end onClick={close} />
+              <NavItem to="/jobs"     icon={JobsIcon}  label={t('nav.jobs')}         onClick={close} />
+              <NavItem to="/my-pay"   icon={PayIcon}   label={t('nav.myPay')}        onClick={close} />
+              <NavItem to="/my-docs"  icon={DocsIcon}  label={t('nav.myDocuments')}  onClick={close} />
             </nav>
             <div className="border-t border-brand-700/60">
               <div className="px-5 py-3">
@@ -183,6 +191,7 @@ export default function EmployeeLayout() {
           <div className="w-8" />
         </header>
 
+        <PendingDocsBanner />
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-6 flex flex-col">
           <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col p-4 lg:p-6">
             <Outlet />
@@ -226,6 +235,15 @@ export default function EmployeeLayout() {
           >
             <PayIcon className="w-6 h-6" />
             <span>{t('nav.myPay')}</span>
+          </NavLink>
+
+          <NavLink to="/my-docs"
+            className={({ isActive }) =>
+              `flex-1 flex flex-col items-center justify-center py-3 gap-0.5 text-xs font-medium transition-colors ${isActive ? 'text-brand-500' : 'text-gray-400'}`
+            }
+          >
+            <DocsIcon className="w-6 h-6" />
+            <span>{t('nav.myDocuments')}</span>
           </NavLink>
         </nav>
       </div>

@@ -24,9 +24,9 @@ if ($jobId) {
     if (!$j->fetch()) $jobId = null;
 }
 
-// Check no open entry already
-$open = $pdo->prepare('SELECT id FROM time_entries WHERE user_id = ? AND end_time IS NULL');
-$open->execute([$auth['user_id']]);
+// Block only if there is an active (non-day_end) open entry today
+$open = $pdo->prepare('SELECT id FROM time_entries WHERE user_id = ? AND end_time IS NULL AND cost_category != ? AND DATE(start_time) = CURDATE()');
+$open->execute([$auth['user_id'], 'day_end']);
 if ($open->fetch()) {
     http_response_code(409);
     exit(json_encode(['error' => 'Day already started']));

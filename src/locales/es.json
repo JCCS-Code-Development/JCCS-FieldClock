@@ -10,7 +10,10 @@
     "reports": "Reportes",
     "loans": "Préstamos",
     "signOut": "Cerrar Sesión",
-    "fieldclock": "FieldClock"
+    "fieldclock": "FieldClock",
+    "documents": "Documentos",
+    "myDocuments": "Mis Docs",
+    "hrDocs": "RRHH"
   },
   "role": {
     "admin": "Administrador",
@@ -44,7 +47,13 @@
     "noLocation": "Selecciona una ubicación o escribe el nombre del sitio.",
     "clockInError": "No se pudo registrar. Intenta de nuevo.",
     "now": "ahora",
-    "unknown": "Ubicación desconocida"
+    "unknown": "Ubicación desconocida",
+    "findingLocation": "Buscando ubicación…",
+    "noSpecificLocation": "— Sin ubicación específica —",
+    "currentLocation": "Ubicación Actual",
+    "mustBeOnline": "Debes estar en línea para marcar entrada o salida.",
+    "clockOutFailed": "Error al registrar salida. Sigues marcado como activo.",
+    "clockInFailed": "Error al registrar entrada. Intenta de nuevo."
   },
   "status": {
     "working": "Trabajando",
@@ -74,7 +83,7 @@
     "gasAllowance": "Subsidio de Gasolina",
     "estimatedTotal": "Total Estimado",
     "w2Notice": "Empleado W-2 — nómina procesada por ADP",
-    "1099Notice": "Contratista 1099 — cheque semanal emitido tras revisión",
+    "1099Notice": "Empleado 1099 — cheque semanal emitido tras revisión de nómina",
     "inProgress": "En progreso",
     "requestCorrection": "Solicitar Corrección",
     "pendingReview": "En revisión",
@@ -102,7 +111,17 @@
       "timeRequired": "Ingresa al menos una nueva hora de inicio o fin.",
       "submit": "Enviar Solicitud",
       "submitError": "No se pudo enviar. Intenta de nuevo."
-    }
+    },
+    "todayHours": "Horas de Hoy",
+    "weekHours": "Esta Semana",
+    "rate": "Tarifa",
+    "salariedPerWeek": "por semana (salario)",
+    "estimatedGross": "Bruto Est.",
+    "breakdownDetail": "Desglose de Pago",
+    "regularHours": "Regular",
+    "overtimeHours": "Tiempo Extra",
+    "loanDeduction": "Descuento de Préstamo",
+    "weeklyRate": "Salario Semanal"
   },
   "timeoff": {
     "title": "Tiempo Libre",
@@ -171,5 +190,35 @@
     "start": "Inicio",
     "end": "Fin",
     "admin": "Administrador"
+  },
+  "pendingDocs": {
+    "banner_one": "{{count}} documento requerido necesita tu firma",
+    "banner_other": "{{count}} documentos requeridos necesitan tu firma",
+    "signNow": "Firmar ahora"
+  },
+  "signature": {
+    "placeholder": "Firma aquí — usa el mouse o el dedo",
+    "clear": "Borrar"
+  },
+  "docs": {
+    "title": "Mis Documentos",
+    "subtitle": "Acuerdos y formularios requeridos para tu expediente laboral.",
+    "allDone": "¡Todos los documentos completados!",
+    "pending_one": "{{count}} documento aún necesita tu firma",
+    "pending_other": "{{count}} documentos aún necesitan tu firma",
+    "progress": "{{signed}} de {{total}} firmados",
+    "signed": "Firmado",
+    "pending": "Pendiente",
+    "signedOn": "Firmado el {{date}}",
+    "printPdf": "Imprimir / PDF",
+    "close": "Cerrar",
+    "signatureOnFile": "Firma Registrada",
+    "drawSignature": "Dibuja Tu Firma",
+    "signedAt": "Firmado el {{date}} a las {{time}}",
+    "ipAddress": "IP: {{ip}}",
+    "submitBtn": "Firmar y Enviar — {{title}}",
+    "immutable": "Una vez enviado, este documento no puede modificarse.",
+    "agreeCheck": "He leído y entiendo completamente este documento. Acepto sus términos y condiciones.",
+    "pendingLabel": "Pendiente"
   }
 }

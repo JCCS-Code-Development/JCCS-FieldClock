@@ -11,26 +11,38 @@ $pdo  = getPDO();
 // ── GET: list loans ──────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
-    // Optional: period_start + period_end → return per-user deduction summary for that period
-    if (!empty($_GET['period_start']) && !empty($_GET['period_end']) && $auth['role'] === 'admin') {
+    // Optional: period_start + period_end → return deduction totals for that period
+    if (!empty($_GET['period_start']) && !empty($_GET['period_end'])) {
         $ps = sanitizeString($_GET['period_start']);
         $pe = sanitizeString($_GET['period_end']);
-        $stmt = $pdo->prepare(
-            'SELECT lp.loan_id, l.user_id, COALESCE(SUM(lp.amount), 0) AS period_deduction
-             FROM loan_payments lp
-             JOIN employee_loans l ON l.id = lp.loan_id
-             WHERE lp.period_start >= ? AND lp.period_end <= ?
-             GROUP BY l.user_id'
-        );
-        $stmt->execute([$ps, $pe]);
-        $rows = $stmt->fetchAll();
-        // Aggregate by user_id
-        $byUser = [];
-        foreach ($rows as $r) {
-            $uid = (int)$r['user_id'];
-            $byUser[$uid] = ($byUser[$uid] ?? 0) + (float)$r['period_deduction'];
+
+        if ($auth['role'] === 'admin') {
+            // Admin: all users grouped by user_id
+            $stmt = $pdo->prepare(
+                'SELECT l.user_id, COALESCE(SUM(lp.amount), 0) AS period_deduction
+                 FROM loan_payments lp
+                 JOIN employee_loans l ON l.id = lp.loan_id
+                 WHERE lp.period_start >= ? AND lp.period_end <= ?
+                 GROUP BY l.user_id'
+            );
+            $stmt->execute([$ps, $pe]);
+            $byUser = [];
+            foreach ($stmt->fetchAll() as $r) {
+                $byUser[(int)$r['user_id']] = (float)$r['period_deduction'];
+            }
+            echo json_encode(['period_loan_deductions' => $byUser]);
+        } else {
+            // Employee: own deduction only
+            $stmt = $pdo->prepare(
+                'SELECT COALESCE(SUM(lp.amount), 0) AS period_deduction
+                 FROM loan_payments lp
+                 JOIN employee_loans l ON l.id = lp.loan_id
+                 WHERE lp.period_start >= ? AND lp.period_end <= ? AND l.user_id = ?'
+            );
+            $stmt->execute([$ps, $pe, $auth['user_id']]);
+            $row = $stmt->fetch();
+            echo json_encode(['period_loan_deduction' => (float)($row['period_deduction'] ?? 0)]);
         }
-        echo json_encode(['period_loan_deductions' => $byUser]);
         exit;
     }
 

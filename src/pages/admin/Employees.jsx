@@ -206,7 +206,7 @@ export default function AdminEmployees() {
                   value={form.pay_type} onChange={set('pay_type')}
                 >
                   <option value="w2">W-2 Employee</option>
-                  <option value="1099">1099 Contractor</option>
+                  <option value="1099">1099 Employee</option>
                 </select>
               </div>
 

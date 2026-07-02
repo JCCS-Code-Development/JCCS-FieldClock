@@ -20,3 +20,6 @@ export const updateAdjustment = (id, data) =>
 
 export const deleteAdjustment = (id) =>
   client.delete('/payroll/adjustments/item.php', { params: { id } }).then((r) => r.data)
+
+export const getAnnualSummary = (year) =>
+  client.get('/payroll/annual-summary.php', { params: { year } }).then((r) => r.data)

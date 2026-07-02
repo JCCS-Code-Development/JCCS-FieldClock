@@ -10,7 +10,10 @@
     "reports": "Reports",
     "loans": "Loans",
     "signOut": "Sign Out",
-    "fieldclock": "FieldClock"
+    "fieldclock": "FieldClock",
+    "documents": "Documents",
+    "myDocuments": "My Docs",
+    "hrDocs": "HR Docs"
   },
   "role": {
     "admin": "Admin",
@@ -44,7 +47,13 @@
     "noLocation": "Select a location or type the job site name below.",
     "clockInError": "Could not clock in. Try again.",
     "now": "now",
-    "unknown": "Unknown location"
+    "unknown": "Unknown location",
+    "findingLocation": "Finding location…",
+    "noSpecificLocation": "— No specific location —",
+    "currentLocation": "Current Location",
+    "mustBeOnline": "You must be online to clock in or out.",
+    "clockOutFailed": "Clock-out failed. You are still clocked in.",
+    "clockInFailed": "Clock-in failed. Try again."
   },
   "status": {
     "working": "Working",
@@ -74,7 +83,7 @@
     "gasAllowance": "Gas Allowance",
     "estimatedTotal": "Estimated Total",
     "w2Notice": "W-2 Employee — payroll processed through ADP",
-    "1099Notice": "1099 Contractor — weekly check issued after review",
+    "1099Notice": "1099 Employee — weekly check issued after payroll review",
     "inProgress": "In progress",
     "requestCorrection": "Request Correction",
     "pendingReview": "Pending review",
@@ -102,7 +111,17 @@
       "timeRequired": "Enter at least a new start or end time.",
       "submit": "Submit Request",
       "submitError": "Could not submit. Try again."
-    }
+    },
+    "todayHours": "Today's Hours",
+    "weekHours": "This Week",
+    "rate": "Pay Rate",
+    "salariedPerWeek": "per week (salary)",
+    "estimatedGross": "Est. Gross",
+    "breakdownDetail": "Pay Breakdown",
+    "regularHours": "Regular",
+    "overtimeHours": "Overtime",
+    "loanDeduction": "Loan Deduction",
+    "weeklyRate": "Weekly Salary"
   },
   "timeoff": {
     "title": "Time Off",
@@ -171,5 +190,35 @@
     "start": "Start",
     "end": "End",
     "admin": "Admin"
+  },
+  "pendingDocs": {
+    "banner_one": "{{count}} required document needs your signature",
+    "banner_other": "{{count}} required documents need your signature",
+    "signNow": "Sign now"
+  },
+  "signature": {
+    "placeholder": "Sign here — use mouse or finger",
+    "clear": "Clear"
+  },
+  "docs": {
+    "title": "My Documents",
+    "subtitle": "Required agreements and forms for your employment record.",
+    "allDone": "All documents complete!",
+    "pending_one": "{{count}} document still needs your signature",
+    "pending_other": "{{count}} documents still need your signature",
+    "progress": "{{signed}} of {{total}} signed",
+    "signed": "Signed",
+    "pending": "Pending",
+    "signedOn": "Signed {{date}}",
+    "printPdf": "Print / PDF",
+    "close": "Close",
+    "signatureOnFile": "Signature on File",
+    "drawSignature": "Draw Your Signature",
+    "signedAt": "Signed {{date}} at {{time}}",
+    "ipAddress": "IP: {{ip}}",
+    "submitBtn": "Sign & Submit — {{title}}",
+    "immutable": "Once submitted, this document cannot be modified.",
+    "agreeCheck": "I have read and fully understand this document. I agree to its terms and conditions.",
+    "pendingLabel": "Pending"
   }
 }

@@ -12,7 +12,7 @@ $end   = $_GET['end']   ?? date('Y-m-d');
 $pdo   = getPDO();
 $uid   = $auth['user_id'];
 
-$user = $pdo->prepare('SELECT id, name, pay_type, pay_rate, overtime_rate, gas_weekly_allowance FROM users WHERE id = ?');
+$user = $pdo->prepare('SELECT id, name, pay_type, pay_rate, overtime_rate, pay_structure, gas_weekly_allowance FROM users WHERE id = ?');
 $user->execute([$uid]);
 $u = $user->fetch();
 
@@ -29,13 +29,15 @@ $entries = $pdo->prepare(
 $entries->execute([':uid' => $uid, ':start' => $start, ':end' => $end]);
 $rows = $entries->fetchAll();
 
-$weeks = []; $categoryHours = []; $pendingMinutes = 0; $approvedMinutes = 0;
+$weeks = []; $categoryHours = []; $pendingMinutes = 0; $approvedMinutes = 0; $todayMinutes = 0;
+$today = date('Y-m-d');
 foreach ($rows as $r) {
     $weeks[$r['iso_week']] = true;
     $cat = $r['cost_category'];
     $categoryHours[$cat] = ($categoryHours[$cat] ?? 0) + $r['minutes'] / 60;
     if ($r['approval_status'] === 'approved') $approvedMinutes += $r['minutes'];
     else $pendingMinutes += $r['minutes'];
+    if (date('Y-m-d', strtotime($r['start_time'])) === $today) $todayMinutes += $r['minutes'];
 }
 $weeksWorked = count($weeks);
 $totalApproved = $approvedMinutes / 60;
@@ -84,4 +86,6 @@ echo json_encode([
     'estimated_total'   => round($baseGross + $gasTotal + $adjTotal, 2),
     'category_hours'    => array_map(fn($h) => round($h, 2), $categoryHours),
     'weeks_worked'      => $weeksWorked,
+    'today_hours'       => round($todayMinutes / 60, 2),
+    'pay_structure'     => $u['pay_structure'] ?? 'hourly',
 ]);

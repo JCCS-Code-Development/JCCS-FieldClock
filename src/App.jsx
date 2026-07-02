@@ -14,6 +14,7 @@ import Home from './pages/employee/Home'
 import ClockAction from './pages/employee/ClockAction'
 import JobList from './pages/employee/JobList'
 import MyPay from './pages/employee/MyPay'
+import MyDocuments from './pages/employee/MyDocuments'
 
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminJobs from './pages/admin/Jobs'
@@ -21,6 +22,8 @@ import AdminEmployees from './pages/admin/Employees'
 import AdminTimesheets from './pages/admin/Timesheets'
 import AdminPayroll from './pages/admin/Payroll'
 import AdminLoans from './pages/admin/Loans'
+import AdminDocuments from './pages/admin/AdminDocuments'
+import AdminHR from './pages/admin/HRDocuments'
 import AdminReports from './pages/admin/Reports'
 
 import InvoicePortal from './pages/contractor/InvoicePortal'
@@ -49,6 +52,7 @@ export default function App() {
             <Route path="/clock" element={<ClockAction />} />
             <Route path="/jobs" element={<JobList />} />
             <Route path="/my-pay" element={<MyPay />} />
+            <Route path="/my-docs" element={<MyDocuments />} />
           </Route>
         </Route>
 
@@ -68,8 +72,10 @@ export default function App() {
             <Route path="/admin/employees" element={<AdminEmployees />} />
             <Route path="/admin/timesheets" element={<AdminTimesheets />} />
             <Route path="/admin/payroll" element={<AdminPayroll />} />
-            <Route path="/admin/loans"   element={<AdminLoans />}   />
-            <Route path="/admin/reports" element={<AdminReports />} />
+            <Route path="/admin/loans"      element={<AdminLoans />}      />
+            <Route path="/admin/documents"  element={<AdminDocuments />}  />
+            <Route path="/admin/hr"         element={<AdminHR />}         />
+            <Route path="/admin/reports"    element={<AdminReports />}    />
           </Route>
         </Route>
       </Route>

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import Card from '../../components/ui/Card'
+import StatsCard from '../../components/admin/StatsCard'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import { getMyPay } from '../../api/payroll'
 import { getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
-import { listLoans } from '../../api/loans'
+import { listLoans, getMyPeriodLoanDeduction } from '../../api/loans'
+import PayPieChart from '../../components/ui/PayPieChart'
 import { getTimeOffRequests, createTimeOffRequest, reviewTimeOffRequest } from '../../api/timeoff'
 import { formatCurrency, formatHours, formatDate, formatTime } from '../../utils/format'
 import { format, startOfWeek, endOfWeek, subWeeks, differenceInCalendarDays, parseISO } from 'date-fns'
@@ -42,6 +44,7 @@ export default function MyPay() {
 
   const [myLoans, setMyLoans]           = useState([])
   const [loadingLoans, setLoadingLoans] = useState(false)
+  const [periodLoanDed, setPeriodLoanDed] = useState(0)
 
   const [timeOffRequests, setTimeOffRequests] = useState([])
   const [toModal, setToModal]       = useState(false)
@@ -69,11 +72,13 @@ export default function MyPay() {
       getEntries({ start: p.start, end: p.end }).catch(() => ({ entries: [] })),
       getChangeRequests().catch(() => ({ requests: [] })),
       getTimeOffRequests().catch(() => ({ requests: [] })),
-    ]).then(([pay, ent, reqs, toReqs]) => {
+      getMyPeriodLoanDeduction(p.start, p.end).catch(() => 0),
+    ]).then(([pay, ent, reqs, toReqs, loanDed]) => {
       setData(pay)
       setEntries(ent?.entries ?? [])
       setMyRequests(reqs?.requests ?? [])
       setTimeOffRequests(toReqs?.requests ?? [])
+      setPeriodLoanDed(loanDed ?? 0)
     }).finally(() => setLoading(false))
   }, [selectedPeriod])
 
@@ -164,29 +169,91 @@ export default function MyPay() {
           {tab === 'pay' && (
             !data
               ? <p className="text-center text-gray-400 py-12 text-sm">{t('pay.noData')}</p>
-              : <>
-                  <Card title={t('pay.hoursSummary')}>
-                    <div className="flex flex-col gap-3">
-                      <Row label={t('pay.approvedHours')} value={formatHours(data.approved_hours ?? 0)} />
-                    </div>
-                  </Card>
-                  <Card title={t('pay.breakdown')}>
-                    <div className="flex flex-col gap-3">
-                      <Row label={t('pay.basePay')} value={formatCurrency(data.base_pay ?? 0)} />
-                      {(data.gas_allowance ?? 0) > 0 && <Row label={t('pay.gasAllowance')} value={formatCurrency(data.gas_allowance)} />}
-                      {data.adjustments?.map((adj, i) => (
-                        <Row key={i}
-                          label={adj.type.replace('_',' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-                          value={formatCurrency(adj.amount)} note={adj.description} />
-                      ))}
-                      <div className="border-t border-gray-100 pt-3 mt-1">
-                        <Row label={t('pay.estimatedTotal')} value={formatCurrency(data.estimated_total ?? 0)} bold />
+              : (() => {
+                  const gasAdj   = data.adjustments?.filter((a) => a.type === 'gas_allowance').reduce((s, a) => s + parseFloat(a.amount), 0) ?? 0
+                  const bonusAdj = data.adjustments?.filter((a) => a.type !== 'gas_allowance').reduce((s, a) => s + parseFloat(a.amount), 0) ?? 0
+                  const gas      = (data.gas_total ?? 0) + gasAdj
+                  const isSalary = data.pay_structure === 'salary'
+                  const isW2     = data.pay_type === 'w2'
+                  const rate     = data.user?.pay_rate ?? 0
+                  const otRate   = data.user?.overtime_rate ?? 0
+                  return (
+                    <>
+                      {/* ── Stat cards ── */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <StatsCard
+                          label={t('pay.todayHours')}
+                          value={formatHours(data.today_hours ?? 0)}
+                          icon={ClockIcon}
+                          color="blue"
+                        />
+                        <StatsCard
+                          label={selectedPeriod === 0 ? t('pay.weekHours') : t('pay.approvedHours')}
+                          value={formatHours(data.approved_hours ?? 0)}
+                          icon={CalendarIcon}
+                          color="indigo"
+                        />
+                        <StatsCard
+                          label={t('pay.rate')}
+                          value={isSalary ? formatCurrency(rate) : `${formatCurrency(rate)}/hr`}
+                          icon={RateIcon}
+                          color="purple"
+                        />
+                        <StatsCard
+                          label={t('pay.estimatedGross')}
+                          value={formatCurrency(data.estimated_total ?? 0)}
+                          icon={GrossIcon}
+                          color="green"
+                        />
                       </div>
-                    </div>
-                  </Card>
-                  {data.pay_type === 'w2' && <div className="bg-green-50 rounded-xl px-4 py-3 text-sm text-green-700">{t('pay.w2Notice')}</div>}
-                  {data.pay_type === '1099' && <div className="bg-blue-50 rounded-xl px-4 py-3 text-sm text-blue-700">{t('pay.1099Notice')}</div>}
-                </>
+
+                      {/* ── Pie chart ── */}
+                      {(data.estimated_total ?? 0) > 0 && (
+                        <Card title={t('pay.breakdown')}>
+                          <PayPieChart
+                            base={data.base_gross ?? 0}
+                            gas={gas}
+                            bonus={bonusAdj}
+                            loan={periodLoanDed}
+                            compact
+                          />
+                        </Card>
+                      )}
+
+                      {/* ── Breakdown detail ── */}
+                      <Card title={t('pay.breakdownDetail')}>
+                        <div className="flex flex-col gap-3">
+                          {isSalary
+                            ? <Row label={t('pay.weeklyRate')} value={formatCurrency(rate)} />
+                            : <>
+                                <Row label={`${t('pay.regularHours')} (${formatHours(data.regular_hours ?? 0)})`} value={formatCurrency((data.regular_hours ?? 0) * rate)} />
+                                {(data.overtime_hours ?? 0) > 0 && (
+                                  <Row label={`${t('pay.overtimeHours')} (${formatHours(data.overtime_hours ?? 0)})`} value={formatCurrency((data.overtime_hours ?? 0) * (otRate || rate * 1.5))} accent />
+                                )}
+                              </>
+                          }
+                          {gas > 0 && <Row label={t('pay.gasAllowance')} value={formatCurrency(gas)} />}
+                          {data.adjustments?.filter((a) => a.type !== 'gas_allowance').map((adj, i) => (
+                            <Row key={i}
+                              label={adj.type.replace(/_/g,' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                              value={formatCurrency(adj.amount)}
+                              note={adj.description}
+                            />
+                          ))}
+                          {periodLoanDed > 0 && (
+                            <Row label={t('pay.loanDeduction')} value={`−${formatCurrency(periodLoanDed)}`} accent />
+                          )}
+                          <div className="border-t border-gray-100 pt-3 mt-1">
+                            <Row label={t('pay.estimatedTotal')} value={formatCurrency(data.estimated_total ?? 0)} bold />
+                          </div>
+                        </div>
+                      </Card>
+
+                      {isW2  && <div className="bg-green-50 rounded-xl px-4 py-3 text-sm text-green-700">{t('pay.w2Notice')}</div>}
+                      {!isW2 && <div className="bg-blue-50  rounded-xl px-4 py-3 text-sm text-blue-700" >{t('pay.1099Notice')}</div>}
+                    </>
+                  )
+                })()
           )}
 
           {tab === 'log' && (
@@ -398,6 +465,11 @@ export default function MyPay() {
     </div>
   )
 }
+
+const ClockIcon  = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 7v5l3.5 3.5"/></svg>
+const CalendarIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="4" width="18" height="18" rx="2"/><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18"/></svg>
+const RateIcon   = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-2.21 0-4 .9-4 2s1.79 2 4 2 4 .9 4 2-1.79 2-4 2m0-8v1m0 9v1"/><circle cx="12" cy="12" r="9"/></svg>
+const GrossIcon  = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="2" y="5" width="20" height="14" rx="2"/><path strokeLinecap="round" d="M2 10h20M6 15h4M14 15h4"/></svg>
 
 function Row({ label, value, accent, bold, note }) {
   return (

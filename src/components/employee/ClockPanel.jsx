@@ -3,11 +3,12 @@ import { MapContainer, TileLayer, Marker } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { format } from 'date-fns'
+import { es, enUS } from 'date-fns/locale'
 import { useTranslation } from 'react-i18next'
 import { useTimeclockStore } from '../../store/timeclockStore'
 import { useGPS } from '../../hooks/useGPS'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
-import { dayStart, dayEnd, setWorking, setLunch, setMaterialRun, setWaiting, getEntries } from '../../api/timeclock'
+import { getStatus, dayStart, dayEnd, setWorking, setLunch, setMaterialRun, setWaiting, getEntries } from '../../api/timeclock'
 import { getNearbyJobs, listJobs } from '../../api/jobs'
 import Spinner from '../ui/Spinner'
 
@@ -130,8 +131,13 @@ function useLiveElapsed(isClockedIn, currentEntry) {
 }
 
 export default function ClockPanel() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { statusLabel, currentEntry, activeJob, dayStarted, setTimeclockData } = useTimeclockStore()
+
+  // Always sync with server on mount so the UI reflects actual DB state
+  useEffect(() => {
+    getStatus().then((data) => setTimeclockData(data)).catch(() => {})
+  }, [])
   const isOnline = useOnlineStatus()
   const { position, loading: gpsLoading, getPosition } = useGPS()
 
@@ -217,9 +223,10 @@ export default function ClockPanel() {
     } finally { setLoading(false) }
   }
 
+  const dateFnsLocale = i18n.language.startsWith('es') ? es : enUS
   const now      = new Date()
-  const dayName  = format(now, 'EEEE')
-  const monthDay = format(now, 'MMMM d')
+  const dayName  = format(now, 'EEEE',   { locale: dateFnsLocale })
+  const monthDay = format(now, 'MMMM d', { locale: dateFnsLocale })
   const mapPos   = position ? [position.lat, position.lng] : null
   const config   = STATUS_CONFIG[statusLabel] ?? null
 
