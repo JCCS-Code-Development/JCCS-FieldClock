@@ -8,6 +8,7 @@
     "timesheets": "Hojas de Tiempo",
     "payroll": "Nómina",
     "reports": "Reportes",
+    "loans": "Préstamos",
     "signOut": "Cerrar Sesión",
     "fieldclock": "FieldClock"
   },
@@ -68,8 +69,6 @@
     "noRequests": "Sin solicitudes de corrección.",
     "hoursSummary": "Resumen de Horas",
     "approvedHours": "Horas Aprobadas",
-    "regularHours": "Horas Regulares",
-    "overtimeHours": "Horas Extra",
     "breakdown": "Desglose de Pago",
     "basePay": "Pago Base",
     "gasAllowance": "Subsidio de Gasolina",
@@ -105,6 +104,32 @@
       "submitError": "No se pudo enviar. Intenta de nuevo."
     }
   },
+  "timeoff": {
+    "title": "Tiempo Libre",
+    "request": "Solicitar Tiempo Libre",
+    "noRequests": "Sin solicitudes de tiempo libre.",
+    "startDate": "Fecha de Inicio",
+    "endDate": "Fecha de Fin",
+    "reason": "Motivo (opcional)",
+    "reasonPlaceholder": "Describe brevemente el motivo de tu solicitud…",
+    "submit": "Enviar Solicitud",
+    "submitError": "No se pudo enviar. Intenta de nuevo.",
+    "cancel": "Cancelar Solicitud",
+    "adminNote": "Nota del administrador",
+    "days_one": "{{count}} día",
+    "days_other": "{{count}} días",
+    "types": {
+      "vacation": "Vacaciones",
+      "sick": "Día de Enfermedad",
+      "personal": "Personal",
+      "unpaid": "Sin Pago"
+    },
+    "status": {
+      "pending": "Pendiente",
+      "approved": "Aprobado",
+      "rejected": "Rechazado"
+    }
+  },
   "auth": {
     "title": "JCCS FieldClock",
     "subtitle": "Inicia sesión en tu cuenta",
@@ -128,6 +153,15 @@
       "mismatch": "Las contraseñas no coinciden.",
       "failed": "No se pudo establecer la contraseña. Intenta de nuevo."
     }
+  },
+  "dashboard": {
+    "overview": "Resumen de hoy",
+    "yourClock": "Tu Reloj",
+    "clockedIn": "Registrados",
+    "changeRequests": "Solicitudes de Cambio",
+    "activeJobs": "Trabajos Activos",
+    "pendingPayroll": "Nómina Pendiente",
+    "currentlyClockedIn": "Actualmente Registrados"
   },
   "common": {
     "cancel": "Cancelar",

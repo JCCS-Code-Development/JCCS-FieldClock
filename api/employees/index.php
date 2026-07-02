@@ -12,25 +12,38 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'GET') {
     requireAdmin($auth);
     $active = isset($_GET['active']) ? (int)$_GET['active'] : 1;
-    $stmt   = $pdo->prepare('SELECT id, name, email, phone, role, pay_type, pay_rate, overtime_rate, gas_weekly_allowance, is_active FROM users WHERE is_active = ? ORDER BY name');
+    $stmt   = $pdo->prepare('SELECT id, name, email, phone, role, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance, is_active FROM users WHERE is_active = ? ORDER BY name');
     $stmt->execute([$active]);
     echo json_encode(['employees' => $stmt->fetchAll()]);
 
 } elseif ($method === 'POST') {
     requireAdmin($auth);
     $body = jsonBody();
-    requireFields($body, ['name', 'email', 'role', 'pay_type', 'pay_rate']);
+    requireFields($body, ['name', 'email', 'role']);
+
+    $role         = sanitizeString($body['role']);
+    $payType      = $role === 'contractor' ? '1099' : sanitizeString($body['pay_type'] ?? 'w2');
+    $payRate      = $role === 'contractor' ? 0       : (float)($body['pay_rate'] ?? 0);
+    $payStructure = $role === 'contractor' ? 'hourly' : sanitizeString($body['pay_structure'] ?? 'hourly');
+
+    if (!in_array($payStructure, ['hourly', 'salary'])) $payStructure = 'hourly';
+
+    if ($role !== 'contractor' && empty($body['pay_type'])) {
+        http_response_code(422);
+        exit(json_encode(['error' => 'pay_type is required']));
+    }
 
     $stmt = $pdo->prepare(
-        'INSERT INTO users (name, email, phone, role, pay_type, pay_rate, overtime_rate, gas_weekly_allowance, is_active) VALUES (?,?,?,?,?,?,?,?,1)'
+        'INSERT INTO users (name, email, phone, role, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance, is_active) VALUES (?,?,?,?,?,?,?,?,?,1)'
     );
     $stmt->execute([
         sanitizeString($body['name']),
         sanitizeString($body['email']),
         isset($body['phone']) ? sanitizeString($body['phone']) : null,
-        sanitizeString($body['role']),
-        sanitizeString($body['pay_type']),
-        (float)$body['pay_rate'],
+        $role,
+        $payType,
+        $payRate,
+        $payStructure,
         isset($body['overtime_rate']) ? (float)$body['overtime_rate'] : null,
         isset($body['gas_weekly_allowance']) ? (float)$body['gas_weekly_allowance'] : null,
     ]);

@@ -14,6 +14,7 @@ CREATE TABLE `users` (
   `role`                 ENUM('employee','admin') NOT NULL DEFAULT 'employee',
   `pay_type`             ENUM('w2','1099') NOT NULL DEFAULT 'w2',
   `pay_rate`             DECIMAL(8,2)  NOT NULL DEFAULT 0.00,
+  `pay_structure`        ENUM('hourly','salary') NOT NULL DEFAULT 'hourly',
   `overtime_rate`        DECIMAL(8,2)  NOT NULL DEFAULT 0.00,
   `gas_weekly_allowance` DECIMAL(6,2)  NULL DEFAULT NULL,
   `password_hash`        VARCHAR(255)  NULL DEFAULT NULL,
@@ -204,6 +205,35 @@ CREATE TABLE `time_change_requests` (
   KEY `requested_by` (`requested_by`),
   CONSTRAINT `fk_tcr_entry` FOREIGN KEY (`entry_id`)     REFERENCES `time_entries` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_tcr_user`  FOREIGN KEY (`requested_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `employee_loans` (
+  `id`          INT UNSIGNED   NOT NULL AUTO_INCREMENT,
+  `user_id`     INT UNSIGNED   NOT NULL,
+  `amount`      DECIMAL(10,2)  NOT NULL,
+  `description` VARCHAR(255)   NULL DEFAULT NULL,
+  `status`      ENUM('active','paid_off') NOT NULL DEFAULT 'active',
+  `created_by`  INT UNSIGNED   NOT NULL,
+  `created_at`  TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `fk_loan_user`    FOREIGN KEY (`user_id`)    REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_loan_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `loan_payments` (
+  `id`           INT UNSIGNED   NOT NULL AUTO_INCREMENT,
+  `loan_id`      INT UNSIGNED   NOT NULL,
+  `amount`       DECIMAL(10,2)  NOT NULL,
+  `period_start` DATE           NULL DEFAULT NULL,
+  `period_end`   DATE           NULL DEFAULT NULL,
+  `notes`        VARCHAR(255)   NULL DEFAULT NULL,
+  `created_by`   INT UNSIGNED   NOT NULL,
+  `created_at`   TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `loan_id` (`loan_id`),
+  CONSTRAINT `fk_lp_loan`    FOREIGN KEY (`loan_id`)    REFERENCES `employee_loans` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_lp_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 1;

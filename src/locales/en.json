@@ -8,6 +8,7 @@
     "timesheets": "Timesheets",
     "payroll": "Payroll",
     "reports": "Reports",
+    "loans": "Loans",
     "signOut": "Sign Out",
     "fieldclock": "FieldClock"
   },
@@ -68,8 +69,6 @@
     "noRequests": "No correction requests yet.",
     "hoursSummary": "Hours Summary",
     "approvedHours": "Approved Hours",
-    "regularHours": "Regular Hours",
-    "overtimeHours": "Overtime Hours",
     "breakdown": "Pay Breakdown",
     "basePay": "Base Pay",
     "gasAllowance": "Gas Allowance",
@@ -105,6 +104,32 @@
       "submitError": "Could not submit. Try again."
     }
   },
+  "timeoff": {
+    "title": "Time Off",
+    "request": "Request Time Off",
+    "noRequests": "No time off requests yet.",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "reason": "Reason (optional)",
+    "reasonPlaceholder": "Briefly describe the reason for your request…",
+    "submit": "Submit Request",
+    "submitError": "Could not submit. Try again.",
+    "cancel": "Cancel Request",
+    "adminNote": "Admin note",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "types": {
+      "vacation": "Vacation",
+      "sick": "Sick Day",
+      "personal": "Personal",
+      "unpaid": "Unpaid"
+    },
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Denied"
+    }
+  },
   "auth": {
     "title": "JCCS FieldClock",
     "subtitle": "Sign in to your account",
@@ -128,6 +153,15 @@
       "mismatch": "Passwords do not match.",
       "failed": "Could not set password. Try again."
     }
+  },
+  "dashboard": {
+    "overview": "Today's overview",
+    "yourClock": "Your Clock",
+    "clockedIn": "Clocked In",
+    "changeRequests": "Change Requests",
+    "activeJobs": "Active Jobs",
+    "pendingPayroll": "Pending Payroll",
+    "currentlyClockedIn": "Currently Clocked In"
   },
   "common": {
     "cancel": "Cancel",

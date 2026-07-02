@@ -12,7 +12,7 @@ $body   = $method !== 'GET' ? jsonBody() : [];
 $id     = isset($_GET['id']) ? (int)$_GET['id'] : (int)($body['id'] ?? 0);
 
 if ($method === 'GET') {
-    $stmt = $pdo->prepare('SELECT id, name, email, phone, role, pay_type, pay_rate, overtime_rate, gas_weekly_allowance, is_active FROM users WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, name, email, phone, role, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance, is_active FROM users WHERE id = ?');
     $stmt->execute([$id]);
     $emp = $stmt->fetch();
     if (!$emp) { http_response_code(404); exit(json_encode(['error' => 'Not found'])); }
@@ -20,7 +20,7 @@ if ($method === 'GET') {
 
 } elseif ($method === 'PUT') {
     requireAdmin($auth);
-    $allowed = ['name','email','phone','role','pay_type','pay_rate','overtime_rate','gas_weekly_allowance'];
+    $allowed = ['name','email','phone','role','pay_type','pay_rate','pay_structure','overtime_rate','gas_weekly_allowance'];
     $sets = []; $params = [];
     foreach ($allowed as $f) {
         if (array_key_exists($f, $body)) {

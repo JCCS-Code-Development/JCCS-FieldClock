@@ -19,3 +19,10 @@ function requireAdmin(array $payload): void {
         exit(json_encode(['error' => 'Forbidden']));
     }
 }
+
+function requireContractorOrAdmin(array $payload): void {
+    if (!in_array($payload['role'], ['contractor', 'admin'])) {
+        http_response_code(403);
+        exit(json_encode(['error' => 'Forbidden']));
+    }
+}

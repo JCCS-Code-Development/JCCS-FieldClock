@@ -10,11 +10,21 @@ $pdo    = getPDO();
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    $uid  = isset($_GET['user_id']) ? (int)$_GET['user_id'] : null;
-    $sql  = 'SELECT pa.*, u.name as user_name, c.name as created_by_name FROM pay_adjustments pa JOIN users u ON u.id = pa.user_id JOIN users c ON c.id = pa.created_by WHERE 1=1';
+    $uid          = isset($_GET['user_id'])      ? (int)$_GET['user_id']       : null;
+    $periodStart  = !empty($_GET['period_start']) ? $_GET['period_start']       : null;
+    $periodEnd    = !empty($_GET['period_end'])   ? $_GET['period_end']         : null;
+
+    $sql    = 'SELECT pa.*, u.name as user_name, c.name as created_by_name
+               FROM pay_adjustments pa
+               JOIN users u ON u.id = pa.user_id
+               JOIN users c ON c.id = pa.created_by
+               WHERE 1=1';
     $params = [];
-    if ($uid) { $sql .= ' AND pa.user_id = :uid'; $params[':uid'] = $uid; }
+    if ($uid)         { $sql .= ' AND pa.user_id = :uid';        $params[':uid'] = $uid; }
+    if ($periodStart) { $sql .= ' AND pa.period_start >= :ps';   $params[':ps']  = $periodStart; }
+    if ($periodEnd)   { $sql .= ' AND pa.period_end <= :pe';     $params[':pe']  = $periodEnd; }
     $sql .= ' ORDER BY pa.created_at DESC';
+
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     echo json_encode(['adjustments' => $stmt->fetchAll()]);

@@ -38,3 +38,12 @@ export const createChangeRequest = (data) =>
 
 export const reviewChangeRequest = (data) =>
   client.post('/timeclock/review-change.php', data).then((r) => r.data)
+
+export const adminCreateEntry = (data) =>
+  client.post('/timeclock/admin-entry.php', data).then((r) => r.data)
+
+export const adminUpdateEntry = (data) =>
+  client.put('/timeclock/admin-entry.php', data).then((r) => r.data)
+
+export const adminDeleteEntry = (id) =>
+  client.delete('/timeclock/admin-entry.php', { params: { id } }).then((r) => r.data)

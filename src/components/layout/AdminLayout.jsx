@@ -43,6 +43,12 @@ const ReportsIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M18 20V10M12 20V4M6 20v-6"/>
   </svg>
 )
+const LoansIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-2.21 0-4 .9-4 2s1.79 2 4 2 4 .9 4 2-1.79 2-4 2m0-8v1m0 9v1M8 12H4m16 0h-4"/>
+    <circle cx="12" cy="12" r="9"/>
+  </svg>
+)
 const LogoutIcon = () => (
   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
@@ -74,7 +80,7 @@ function NavItem({ to, icon, label, end, onClick }) {
 
 function SidebarLogo({ label }) {
   return (
-    <div className="px-5 py-5 border-b border-brand-700/60">
+    <div className="px-5 py-5 border-b border-brand-700/60 flex flex-col items-center text-center">
       <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-12 w-auto"
         style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
       <p className="text-brand-400 text-xs font-bold mt-2 tracking-widest uppercase">{label}</p>
@@ -94,6 +100,7 @@ export default function AdminLayout() {
     { to: '/admin/employees',  icon: <EmployeesIcon />, label: t('nav.employees')           },
     { to: '/admin/timesheets', icon: <TimesheetIcon />, label: t('nav.timesheets')          },
     { to: '/admin/payroll',    icon: <PayrollIcon />,   label: t('nav.payroll')             },
+    { to: '/admin/loans',      icon: <LoansIcon />,     label: t('nav.loans')               },
     { to: '/admin/reports',    icon: <ReportsIcon />,   label: t('nav.reports')             },
   ]
 
