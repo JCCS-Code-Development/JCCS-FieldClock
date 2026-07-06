@@ -14,3 +14,9 @@ export const updateEmployee = (id, data) =>
 
 export const deactivateEmployee = (id) =>
   client.delete('/employees/item.php', { params: { id } }).then((r) => r.data)
+
+export const resetEmployeePassword = (id, newPassword = null) =>
+  client.post('/employees/reset-password.php', {
+    user_id: id,
+    ...(newPassword ? { new_password: newPassword } : {}),
+  }).then((r) => r.data)

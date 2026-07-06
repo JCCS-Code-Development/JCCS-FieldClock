@@ -6,7 +6,7 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import Spinner from '../../components/ui/Spinner'
-import { listEmployees, createEmployee, updateEmployee, deactivateEmployee } from '../../api/employees'
+import { listEmployees, createEmployee, updateEmployee, deactivateEmployee, resetEmployeePassword } from '../../api/employees'
 import { listDocuments, getDocumentUrl } from '../../api/documents'
 import { formatCurrency } from '../../utils/format'
 import { format, parseISO } from 'date-fns'
@@ -46,6 +46,12 @@ export default function AdminEmployees() {
   const [form, setForm]           = useState(EMPTY)
   const [saving, setSaving]       = useState(false)
   const [error, setError]         = useState('')
+
+  // Password reset modal
+  const [pwModal,    setPwModal]    = useState(null)  // employee row | null
+  const [pwInput,    setPwInput]    = useState('')
+  const [pwSaving,   setPwSaving]   = useState(false)
+  const [pwError,    setPwError]    = useState('')
 
   // Contractor documents modal
   const [docsModal,    setDocsModal]    = useState(null)  // employee row | null
@@ -117,6 +123,32 @@ export default function AdminEmployees() {
     await deactivateEmployee(id); load()
   }
 
+  const openPwModal = (emp) => { setPwModal(emp); setPwInput(''); setPwError('') }
+
+  const handlePromptReset = async () => {
+    setPwSaving(true); setPwError('')
+    try {
+      await resetEmployeePassword(pwModal.id)
+      setPwModal(null)
+      alert(`${pwModal.name} will be prompted to set a new password on next login.`)
+    } catch (err) {
+      setPwError(err?.response?.data?.error ?? 'Could not reset. Try again.')
+    } finally { setPwSaving(false) }
+  }
+
+  const handleSetPassword = async () => {
+    if (!pwInput.trim()) { setPwError('Enter a password.'); return }
+    if (pwInput.length < 8) { setPwError('Password must be at least 8 characters.'); return }
+    setPwSaving(true); setPwError('')
+    try {
+      await resetEmployeePassword(pwModal.id, pwInput)
+      setPwModal(null)
+      alert(`Password updated for ${pwModal.name}.`)
+    } catch (err) {
+      setPwError(err?.response?.data?.error ?? 'Could not set password. Try again.')
+    } finally { setPwSaving(false) }
+  }
+
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   // Per doc_type: most recent upload
@@ -146,6 +178,7 @@ export default function AdminEmployees() {
       render: (_, row) => (
         <div className="flex gap-2">
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(row) }}>Edit</Button>
+          <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openPwModal(row) }}>Reset Password</Button>
           {row.role === 'contractor' && (
             <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openDocs(row) }}>Documents</Button>
           )}
@@ -253,6 +286,41 @@ export default function AdminEmployees() {
             <Button variant="secondary" fullWidth onClick={() => setModal(null)}>Cancel</Button>
             <Button fullWidth loading={saving} onClick={handleSave}>Save</Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Reset password modal */}
+      <Modal isOpen={!!pwModal} onClose={() => setPwModal(null)} title={`Reset Password — ${pwModal?.name ?? ''}`}>
+        <div className="flex flex-col gap-5">
+          {/* Option 1: prompt on next login */}
+          <div className="rounded-2xl border border-gray-200 p-4 flex flex-col gap-3">
+            <div>
+              <p className="font-semibold text-sm text-gray-900">Prompt reset on next login</p>
+              <p className="text-xs text-gray-500 mt-0.5">Clears their current password. They will be asked to set a new one when they next log in.</p>
+            </div>
+            <Button variant="secondary" loading={pwSaving} onClick={handlePromptReset}>
+              Clear Password &amp; Prompt Reset
+            </Button>
+          </div>
+
+          {/* Option 2: set password directly */}
+          <div className="rounded-2xl border border-gray-200 p-4 flex flex-col gap-3">
+            <div>
+              <p className="font-semibold text-sm text-gray-900">Set a password directly</p>
+              <p className="text-xs text-gray-500 mt-0.5">Choose a password for them. Share it with the employee so they can log in.</p>
+            </div>
+            <Input
+              label="New Password"
+              type="password"
+              value={pwInput}
+              onChange={(e) => setPwInput(e.target.value)}
+              placeholder="Min. 8 characters"
+            />
+            <Button loading={pwSaving} onClick={handleSetPassword}>Set Password</Button>
+          </div>
+
+          {pwError && <p className="text-sm text-red-600 font-medium">{pwError}</p>}
+          <Button variant="secondary" fullWidth onClick={() => setPwModal(null)}>Cancel</Button>
         </div>
       </Modal>
 
