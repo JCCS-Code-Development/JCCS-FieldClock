@@ -136,8 +136,8 @@ export default function ClockPanel() {
 
   // Always sync with server on mount so the UI reflects actual DB state
   useEffect(() => {
-    getStatus().then((data) => setTimeclockData(data)).catch(() => {})
-  }, [])
+    getStatus().then(setTimeclockData).catch(() => {})
+  }, [setTimeclockData])
   const isOnline = useOnlineStatus()
   const { position, loading: gpsLoading, getPosition } = useGPS()
 
@@ -155,6 +155,7 @@ export default function ClockPanel() {
   const { entries: todayEntries, completedSeconds } = useTodayData(statusLabel)
   const dayTotal = completedSeconds + liveElapsed
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { getPosition() }, [])
 
   useEffect(() => {

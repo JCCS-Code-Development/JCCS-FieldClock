@@ -5,6 +5,7 @@ import OfflineBanner from '../OfflineBanner'
 import LangSwitcher from '../ui/LangSwitcher'
 import { useAuthStore } from '../../store/authStore'
 import { logout as logoutAPI } from '../../api/auth'
+import LiveClock from '../ui/LiveClock'
 
 const DashboardIcon = () => (
   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -188,7 +189,7 @@ export default function AdminLayout() {
           <button onClick={() => setDrawerOpen(true)} className="p-1 text-brand-100/80"><MenuIcon /></button>
           <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-7 w-auto"
             style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
-          <div className="w-8" />
+          <LiveClock className="text-white/80" />
         </header>
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 w-full">
           <div className="max-w-7xl mx-auto w-full">

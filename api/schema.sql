@@ -236,6 +236,23 @@ CREATE TABLE `loan_payments` (
   CONSTRAINT `fk_lp_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS `flat_rate_payments` (
+  `id`           INT          NOT NULL AUTO_INCREMENT,
+  `user_id`      INT          NOT NULL,
+  `period_start` DATE         NOT NULL,
+  `period_end`   DATE         NOT NULL,
+  `amount`       DECIMAL(8,2) NOT NULL,
+  `description`  VARCHAR(200) NOT NULL DEFAULT '',
+  `status`       ENUM('pending','issued') NOT NULL DEFAULT 'pending',
+  `created_by`   INT          NOT NULL,
+  `created_at`   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_frp_user`   (`user_id`),
+  KEY `idx_frp_period` (`period_start`, `period_end`),
+  CONSTRAINT `fk_frp_user`       FOREIGN KEY (`user_id`)    REFERENCES `users` (`id`),
+  CONSTRAINT `fk_frp_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Seed: first admin account (update phone/name before importing)

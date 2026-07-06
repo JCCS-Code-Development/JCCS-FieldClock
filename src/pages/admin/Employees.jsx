@@ -84,9 +84,12 @@ export default function AdminEmployees() {
   const handleSave = async () => {
     if (!form.name.trim())  { setError('Name is required.'); return }
     if (!form.email.trim()) { setError('Email is required so the employee can log in.'); return }
-    if (!form.pay_rate && form.role !== 'contractor') {
-      setError(form.pay_structure === 'salary' ? 'Weekly salary is required.' : 'Hourly rate is required.')
-      return
+    if (form.role !== 'contractor') {
+      const rate = parseFloat(form.pay_rate)
+      if (!form.pay_rate || isNaN(rate) || rate <= 0) {
+        setError(form.pay_structure === 'salary' ? 'Weekly salary must be a number greater than 0.' : 'Hourly rate must be a number greater than 0.')
+        return
+      }
     }
     setSaving(true); setError('')
     const payload = {

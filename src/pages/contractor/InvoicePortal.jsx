@@ -1,29 +1,33 @@
 import { useState, useEffect, useRef } from 'react'
 import { format, startOfWeek, endOfWeek, addWeeks, isAfter } from 'date-fns'
+import { es, enUS } from 'date-fns/locale'
+import { useTranslation } from 'react-i18next'
 import { listInvoices, uploadInvoice, deleteInvoice, getDownloadUrl } from '../../api/contractor'
 import { subscribeToPush, unsubscribeFromPush, getCurrentSubscription } from '../../api/push'
 
 // ── helpers ─────────────────────────────────────────────────────────
 const weekStart = (d) => startOfWeek(d, { weekStartsOn: 1 })
 const weekEnd   = (d) => endOfWeek(d,   { weekStartsOn: 1 })
-const fmt       = (d) => format(d, 'MMM d, yyyy')
-const fmtShort  = (d) => format(d, 'MMM d')
 
-function useWeek(offset) {
+function useWeek(offset, locale) {
   const now  = new Date()
   const base = addWeeks(weekStart(now), offset)
+  const fmt      = (d) => format(d, 'MMM d, yyyy', { locale })
+  const fmtShort = (d) => format(d, 'MMM d',       { locale })
   return {
-    start: base,
-    end:   weekEnd(base),
-    label: offset === 0 ? 'This Week' : offset === -1 ? 'Last Week' : `${fmtShort(base)} – ${fmtShort(weekEnd(base))}`,
+    start:    base,
+    end:      weekEnd(base),
+    label:    null, // resolved in component with t()
+    fmtFull:  fmt,
+    fmtShort,
   }
 }
 
-const STATUS_META = {
-  submitted:    { label: 'Submitted',    color: 'bg-amber-100 text-amber-700' },
-  under_review: { label: 'Under Review', color: 'bg-blue-100 text-blue-700' },
-  check_ready:  { label: 'Check Ready',  color: 'bg-green-100 text-green-700' },
-  paid:         { label: 'Paid',         color: 'bg-gray-100 text-gray-600' },
+const STATUS_COLORS = {
+  submitted:    'bg-amber-100 text-amber-700',
+  under_review: 'bg-blue-100 text-blue-700',
+  check_ready:  'bg-green-100 text-green-700',
+  paid:         'bg-gray-100 text-gray-600',
 }
 
 const UploadIcon = () => (
@@ -52,8 +56,18 @@ const ExternalIcon = () => (
 
 // ── Component ────────────────────────────────────────────────────────
 export default function InvoicePortal() {
+  const { t, i18n } = useTranslation()
+  const dfnsLocale   = i18n.language.startsWith('es') ? es : enUS
+
   const [offset, setOffset]         = useState(0)
-  const week                         = useWeek(offset)
+  const week                         = useWeek(offset, dfnsLocale)
+  const { fmtFull, fmtShort }        = week
+
+  const weekLabel = offset === 0
+    ? t('contractor.invoice.thisWeek')
+    : offset === -1
+      ? t('contractor.invoice.lastWeek')
+      : `${fmtShort(week.start)} – ${fmtShort(week.end)}`
 
   const [invoices, setInvoices]     = useState([])
   const [loading, setLoading]       = useState(true)
@@ -119,7 +133,7 @@ export default function InvoicePortal() {
     e.preventDefault()
     if (!file) { setUploadError('Please select a file.'); return }
 
-    const uploadWeek = useWeekObj(uploadWeekOffset)
+    const uploadWeek = weekObj(uploadWeekOffset)
     const form = new FormData()
     form.append('file', file)
     form.append('period_start', format(uploadWeek.start, 'yyyy-MM-dd'))
@@ -137,7 +151,7 @@ export default function InvoicePortal() {
     setUploading(false)
   }
 
-  function useWeekObj(off) {
+  function weekObj(off) {
     const now  = new Date()
     const base = addWeeks(weekStart(now), off)
     return { start: base, end: weekEnd(base) }
@@ -171,13 +185,13 @@ export default function InvoicePortal() {
       {/* Header + push toggle */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Invoices</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Submit your weekly invoice and track payments</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('contractor.invoice.title')}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{t('contractor.invoice.subtitle')}</p>
         </div>
         <button
           onClick={togglePush}
           disabled={pushLoading}
-          title={pushSub ? 'Notifications on — click to turn off' : 'Enable push notifications'}
+          title={pushSub ? t('contractor.invoice.notificationsOn') : t('contractor.invoice.enableNotifications')}
           className={`p-2 rounded-xl transition-colors ${pushSub ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
         >
           <BellIcon active={!!pushSub} />
@@ -190,8 +204,8 @@ export default function InvoicePortal() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
         </button>
         <div className="text-center">
-          <p className="font-semibold text-gray-900">{week.label}</p>
-          <p className="text-xs text-gray-500">{fmt(week.start)} – {fmt(week.end)}</p>
+          <p className="font-semibold text-gray-900">{weekLabel}</p>
+          <p className="text-xs text-gray-500">{fmtFull(week.start)} – {fmtFull(week.end)}</p>
         </div>
         <button
           onClick={() => setOffset((o) => o + 1)}
@@ -207,17 +221,17 @@ export default function InvoicePortal() {
         <div className={`rounded-2xl border p-5 ${thisWeekHasInvoice ? 'bg-green-50 border-green-200' : 'bg-white border-dashed border-gray-300'}`}>
           {thisWeekHasInvoice ? (
             <p className="text-green-700 font-medium text-sm">
-              Invoice submitted for this week. We'll notify you when your check is ready.
+              {t('contractor.invoice.submittedThisWeek')}
             </p>
           ) : (
             <div className="text-center space-y-3">
-              <p className="text-gray-500 text-sm">No invoice submitted for this week yet.</p>
+              <p className="text-gray-500 text-sm">{t('contractor.invoice.noneThisWeek')}</p>
               <button
                 onClick={openUpload}
                 className="inline-flex items-center gap-2 bg-brand-500 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-brand-700 transition-colors"
               >
                 <UploadIcon />
-                Submit Invoice
+                {t('contractor.invoice.submit')}
               </button>
             </div>
           )}
@@ -226,30 +240,30 @@ export default function InvoicePortal() {
 
       {/* Invoice list for selected week */}
       <div className="space-y-3">
-        {loading && <p className="text-center text-gray-400 py-8">Loading…</p>}
+        {loading && <p className="text-center text-gray-400 py-8">{t('common.loading')}</p>}
         {error && <p className="text-center text-red-500 py-4">{error}</p>}
 
         {!loading && !error && weekInvoices.length === 0 && (
           <div className="text-center py-10 text-gray-400">
-            <p className="text-sm">No invoices for this week.</p>
+            <p className="text-sm">{t('contractor.invoice.noneForWeek')}</p>
             {offset !== 0 && (
               <button onClick={openUpload} className="mt-3 text-brand-500 text-sm hover:underline">
-                Submit one
+                {t('contractor.invoice.submitOne')}
               </button>
             )}
           </div>
         )}
 
         {weekInvoices.map((inv) => {
-          const meta = STATUS_META[inv.status] ?? STATUS_META.submitted
+          const color = STATUS_COLORS[inv.status] ?? STATUS_COLORS.submitted
           return (
             <div key={inv.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${meta.color}`}>{meta.label}</span>
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${color}`}>{t(`contractor.invoice.status.${inv.status}`)}</span>
                     {inv.status === 'check_ready' && (
-                      <span className="text-green-600 text-xs font-medium">🎉 Ready for pickup!</span>
+                      <span className="text-green-600 text-xs font-medium">{t('contractor.invoice.readyForPickup')}</span>
                     )}
                   </div>
                   <p className="mt-2 text-sm text-gray-700 font-medium truncate">{inv.file_original_name}</p>
@@ -259,7 +273,7 @@ export default function InvoicePortal() {
                   </p>
                   {inv.admin_note && (
                     <p className="mt-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                      <span className="font-medium">Note: </span>{inv.admin_note}
+                      <span className="font-medium">{t('contractor.invoice.note')}: </span>{inv.admin_note}
                     </p>
                   )}
                 </div>
@@ -270,7 +284,7 @@ export default function InvoicePortal() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500"
-                    title="View invoice"
+                    title={t('contractor.invoice.viewInvoice')}
                   >
                     <ExternalIcon />
                   </a>
@@ -278,7 +292,7 @@ export default function InvoicePortal() {
                     <button
                       onClick={() => setDeleteTarget(inv)}
                       className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-400"
-                      title="Delete invoice"
+                      title={t('contractor.invoice.deleteInvoice')}
                     >
                       <TrashIcon />
                     </button>
@@ -293,14 +307,14 @@ export default function InvoicePortal() {
       {/* All other invoices summary */}
       {offset === 0 && invoices.filter((i) => !weekInvoices.includes(i)).length > 0 && (
         <div className="border-t border-gray-200 pt-4">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">History</h2>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('contractor.invoice.history')}</h2>
           <div className="space-y-2">
             {invoices.filter((i) => !weekInvoices.includes(i)).slice(0, 8).map((inv) => {
-              const meta = STATUS_META[inv.status] ?? STATUS_META.submitted
+              const color = STATUS_COLORS[inv.status] ?? STATUS_COLORS.submitted
               return (
                 <div key={inv.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3">
                   <div>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${meta.color} mr-2`}>{meta.label}</span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color} mr-2`}>{t(`contractor.invoice.status.${inv.status}`)}</span>
                     <span className="text-sm text-gray-600">
                       {fmtShort(new Date(inv.period_start + 'T00:00:00'))} – {fmtShort(new Date(inv.period_end + 'T00:00:00'))}
                       {inv.amount ? ` · $${parseFloat(inv.amount).toFixed(2)}` : ''}
@@ -320,18 +334,18 @@ export default function InvoicePortal() {
       {uploadModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
-            <h2 className="text-lg font-bold text-gray-900">Submit Invoice</h2>
+            <h2 className="text-lg font-bold text-gray-900">{t('contractor.invoice.submit')}</h2>
 
             <form onSubmit={handleUpload} className="space-y-4">
               {/* Week for upload */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Pay Week</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('contractor.invoice.payWeek')}</label>
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={() => setUploadWeekOffset((o) => o - 1)} className="p-1.5 hover:bg-gray-100 rounded-lg">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-4"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
                   </button>
                   <span className="flex-1 text-center text-sm font-medium text-gray-800">
-                    {uploadWeekOffset === 0 ? 'This Week' : uploadWeekOffset === -1 ? 'Last Week' : `${fmtShort(useWeekObj(uploadWeekOffset).start)} – ${fmtShort(useWeekObj(uploadWeekOffset).end)}`}
+                    {uploadWeekOffset === 0 ? t('contractor.invoice.thisWeek') : uploadWeekOffset === -1 ? t('contractor.invoice.lastWeek') : `${fmtShort(weekObj(uploadWeekOffset).start)} – ${fmtShort(weekObj(uploadWeekOffset).end)}`}
                   </span>
                   <button type="button" onClick={() => setUploadWeekOffset((o) => o + 1)} disabled={uploadWeekOffset >= 0}
                     className="p-1.5 hover:bg-gray-100 rounded-lg disabled:opacity-30">
@@ -342,7 +356,7 @@ export default function InvoicePortal() {
 
               {/* Amount */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Amount (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('contractor.invoice.amountOptional')}</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
                   <input
@@ -355,7 +369,7 @@ export default function InvoicePortal() {
 
               {/* File */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Invoice File</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('contractor.invoice.fileLabel')}</label>
                 <div
                   onClick={() => fileRef.current?.click()}
                   className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center cursor-pointer hover:border-brand-500 transition-colors"
@@ -365,8 +379,8 @@ export default function InvoicePortal() {
                   ) : (
                     <>
                       <UploadIcon />
-                      <p className="text-sm text-gray-500 mt-1">Tap to choose a PDF or photo</p>
-                      <p className="text-xs text-gray-400">PDF, JPEG, PNG, WEBP · max 10 MB</p>
+                      <p className="text-sm text-gray-500 mt-1">{t('contractor.invoice.fileHint')}</p>
+                      <p className="text-xs text-gray-400">{t('contractor.invoice.fileTypes')}</p>
                     </>
                   )}
                 </div>
@@ -384,11 +398,11 @@ export default function InvoicePortal() {
               <div className="flex gap-3 pt-1">
                 <button type="button" onClick={() => setUploadModal(false)}
                   className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" disabled={uploading}
                   className="flex-1 py-2.5 bg-brand-500 text-white rounded-xl text-sm font-semibold hover:bg-brand-700 transition-colors disabled:opacity-60">
-                  {uploading ? 'Uploading…' : 'Submit'}
+                  {uploading ? t('common.uploading') : t('contractor.invoice.submit')}
                 </button>
               </div>
             </form>
@@ -400,17 +414,17 @@ export default function InvoicePortal() {
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h2 className="text-lg font-bold text-gray-900">Delete Invoice?</h2>
+            <h2 className="text-lg font-bold text-gray-900">{t('contractor.invoice.deleteTitle')}</h2>
             <p className="text-sm text-gray-500">
-              This will permanently delete <span className="font-medium">{deleteTarget.file_original_name}</span>. This cannot be undone.
+              {t('contractor.invoice.deleteConfirm', { name: deleteTarget.file_original_name })}
             </p>
             <div className="flex gap-3">
               <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
-                Cancel
+                {t('common.cancel')}
               </button>
               <button onClick={handleDelete} disabled={deleting}
                 className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-60">
-                {deleting ? 'Deleting…' : 'Delete'}
+                {deleting ? t('common.deleting') : t('common.delete')}
               </button>
             </div>
           </div>

@@ -7,6 +7,7 @@ import LangSwitcher from '../ui/LangSwitcher'
 import { useTimeclockStore } from '../../store/timeclockStore'
 import { useAuthStore } from '../../store/authStore'
 import { logout as logoutAPI } from '../../api/auth'
+import LiveClock from '../ui/LiveClock'
 
 const STATUS_COLORS = {
   traveling:    'bg-sky-500',
@@ -188,7 +189,7 @@ export default function EmployeeLayout() {
           <button onClick={() => setDrawerOpen(true)} className="p-1 text-brand-100/80"><MenuIcon /></button>
           <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-7 w-auto"
             style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
-          <div className="w-8" />
+          <LiveClock className="text-white/80" />
         </header>
 
         <PendingDocsBanner />
@@ -206,7 +207,7 @@ export default function EmployeeLayout() {
               `flex-1 flex flex-col items-center justify-center py-3 gap-0.5 text-xs font-medium transition-colors ${isActive ? 'text-brand-500' : 'text-gray-400'}`
             }
           >
-            {({ isActive }) => (
+            {({ isActive: _isActive }) => (
               <>
                 <span className="relative">
                   <ClockIcon className="w-6 h-6" />

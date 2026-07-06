@@ -44,7 +44,8 @@ foreach ($adjRows->fetchAll() as $adj) {
 }
 
 // User info
-$users = $pdo->query('SELECT id, name, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance FROM users WHERE is_active = 1')->fetchAll();
+// Include all users — even deactivated ones may have entries in this period
+$users = $pdo->query('SELECT id, name, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance FROM users')->fetchAll();
 $userMap = [];
 foreach ($users as $u) { $userMap[$u['id']] = $u; }
 
@@ -72,7 +73,7 @@ foreach ($byUser as $uid => $data) {
         // Fixed weekly salary — pay_rate is the weekly amount regardless of hours
         $totalHours = $totalMinutes / 60;
         $regHours   = $totalHours;
-        $baseGross  = (float)$u['pay_rate'] * $weeksWorked;
+        $baseGross  = (float)($u['pay_rate'] ?? 0) * $weeksWorked;
     } elseif ($u['pay_type'] === 'w2') {
         foreach ($weeks as $weekData) {
             $weekMins = array_sum($weekData);
@@ -80,11 +81,14 @@ foreach ($byUser as $uid => $data) {
             $regHours += min($weekHrs, 40);
             $otHours  += max(0, $weekHrs - 40);
         }
-        $baseGross = ($regHours * $u['pay_rate']) + ($otHours * ($u['overtime_rate'] ?? $u['pay_rate'] * 1.5));
+        $rate      = (float)($u['pay_rate'] ?? 0);
+        $otRate    = (float)($u['overtime_rate'] ?? $rate * 1.5);
+        $baseGross = ($regHours * $rate) + ($otHours * $otRate);
     } else {
+        $rate       = (float)($u['pay_rate'] ?? 0);
         $totalHours = $totalMinutes / 60;
         $regHours   = $totalHours;
-        $baseGross  = $totalHours * $u['pay_rate'];
+        $baseGross  = $totalHours * $rate;
     }
 
     $gasTotal = $u['gas_weekly_allowance'] !== null ? ($u['gas_weekly_allowance'] * $weeksWorked) : 0;

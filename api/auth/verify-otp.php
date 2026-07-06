@@ -47,3 +47,4 @@ echo json_encode([
         'pay_type' => $user['pay_type'],
     ],
 ]);
+exit;

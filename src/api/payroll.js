@@ -23,3 +23,15 @@ export const deleteAdjustment = (id) =>
 
 export const getAnnualSummary = (year) =>
   client.get('/payroll/annual-summary.php', { params: { year } }).then((r) => r.data)
+
+export const listFlatRatePayments = (params) =>
+  client.get('/payroll/flat-rate.php', { params }).then((r) => r.data)
+
+export const createFlatRatePayment = (data) =>
+  client.post('/payroll/flat-rate.php', data).then((r) => r.data)
+
+export const updateFlatRatePayment = (id, data) =>
+  client.put('/payroll/flat-rate.php', { id, ...data }).then((r) => r.data)
+
+export const deleteFlatRatePayment = (id) =>
+  client.delete('/payroll/flat-rate.php', { params: { id } }).then((r) => r.data)

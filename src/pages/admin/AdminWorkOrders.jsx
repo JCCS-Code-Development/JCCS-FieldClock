@@ -16,7 +16,7 @@ export default function AdminWorkOrders() {
   const [tab, setTab] = useState('review')
   const [workOrders, setWorkOrders] = useState([])
   const [jobs, setJobs] = useState([])
-  const [employees, setEmployees] = useState([])
+  const [_employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [editModal, setEditModal] = useState(null)
   const [form, setForm] = useState({})
@@ -36,6 +36,7 @@ export default function AdminWorkOrders() {
       setEmployees(e.employees ?? [])
     }).finally(() => setLoading(false))
   }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [filterJob, filterStatus])
 
   const openEdit = (wo) => { setForm({ ...wo }); setEditModal(wo) }

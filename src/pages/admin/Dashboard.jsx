@@ -38,6 +38,7 @@ export default function AdminDashboard() {
         pendingReview:    woReview.work_orders?.length ?? 0,
       })
     }).finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const STATUS_LABELS = {

@@ -46,9 +46,10 @@ if ($auth['role'] === 'admin') {
 }
 
 echo json_encode([
-    'statusLabel'      => $entry['status_label'] ?? null,
+    'statusLabel'      => $entry ? $entry['status_label'] : null,
     'dayStarted'       => $entry !== null,
     'currentEntry'     => $entry,
     'activeJob'        => $activeJob,
     'active_employees' => $activeEmployees,
 ]);
+exit;

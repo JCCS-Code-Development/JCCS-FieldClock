@@ -25,7 +25,11 @@ client.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config
-    if (error.response?.status !== 401 || original._retry) {
+    if (
+      error.response?.status !== 401 ||
+      original._retry ||
+      original.url?.includes('/auth/')
+    ) {
       return Promise.reject(error)
     }
     if (isRefreshing) {
@@ -45,7 +49,7 @@ client.interceptors.response.use(
         { refreshToken }
       )
       const newToken = res.data.token
-      updateToken(newToken)
+      updateToken(newToken, res.data.refreshToken ?? undefined)
       processQueue(null, newToken)
       original.headers.Authorization = `Bearer ${newToken}`
       return client(original)

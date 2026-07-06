@@ -37,7 +37,8 @@ import { useTranslation } from 'react-i18next'
 import { useTimeclockStore } from '../../store/timeclockStore'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useGPS } from '../../hooks/useGPS'
-import { getStatus, dayStart, dayEnd, setWorking, setLunch, setMaterialRun, setWaiting } from '../../api/timeclock'
+import { useGPSTracking } from '../../hooks/useGPSTracking'
+import { getStatus, dayStart, dayEnd, setWorking, setLunch, setMaterialRun, setWaiting, switchJob } from '../../api/timeclock'
 import { getNearbyJobs, listJobs } from '../../api/jobs'
 import Spinner from '../ui/Spinner'
 
@@ -48,6 +49,15 @@ const STATUS_CONFIG = {
   material_run: { label: 'Material Run', color: 'bg-violet-500', text: 'text-violet-700' },
   waiting:      { label: 'Waiting',      color: 'bg-orange-500', text: 'text-orange-700' },
   done:         { label: 'Done',         color: 'bg-gray-400',   text: 'text-gray-500'   },
+}
+
+function useClockTime() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  return now
 }
 
 function useLiveTimer(startTime) {
@@ -86,8 +96,8 @@ export default function ClockToggle() {
 
   // Sync with server on mount so button always reflects actual DB state
   useEffect(() => {
-    getStatus().then((data) => setTimeclockData(data)).catch(() => {})
-  }, [])
+    getStatus().then(setTimeclockData).catch(() => {})
+  }, [setTimeclockData])
   const isOnline = useOnlineStatus()
   const { position, loading: gpsLoading, getPosition } = useGPS()
 
@@ -95,14 +105,22 @@ export default function ClockToggle() {
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState('')
   const [jobs, setJobs]             = useState([])
-  const [selectedJobId, setSelectedJobId] = useState('')
+  const [selectedJobId, setSelectedJobId] = useState(activeJob?.id ? String(activeJob.id) : '')
   const [locationLabel, setLocationLabel] = useState(null)
   const [loadingJobs, setLoadingJobs] = useState(false)
 
-  const elapsed     = useLiveTimer(currentEntry?.start_time)
-  const isClockedIn = dayStarted && statusLabel !== 'done' && statusLabel !== null
+  const now             = useClockTime()
+  const elapsed         = useLiveTimer(currentEntry?.start_time)
+  const isClockedIn     = dayStarted && statusLabel != null && statusLabel !== 'done'
+  const { dailyMiles, flush: flushMileage } = useGPSTracking(isClockedIn)
+  const [switchingJob, setSwitchingJob] = useState(false)
+
+  // True when user has picked a different job than the active one while clocked in
+  const activeJobId      = activeJob?.id ? String(activeJob.id) : ''
+  const pendingJobChange = isClockedIn && selectedJobId !== activeJobId
 
   // Get GPS + jobs on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { getPosition() }, [])
 
   useEffect(() => {
@@ -140,6 +158,7 @@ export default function ClockToggle() {
         const data = await dayStart({ job_id: selectedJobId ? parseInt(selectedJobId) : null })
         setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
       } else {
+        await flushMileage()
         const data = await dayEnd({})
         setTimeclockData({ statusLabel: 'done', currentEntry: data.currentEntry, activeJob: null, dayStarted: true })
       }
@@ -154,12 +173,27 @@ export default function ClockToggle() {
     if (!isOnline || !isClockedIn) return
     setLoading(true)
     try {
+      await flushMileage()
       const fn = { working: setWorking, lunch: setLunch, material_run: setMaterialRun, waiting: setWaiting }[action]
       if (!fn) return
       const data = await fn({})
       setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSwitchJob = async () => {
+    if (!isOnline || !isClockedIn) return
+    setSwitchingJob(true)
+    setError('')
+    try {
+      const data = await switchJob({ job_id: selectedJobId ? parseInt(selectedJobId) : null })
+      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
+    } catch (err) {
+      setError(err?.response?.data?.error ?? 'Could not switch job. Try again.')
+    } finally {
+      setSwitchingJob(false)
     }
   }
 
@@ -187,7 +221,7 @@ export default function ClockToggle() {
           <select
             value={selectedJobId}
             onChange={(e) => setSelectedJobId(e.target.value)}
-            disabled={isClockedIn || loadingJobs}
+            disabled={loadingJobs}
             className="w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3 pr-10 text-sm font-medium text-gray-800 outline-none focus:border-brand-500 disabled:opacity-60 appearance-none"
           >
             <option value="">{t('home.noSpecificLocation')}</option>
@@ -200,6 +234,27 @@ export default function ClockToggle() {
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">▾</span>
         </div>
         {loadingJobs && <p className="text-xs text-gray-400 mt-1">{t('home.loadingLocations')}</p>}
+
+        {/* Switch job button — visible when clocked in and a different job is selected */}
+        {pendingJobChange && (
+          <button
+            onClick={handleSwitchJob}
+            disabled={switchingJob || loading || !isOnline}
+            className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white text-sm font-semibold py-2.5 transition-colors"
+          >
+            {switchingJob
+              ? <Spinner size="sm" />
+              : (
+                <>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4"/>
+                  </svg>
+                  {t('home.switchJob')}
+                </>
+              )
+            }
+          </button>
+        )}
       </div>
 
       {/* Live timer */}
@@ -216,10 +271,26 @@ export default function ClockToggle() {
         </span>
       )}
 
+      {/* Daily mileage */}
+      {isClockedIn && (
+        <div className="flex items-center gap-1.5 text-sm text-gray-500">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4 text-sky-500">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 13l4.553 2.276A1 1 0 0021 21.382V10.618a1 1 0 00-.553-.894L15 7m0 13V7m0 0L9 4"/>
+          </svg>
+          <span className="font-semibold tabular-nums text-sky-600">{dailyMiles.toFixed(1)} mi</span>
+          <span className="text-gray-400">today</span>
+        </div>
+      )}
+
+      {/* Current time */}
+      <p className="text-3xl font-semibold tabular-nums text-gray-800 tracking-tight">
+        {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+      </p>
+
       {/* Main clock in/out button */}
       <button
         onClick={handleToggle}
-        disabled={loading || !isOnline}
+        disabled={loading || switchingJob || !isOnline}
         className={`w-40 h-40 rounded-full flex flex-col items-center justify-center gap-2 text-white font-bold text-lg shadow-xl transition-all active:scale-95 disabled:opacity-50
           ${isClockedIn
             ? 'bg-red-500 hover:bg-red-600 ring-4 ring-red-200'
@@ -248,7 +319,7 @@ export default function ClockToggle() {
               <button
                 key={key}
                 onClick={() => handleStatus(key)}
-                disabled={loading || statusLabel === key}
+                disabled={loading || switchingJob || statusLabel === key}
                 className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all border-2
                   ${statusLabel === key
                     ? `${STATUS_CONFIG[key].text} border-current/40 bg-current/5`

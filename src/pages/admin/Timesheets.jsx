@@ -9,6 +9,8 @@ import {
 } from '../../api/timeclock'
 import { getTimeOffRequests, reviewTimeOffRequest } from '../../api/timeoff'
 import { listEmployees } from '../../api/employees'
+import { listJobs } from '../../api/jobs'
+import { getDailyMileage } from '../../api/gps'
 import { formatTime } from '../../utils/format'
 
 const STATUS_OPTIONS = [
@@ -81,13 +83,14 @@ function groupByDay(entries) {
 }
 
 // ── Entry edit / create modal ────────────────────────────────────
-function EntryModal({ entry, defaultDate, userId, onSave, onClose }) {
+function EntryModal({ entry, defaultDate, userId, jobs, onSave, onClose }) {
   const isNew = !entry?.id
   const toLocal = (dt) => dt ? format(new Date(dt), "yyyy-MM-dd'T'HH:mm") : ''
 
   const [statusLabel, setStatusLabel] = useState(entry?.status_label ?? 'working')
   const [startTime,   setStartTime]   = useState(isNew ? (defaultDate ? defaultDate + 'T08:00' : '') : toLocal(entry.start_time))
   const [endTime,     setEndTime]     = useState(isNew ? (defaultDate ? defaultDate + 'T17:00' : '') : toLocal(entry.end_time))
+  const [jobId,       setJobId]       = useState(entry?.job_id ? String(entry.job_id) : '')
   const [notes,       setNotes]       = useState(entry?.notes ?? '')
   const [error,       setError]       = useState('')
   const [saving,      setSaving]      = useState(false)
@@ -100,6 +103,7 @@ function EntryModal({ entry, defaultDate, userId, onSave, onClose }) {
         status_label: statusLabel,
         start_time:   startTime.replace('T', ' ') + ':00',
         end_time:     endTime ? endTime.replace('T', ' ') + ':00' : null,
+        job_id:       jobId ? parseInt(jobId) : null,
         notes:        notes.trim() || null,
       }
       await onSave(isNew ? { ...payload, user_id: userId } : { ...payload, id: entry.id })
@@ -122,6 +126,19 @@ function EntryModal({ entry, defaultDate, userId, onSave, onClose }) {
               {opt.label}
             </button>
           ))}
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Project / Job</label>
+        <div className="relative">
+          <select value={jobId} onChange={e => setJobId(e.target.value)}
+            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 pr-8 text-sm outline-none focus:border-brand-500 appearance-none bg-white">
+            <option value="">— No project assigned —</option>
+            {(jobs ?? []).map(j => (
+              <option key={j.id} value={j.id}>{j.name}{j.client_name ? ` · ${j.client_name}` : ''}</option>
+            ))}
+          </select>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -154,7 +171,7 @@ function EntryModal({ entry, defaultDate, userId, onSave, onClose }) {
 }
 
 // ── Day group ────────────────────────────────────────────────────
-function DayGroup({ day, entries, onEdit, onDelete, onAdd }) {
+function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
   const dayMins  = totalMins(entries)
   const dayLabel = format(parseISO(day), 'EEEE, MMMM d')
 
@@ -163,6 +180,9 @@ function DayGroup({ day, entries, onEdit, onDelete, onAdd }) {
       <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
         <p className="text-sm font-bold text-gray-900">{dayLabel}</p>
         <div className="flex items-center gap-3">
+          {miles > 0 && (
+            <span className="text-sm font-semibold text-sky-600">{miles.toFixed(1)} mi</span>
+          )}
           <span className={`text-sm font-semibold ${dayMins > 0 ? 'text-brand-600' : 'text-gray-400'}`}>
             {fmtDur(dayMins)} total
           </span>
@@ -336,6 +356,8 @@ export default function AdminTimesheets() {
   const [addDate,     setAddDate]     = useState(null)
   const [deleteId,    setDeleteId]    = useState(null)
   const [deleting,    setDeleting]    = useState(false)
+  const [weekMiles,   setWeekMiles]   = useState({})
+  const [allJobs,     setAllJobs]     = useState([])
 
   useEffect(() => {
     listEmployees().then(d => {
@@ -343,8 +365,10 @@ export default function AdminTimesheets() {
       setEmployees(emps)
       if (emps.length > 0) setSelectedEmp(emps[0])
     })
+    listJobs().then(d => setAllJobs(d.jobs ?? [])).catch(() => {})
     loadRequests()
     loadTimeOff()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadRequests = () => {
@@ -377,13 +401,28 @@ export default function AdminTimesheets() {
   }
 
   useEffect(() => {
-    if (selectedEmp) loadEntries(selectedEmp.id, dateFrom, dateTo)
+    if (!selectedEmp) return
+    loadEntries(selectedEmp.id, dateFrom, dateTo)
+    // Fetch mileage for each day in the week
+    const days = []
+    let d = new Date(dateFrom)
+    while (d.toISOString().slice(0,10) <= dateTo) {
+      days.push(d.toISOString().slice(0,10))
+      d = new Date(d.getTime() + 86400000)
+    }
+    Promise.all(days.map(date =>
+      getDailyMileage({ date, user_id: selectedEmp.id })
+        .then(r => [date, r.daily_miles ?? 0])
+        .catch(() => [date, 0])
+    )).then(results => setWeekMiles(Object.fromEntries(results)))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmp, dateFrom, dateTo])
 
   const dayGroups  = useMemo(() => groupByDay(entries), [entries])
   const periodMins = useMemo(() => totalMins(entries), [entries])
   const grossEst   = selectedEmp ? ((periodMins / 60) * (selectedEmp.pay_rate ?? 0)).toFixed(2) : '0.00'
   const hasGas     = selectedEmp?.gas_weekly_allowance != null && parseFloat(selectedEmp.gas_weekly_allowance) > 0
+  const totalWeekMiles = Object.values(weekMiles).reduce((s, m) => s + m, 0)
   const pendingCount = requests.length
 
   const handleSave = async (payload) => {
@@ -463,6 +502,12 @@ export default function AdminTimesheets() {
                     <GasIcon /> Gas ${selectedEmp.gas_weekly_allowance}/wk
                   </div>
                 )}
+                {totalWeekMiles > 0 && (
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Miles</p>
+                    <p className="text-xl font-bold text-sky-600">{totalWeekMiles.toFixed(1)} mi</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -518,6 +563,7 @@ export default function AdminTimesheets() {
                   : <div className="flex flex-col gap-3">
                       {dayGroups.map(([day, dayEntries]) => (
                         <DayGroup key={day} day={day} entries={dayEntries}
+                          miles={weekMiles[day] ?? 0}
                           onEdit={setEditModal} onDelete={setDeleteId} onAdd={setAddDate} />
                       ))}
                     </div>
@@ -598,7 +644,7 @@ export default function AdminTimesheets() {
       {/* Edit modal */}
       <Modal isOpen={!!editModal} onClose={() => setEditModal(null)} title="Edit Time Entry">
         {editModal && (
-          <EntryModal entry={editModal} userId={selectedEmp?.id}
+          <EntryModal entry={editModal} userId={selectedEmp?.id} jobs={allJobs}
             onSave={handleSave} onClose={() => setEditModal(null)} />
         )}
       </Modal>
@@ -606,7 +652,7 @@ export default function AdminTimesheets() {
       {/* Add modal */}
       <Modal isOpen={!!addDate} onClose={() => setAddDate(null)} title="Add Time Entry">
         {addDate && (
-          <EntryModal entry={null} defaultDate={addDate} userId={selectedEmp?.id}
+          <EntryModal entry={null} defaultDate={addDate} userId={selectedEmp?.id} jobs={allJobs}
             onSave={handleSave} onClose={() => setAddDate(null)} />
         )}
       </Modal>

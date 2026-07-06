@@ -17,7 +17,8 @@
   },
   "role": {
     "admin": "Administrador",
-    "employee": "Empleado"
+    "employee": "Empleado",
+    "contractor": "Contratista"
   },
   "lang": {
     "switchTo": "English",
@@ -53,7 +54,8 @@
     "currentLocation": "Ubicación Actual",
     "mustBeOnline": "Debes estar en línea para marcar entrada o salida.",
     "clockOutFailed": "Error al registrar salida. Sigues marcado como activo.",
-    "clockInFailed": "Error al registrar entrada. Intenta de nuevo."
+    "clockInFailed": "Error al registrar entrada. Intenta de nuevo.",
+    "switchJob": "Cambiar a Este Trabajo"
   },
   "status": {
     "working": "Trabajando",
@@ -121,7 +123,18 @@
     "regularHours": "Regular",
     "overtimeHours": "Tiempo Extra",
     "loanDeduction": "Descuento de Préstamo",
-    "weeklyRate": "Salario Semanal"
+    "weeklyRate": "Salario Semanal",
+    "paycheck": {
+      "processing": "En Proceso",
+      "available": "Disponible — Listo para Recoger",
+      "pickedUp": "Recogido",
+      "title": "Estado de Pago",
+      "none": "Aún no hay registros de pago.",
+      "history": "Pagos Anteriores",
+      "notificationsOn": "Notificaciones activas — toca para desactivar",
+      "enableNotifications": "Activar notificaciones de pago"
+    },
+    "todayMiles": "Millas de Hoy"
   },
   "timeoff": {
     "title": "Tiempo Libre",
@@ -171,7 +184,8 @@
       "tooShort": "La contraseña debe tener al menos 6 caracteres.",
       "mismatch": "Las contraseñas no coinciden.",
       "failed": "No se pudo establecer la contraseña. Intenta de nuevo."
-    }
+    },
+    "passwordRequired": "La contraseña es obligatoria."
   },
   "dashboard": {
     "overview": "Resumen de hoy",
@@ -183,13 +197,11 @@
     "currentlyClockedIn": "Actualmente Registrados"
   },
   "common": {
-    "cancel": "Cancelar",
-    "save": "Guardar",
     "loading": "Cargando…",
-    "error": "Algo salió mal.",
-    "start": "Inicio",
-    "end": "Fin",
-    "admin": "Administrador"
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "deleting": "Eliminando…",
+    "uploading": "Subiendo…"
   },
   "pendingDocs": {
     "banner_one": "{{count}} documento requerido necesita tu firma",
@@ -220,5 +232,62 @@
     "immutable": "Una vez enviado, este documento no puede modificarse.",
     "agreeCheck": "He leído y entiendo completamente este documento. Acepto sus términos y condiciones.",
     "pendingLabel": "Pendiente"
+  },
+  "pendingContractorDocs": {
+    "banner_one": "{{count}} documento requerido pendiente",
+    "banner_other": "{{count}} documentos requeridos pendientes",
+    "uploadNow": "Subir Ahora"
+  },
+  "contractor": {
+    "nav": {
+      "portal": "Portal de Contratistas",
+      "invoices": "Mis Facturas",
+      "documents": "Documentos"
+    },
+    "invoice": {
+      "title": "Mis Facturas",
+      "subtitle": "Envía tu factura semanal y rastrea tus pagos",
+      "thisWeek": "Esta Semana",
+      "lastWeek": "La Semana Pasada",
+      "submittedThisWeek": "Factura enviada esta semana. Te notificaremos cuando tu cheque esté listo.",
+      "noneThisWeek": "Aún no has enviado factura esta semana.",
+      "noneForWeek": "No hay facturas para esta semana.",
+      "submit": "Enviar Factura",
+      "submitOne": "Enviar una",
+      "payWeek": "Semana de Pago",
+      "amountOptional": "Monto de Factura (opcional)",
+      "fileLabel": "Archivo de Factura",
+      "fileHint": "Toca para elegir un PDF o foto",
+      "fileTypes": "PDF, JPEG, PNG, WEBP · máx 10 MB",
+      "history": "Historial",
+      "note": "Nota",
+      "viewInvoice": "Ver factura",
+      "deleteInvoice": "Eliminar factura",
+      "deleteTitle": "¿Eliminar Factura?",
+      "deleteConfirm": "Esto eliminará permanentemente {{name}}. Esta acción no se puede deshacer.",
+      "readyForPickup": "¡Lista para recoger!",
+      "notificationsOn": "Notificaciones activadas — toca para desactivar",
+      "enableNotifications": "Activar notificaciones push",
+      "status": {
+        "submitted": "Enviada",
+        "under_review": "En Revisión",
+        "check_ready": "Cheque Listo",
+        "paid": "Pagada"
+      }
+    },
+    "docs": {
+      "title": "Documentos Legales",
+      "subtitle": "Documentos requeridos para tu expediente de contratista. Una vez subidos, se guardan permanentemente.",
+      "w9": "W-9",
+      "w9Desc": "Solicitud de Número de Identificación del Contribuyente y Certificación",
+      "workersComp": "Compensación Laboral",
+      "workersCompDesc": "Prueba de cobertura de seguro de compensación laboral",
+      "onFile": "En archivo",
+      "required": "Requerido",
+      "upload": "Subir",
+      "replace": "Reemplazar",
+      "previousVersions": "Versiones anteriores",
+      "footer": "Los documentos se almacenan de forma segura y solo son accesibles para ti y los administradores de JCCS. Una vez subidos, no se pueden eliminar."
+    }
   }
 }

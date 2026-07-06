@@ -55,10 +55,13 @@ if ($u['pay_type'] === 'w2') {
     foreach ($weekMins as $m) {
         $h = $m / 60; $regHours += min($h, 40); $otHours += max(0, $h - 40);
     }
-    $baseGross = ($regHours * $u['pay_rate']) + ($otHours * ($u['overtime_rate'] ?? $u['pay_rate'] * 1.5));
+    $rate      = (float)($u['pay_rate'] ?? 0);
+    $otRate    = (float)($u['overtime_rate'] ?? $rate * 1.5);
+    $baseGross = ($regHours * $rate) + ($otHours * $otRate);
 } else {
+    $rate      = (float)($u['pay_rate'] ?? 0);
     $regHours  = $totalApproved;
-    $baseGross = $totalApproved * $u['pay_rate'];
+    $baseGross = $totalApproved * $rate;
 }
 
 $gasTotal = $u['gas_weekly_allowance'] !== null ? ($u['gas_weekly_allowance'] * $weeksWorked) : 0;

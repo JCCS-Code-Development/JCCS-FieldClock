@@ -47,3 +47,6 @@ export const adminUpdateEntry = (data) =>
 
 export const adminDeleteEntry = (id) =>
   client.delete('/timeclock/admin-entry.php', { params: { id } }).then((r) => r.data)
+
+export const switchJob = (payload) =>
+  client.post('/timeclock/switch-job.php', payload).then((r) => r.data)

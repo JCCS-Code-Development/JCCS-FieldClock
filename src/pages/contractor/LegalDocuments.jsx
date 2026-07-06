@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
+import { es, enUS } from 'date-fns/locale'
+import { useTranslation } from 'react-i18next'
 import { listDocuments, uploadDocument, getDocumentUrl } from '../../api/documents'
 
-const DOC_TYPES = [
+const DOC_TYPE_KEYS = [
   {
     key: 'w9',
-    label: 'W-9',
-    description: 'Request for Taxpayer Identification Number and Certification',
+    labelKey: 'contractor.docs.w9',
+    descKey:  'contractor.docs.w9Desc',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-7 text-brand-500">
         <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
@@ -15,8 +17,8 @@ const DOC_TYPES = [
   },
   {
     key: 'workers_comp',
-    label: "Worker's Compensation",
-    description: 'Proof of workers\' compensation insurance coverage',
+    labelKey: 'contractor.docs.workersComp',
+    descKey:  'contractor.docs.workersCompDesc',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-7 text-brand-500">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
@@ -44,6 +46,10 @@ const CheckIcon = () => (
 )
 
 export default function LegalDocuments() {
+  const { t, i18n } = useTranslation()
+  const dfnsLocale   = i18n.language.startsWith('es') ? es : enUS
+  const DOC_TYPES    = DOC_TYPE_KEYS.map((d) => ({ ...d, label: t(d.labelKey), description: t(d.descKey) }))
+
   const [documents, setDocuments] = useState([])
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
@@ -101,10 +107,8 @@ export default function LegalDocuments() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Legal Documents</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          Required documents for your contractor record. Once uploaded, documents are kept permanently on file.
-        </p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('contractor.docs.title')}</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{t('contractor.docs.subtitle')}</p>
       </div>
 
       {error && <p className="text-sm text-red-500 bg-red-50 rounded-xl px-4 py-3">{error}</p>}
@@ -127,11 +131,11 @@ export default function LegalDocuments() {
                     {latest ? (
                       <span className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
                         <CheckIcon />
-                        On file
+                        {t('contractor.docs.onFile')}
                       </span>
                     ) : (
                       <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                        Required
+                        {t('contractor.docs.required')}
                       </span>
                     )}
                   </div>
@@ -150,7 +154,7 @@ export default function LegalDocuments() {
                         {latest.file_original_name}
                       </a>
                       <span className="text-xs text-gray-400">
-                        · {format(parseISO(latest.uploaded_at), 'MMM d, yyyy')}
+                        · {format(parseISO(latest.uploaded_at), 'MMM d, yyyy', { locale: dfnsLocale })}
                       </span>
                     </div>
                   )}
@@ -164,7 +168,7 @@ export default function LegalDocuments() {
                     className="flex items-center gap-2 px-4 py-2 bg-brand-500 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 transition-colors disabled:opacity-60"
                   >
                     <UploadIcon />
-                    {isUploading ? 'Uploading…' : latest ? 'Replace' : 'Upload'}
+                    {isUploading ? t('common.uploading') : latest ? t('contractor.docs.replace') : t('contractor.docs.upload')}
                   </button>
                   <input
                     ref={fileRefs[key]}
@@ -183,7 +187,7 @@ export default function LegalDocuments() {
               {/* Version history */}
               {history.length > 1 && (
                 <div className="border-t border-gray-100 px-5 py-3">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Previous versions</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{t('contractor.docs.previousVersions')}</p>
                   <div className="space-y-1.5">
                     {history.slice(1).map((doc) => (
                       <div key={doc.id} className="flex items-center gap-2">
@@ -197,7 +201,7 @@ export default function LegalDocuments() {
                           {doc.file_original_name}
                         </a>
                         <span className="text-xs text-gray-300">
-                          {format(parseISO(doc.uploaded_at), 'MMM d, yyyy')}
+                          {format(parseISO(doc.uploaded_at), 'MMM d, yyyy', { locale: dfnsLocale })}
                         </span>
                       </div>
                     ))}
@@ -209,10 +213,7 @@ export default function LegalDocuments() {
         })}
       </div>
 
-      <p className="text-xs text-gray-400 text-center pb-4">
-        Documents are stored securely and are only accessible to you and JCCS administrators.
-        Once uploaded, documents cannot be deleted.
-      </p>
+      <p className="text-xs text-gray-400 text-center pb-4">{t('contractor.docs.footer')}</p>
     </div>
   )
 }

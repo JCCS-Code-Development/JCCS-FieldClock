@@ -7,6 +7,7 @@ export default function StatsCard({ label, value, icon, color = 'blue', onClick 
     purple: 'bg-purple-50 text-purple-600',
     indigo: 'bg-indigo-50 text-indigo-600',
     violet: 'bg-violet-50 text-violet-600',
+    sky:    'bg-sky-50    text-sky-600',
   }
   return (
     <div

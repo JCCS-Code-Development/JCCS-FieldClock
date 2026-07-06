@@ -33,6 +33,7 @@ export default function WorkOrders() {
       .finally(() => setLoading(false))
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [jobId])
 
   const handleComplete = async (id, notes) => {

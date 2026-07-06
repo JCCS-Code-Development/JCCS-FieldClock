@@ -5,7 +5,7 @@ import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
 import { listLoans, getLoan, createLoan, updateLoan, deleteLoan, recordPayment, deletePayment } from '../../api/loans'
 import { listEmployees } from '../../api/employees'
-import { formatCurrency, formatDate } from '../../utils/format'
+import { formatCurrency } from '../../utils/format'
 import { format, startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 
 const periods = Array.from({ length: 8 }, (_, i) => {
@@ -84,6 +84,7 @@ export default function AdminLoans() {
     } finally { setLoading(false) }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [statusFilter])
 
   // ── Expand / collapse loan detail ───────────────────────────────
@@ -228,7 +229,7 @@ export default function AdminLoans() {
           {loans.map((loan) => {
             const isExpanded = expanded === loan.id
             const loanDetail = detail[loan.id]
-            const paidPct    = loan.amount > 0 ? Math.min((loan.paid_total / loan.amount) * 100, 100) : 0
+            const _paidPct   = loan.amount > 0 ? Math.min((loan.paid_total / loan.amount) * 100, 100) : 0
             const isPaidOff  = loan.status === 'paid_off'
 
             return (

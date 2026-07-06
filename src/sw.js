@@ -33,16 +33,27 @@ registerRoute(
 )
 
 // ── Push notifications ───────────────────────────────────────────
+const PUSH_CONFIGS = {
+  paycheck:    { body: 'Your paycheck is available. Tap to view.',        tag: 'paycheck',    url: '/my-pay' },
+  check_ready: { body: 'Your check is ready for this week. Tap to view.', tag: 'check-ready', url: '/contractor/invoices' },
+}
+
 self.addEventListener('push', (event) => {
+  let cfg = PUSH_CONFIGS.check_ready
+  try {
+    const data = JSON.parse(event.data?.text() ?? '{}')
+    if (data.type && PUSH_CONFIGS[data.type]) cfg = PUSH_CONFIGS[data.type]
+  } catch {}
+
   event.waitUntil(
     self.registration.showNotification('JCCS FieldClock', {
-      body: 'Your check is ready for this week. Log in to view payment details.',
-      icon: '/pwa-192x192.png',
-      badge: '/pwa-192x192.png',
+      body:    cfg.body,
+      icon:    '/pwa-192x192.png',
+      badge:   '/pwa-192x192.png',
       vibrate: [200, 100, 200],
-      tag: 'check-ready',
+      tag:     cfg.tag,
       renotify: true,
-      data: { url: '/contractor/invoices' },
+      data:    { url: cfg.url },
     })
   )
 })

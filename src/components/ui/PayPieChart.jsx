@@ -56,7 +56,7 @@ export default function PayPieChart({ base = 0, gas = 0, bonus = 0, loan = 0, co
     })
 
   const chartSize = compact ? 160 : SIZE
-  const scale     = chartSize / SIZE
+  const _scale    = chartSize / SIZE
 
   return (
     <div className={`flex ${compact ? 'flex-col items-center gap-3' : 'flex-col gap-4'} w-full`}>

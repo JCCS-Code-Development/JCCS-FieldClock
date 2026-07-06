@@ -8,6 +8,9 @@ import Spinner from '../../components/ui/Spinner'
 import { getMyPay } from '../../api/payroll'
 import { getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
 import { listLoans, getMyPeriodLoanDeduction } from '../../api/loans'
+import { listPaychecks } from '../../api/paychecks'
+import { subscribeToPush, unsubscribeFromPush, getCurrentSubscription } from '../../api/push'
+import { getDailyMileage } from '../../api/gps'
 import PayPieChart from '../../components/ui/PayPieChart'
 import { getTimeOffRequests, createTimeOffRequest, reviewTimeOffRequest } from '../../api/timeoff'
 import { formatCurrency, formatHours, formatDate, formatTime } from '../../utils/format'
@@ -55,6 +58,14 @@ export default function MyPay() {
   const [toSaving, setToSaving]     = useState(false)
   const [toError, setToError]       = useState('')
 
+  // Paycheck status + push notifications
+  const [paychecks,   setPaychecks]   = useState([])
+  const [pushSub,     setPushSub]     = useState(null)
+  const [pushLoading, setPushLoading] = useState(false)
+
+  // Mileage
+  const [todayMiles, setTodayMiles] = useState(null)
+
   const p = periods[selectedPeriod]
 
   const loadTimeOff = () =>
@@ -64,6 +75,21 @@ export default function MyPay() {
     setLoadingLoans(true)
     listLoans().catch(() => ({ loans: [] })).then(d => setMyLoans(d.loans ?? [])).finally(() => setLoadingLoans(false))
   }
+
+  const togglePush = async () => {
+    setPushLoading(true)
+    try {
+      if (pushSub) { await unsubscribeFromPush(); setPushSub(null) }
+      else { const sub = await subscribeToPush(); setPushSub(sub) }
+    } catch {}
+    setPushLoading(false)
+  }
+
+  useEffect(() => {
+    listPaychecks().then((d) => setPaychecks(d.paychecks ?? [])).catch(() => {})
+    getCurrentSubscription().then(setPushSub).catch(() => {})
+    getDailyMileage().then((d) => setTodayMiles(d.daily_miles ?? 0)).catch(() => {})
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -80,6 +106,7 @@ export default function MyPay() {
       setTimeOffRequests(toReqs?.requests ?? [])
       setPeriodLoanDed(loanDed ?? 0)
     }).finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPeriod])
 
   useEffect(() => { if (tab === 'loans') loadLoans() }, [tab])
@@ -167,19 +194,84 @@ export default function MyPay() {
       ) : (
         <>
           {tab === 'pay' && (
-            !data
-              ? <p className="text-center text-gray-400 py-12 text-sm">{t('pay.noData')}</p>
-              : (() => {
-                  const gasAdj   = data.adjustments?.filter((a) => a.type === 'gas_allowance').reduce((s, a) => s + parseFloat(a.amount), 0) ?? 0
-                  const bonusAdj = data.adjustments?.filter((a) => a.type !== 'gas_allowance').reduce((s, a) => s + parseFloat(a.amount), 0) ?? 0
-                  const gas      = (data.gas_total ?? 0) + gasAdj
-                  const isSalary = data.pay_structure === 'salary'
-                  const isW2     = data.pay_type === 'w2'
-                  const rate     = data.user?.pay_rate ?? 0
-                  const otRate   = data.user?.overtime_rate ?? 0
-                  return (
-                    <>
-                      {/* ── Stat cards ── */}
+            <>
+              {/* ── Paycheck status ── */}
+              {(() => {
+                const latest = paychecks[0] ?? null
+                const statusCfg = {
+                  processing: { label: t('pay.paycheck.processing'), color: 'text-amber-700 bg-amber-50 border-amber-200' },
+                  available:  { label: t('pay.paycheck.available'),  color: 'text-green-700 bg-green-50 border-green-200'  },
+                  picked_up:  { label: t('pay.paycheck.pickedUp'),   color: 'text-gray-600  bg-gray-50  border-gray-200'   },
+                }
+                const cfg = latest ? (statusCfg[latest.status] ?? statusCfg.processing) : null
+                return (
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-base font-semibold text-gray-900">{t('pay.paycheck.title')}</h2>
+                      <button
+                        onClick={togglePush}
+                        disabled={pushLoading}
+                        title={pushSub ? t('pay.paycheck.notificationsOn') : t('pay.paycheck.enableNotifications')}
+                        className={`p-2 rounded-xl transition-colors ${pushSub ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                      >
+                        <svg viewBox="0 0 24 24" fill={pushSub ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                      </button>
+                    </div>
+                    {!latest
+                      ? <p className="text-sm text-gray-400">{t('pay.paycheck.none')}</p>
+                      : (
+                        <div className="space-y-3">
+                          <div className={`flex items-center justify-between rounded-xl border px-4 py-3 ${cfg.color}`}>
+                            <div>
+                              <p className="text-sm font-semibold">{cfg.label}</p>
+                              <p className="text-xs opacity-70 mt-0.5">
+                                {formatDate(latest.period_start)} – {formatDate(latest.period_end)}
+                                {latest.amount ? ` · ${formatCurrency(parseFloat(latest.amount))}` : ''}
+                              </p>
+                              {latest.notes && <p className="text-xs opacity-60 mt-0.5">{latest.notes}</p>}
+                            </div>
+                            {latest.status === 'available' && (
+                              <span className="text-2xl" title={t('pay.paycheck.available')}>🎉</span>
+                            )}
+                          </div>
+                          {paychecks.length > 1 && (
+                            <div>
+                              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{t('pay.paycheck.history')}</p>
+                              <div className="space-y-1.5">
+                                {paychecks.slice(1, 5).map((pc) => {
+                                  const c = statusCfg[pc.status] ?? statusCfg.processing
+                                  return (
+                                    <div key={pc.id} className="flex items-center justify-between text-sm text-gray-600">
+                                      <span>{formatDate(pc.period_start)} – {formatDate(pc.period_end)}</span>
+                                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c.color}`}>{c.label}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+                  </div>
+                )
+              })()}
+
+              {!data
+                ? <p className="text-center text-gray-400 py-12 text-sm">{t('pay.noData')}</p>
+                : (() => {
+                    const gasAdj   = data.adjustments?.filter((a) => a.type === 'gas_allowance').reduce((s, a) => s + parseFloat(a.amount), 0) ?? 0
+                    const bonusAdj = data.adjustments?.filter((a) => a.type !== 'gas_allowance').reduce((s, a) => s + parseFloat(a.amount), 0) ?? 0
+                    const gas      = (data.gas_total ?? 0) + gasAdj
+                    const isSalary = data.pay_structure === 'salary'
+                    const isW2     = data.pay_type === 'w2'
+                    const rate     = data.user?.pay_rate ?? 0
+                    const otRate   = data.user?.overtime_rate ?? 0
+                    return (
+                      <>
+                        {/* ── Stat cards ── */}
                       <div className="grid grid-cols-2 gap-3">
                         <StatsCard
                           label={t('pay.todayHours')}
@@ -205,6 +297,14 @@ export default function MyPay() {
                           icon={GrossIcon}
                           color="green"
                         />
+                        {todayMiles !== null && (
+                          <StatsCard
+                            label={t('pay.todayMiles')}
+                            value={`${todayMiles.toFixed(1)} mi`}
+                            icon={MileageIcon}
+                            color="sky"
+                          />
+                        )}
                       </div>
 
                       {/* ── Pie chart ── */}
@@ -253,7 +353,8 @@ export default function MyPay() {
                       {!isW2 && <div className="bg-blue-50  rounded-xl px-4 py-3 text-sm text-blue-700" >{t('pay.1099Notice')}</div>}
                     </>
                   )
-                })()
+                })()}
+            </>
           )}
 
           {tab === 'log' && (
@@ -466,6 +567,7 @@ export default function MyPay() {
   )
 }
 
+const MileageIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 13l4.553 2.276A1 1 0 0021 21.382V10.618a1 1 0 00-.553-.894L15 7m0 13V7m0 0L9 4"/></svg>
 const ClockIcon  = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 7v5l3.5 3.5"/></svg>
 const CalendarIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="4" width="18" height="18" rx="2"/><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18"/></svg>
 const RateIcon   = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-2.21 0-4 .9-4 2s1.79 2 4 2 4 .9 4 2-1.79 2-4 2m0-8v1m0 9v1"/><circle cx="12" cy="12" r="9"/></svg>

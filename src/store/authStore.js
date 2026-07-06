@@ -15,7 +15,8 @@ export const useAuthStore = create(
       logout: () =>
         set({ user: null, token: null, refreshToken: null, isAuthenticated: false }),
 
-      updateToken: (token) => set({ token }),
+      updateToken: (token, refreshToken) =>
+        set(refreshToken ? { token, refreshToken } : { token }),
     }),
     { name: 'fieldclock-auth' }
   )

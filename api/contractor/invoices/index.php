@@ -80,8 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $filePath    = 'uploads/invoices/' . $userId . '/' . $filename;
     $origName    = sanitizeString($file['name']);
     $amount      = !empty($_POST['amount']) ? (float)$_POST['amount'] : null;
-    $periodStart = $_POST['period_start'];
-    $periodEnd   = $_POST['period_end'];
+    $periodStart = sanitizeString($_POST['period_start'] ?? '');
+    $periodEnd   = sanitizeString($_POST['period_end']   ?? '');
 
     $pdo->prepare(
         'INSERT INTO contractor_invoices (user_id, period_start, period_end, file_path, file_original_name, file_type, amount, status)

@@ -200,7 +200,7 @@ function FI({ label, children, required }) {
   )
 }
 const inputCls = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-brand-500'
-const selectCls = `${inputCls} bg-white`
+const _selectCls = `${inputCls} bg-white`
 
 function EmergencyContactForm({ data, onChange, disabled }) {
   const set = (field) => (e) => onChange({ ...data, [field]: e.target.value })
@@ -256,7 +256,7 @@ function EmergencyContactForm({ data, onChange, disabled }) {
   )
 }
 
-function I9Form({ data, onChange, disabled, empName }) {
+function I9Form({ data, onChange, disabled, empName: _empName }) {
   const set = (field) => (e) => onChange({ ...data, [field]: e.target.value })
   return (
     <div className="space-y-5">

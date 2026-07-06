@@ -25,6 +25,7 @@ export default function ClockAction() {
   const [error, setError] = useState(null)
   const [arrivalResult, setArrivalResult] = useState(null) // { within_radius, distance_meters }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { getPosition() }, [])
 
   useEffect(() => {

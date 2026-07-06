@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ActionButton from '../ui/ActionButton'
 import Badge from '../ui/Badge'
-import Spinner from '../ui/Spinner'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useTimeclockStore } from '../../store/timeclockStore'
 import {
@@ -51,7 +50,6 @@ export default function ClockWidget() {
     setTimeclockData(data)
     setError(null)
   }
-  const handleError = (err) => setError(err?.response?.data?.error ?? 'Something went wrong.')
 
   const startDay = useGPSAction(dayStart, refresh)
   const endDay = useGPSAction(dayEnd, refresh)

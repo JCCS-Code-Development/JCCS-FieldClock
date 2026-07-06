@@ -16,5 +16,12 @@ $stmt->execute([$rt]);
 $row = $stmt->fetch();
 if (!$row) { http_response_code(401); exit(json_encode(['error' => 'Invalid or expired refresh token'])); }
 
+// Rotate: delete the used token and issue a new one
+$pdo->prepare('DELETE FROM refresh_tokens WHERE token_hash = SHA2(?,256)')->execute([$rt]);
+$newRefreshToken = bin2hex(random_bytes(32));
+$pdo->prepare('INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES (?, SHA2(?,256), NOW() + INTERVAL ? SECOND)')
+    ->execute([$row['user_id'], $newRefreshToken, JWT_REFRESH_EXPIRY]);
+
 $token = jwt_encode(['user_id' => $row['user_id'], 'role' => $row['role']]);
-echo json_encode(['token' => $token]);
+echo json_encode(['token' => $token, 'refreshToken' => $newRefreshToken]);
+exit;

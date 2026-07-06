@@ -4,12 +4,13 @@ import { getStatus } from '../api/timeclock'
 
 export function useTimeclock() {
   const store = useTimeclockStore()
+  const { setTimeclockData } = store
 
   useEffect(() => {
     getStatus()
-      .then((data) => store.setTimeclockData(data))
+      .then(setTimeclockData)
       .catch(() => {})
-  }, [])
+  }, [setTimeclockData])
 
   return store
 }

@@ -4,10 +4,11 @@ import PrintChecks from '../../components/admin/PrintChecks'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
-import { getSummary, getBreakdown, listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment } from '../../api/payroll'
+import { getSummary, getBreakdown, listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment, listFlatRatePayments, createFlatRatePayment, updateFlatRatePayment, deleteFlatRatePayment } from '../../api/payroll'
 import { listEmployees } from '../../api/employees'
 import { listInvoices, updateInvoiceStatus, getDownloadUrl } from '../../api/contractor'
 import { getPeriodLoanTotals } from '../../api/loans'
+import { listPaychecks, createPaycheck, updatePaycheck, deletePaycheck } from '../../api/paychecks'
 import PayPieChart from '../../components/ui/PayPieChart'
 import { formatCurrency, formatHours, formatDate } from '../../utils/format'
 import { format, startOfWeek, endOfWeek, subWeeks } from 'date-fns'
@@ -92,6 +93,26 @@ export default function AdminPayroll() {
   const [gasChecked,   setGasChecked]   = useState({})
   const [gasSaving,    setGasSaving]    = useState(false)
 
+  // Flat rate payments
+  const [flatRatePayments, setFlatRatePayments] = useState([])
+  const [loadingFR,        setLoadingFR]        = useState(false)
+  const [frModal,          setFrModal]          = useState(false)
+  const [frForm,           setFrForm]           = useState({ user_id: '', amount: '', description: '' })
+  const [frSaving,         setFrSaving]         = useState(false)
+  const [frError,          setFrError]          = useState('')
+  const [frPrintOpen,      setFrPrintOpen]      = useState(false)
+
+  // Paychecks
+  const [paychecks,      setPaychecks]      = useState([])
+  const [loadingPay,     setLoadingPay]     = useState(false)
+  const [pcModal,        setPcModal]        = useState(false)   // create modal
+  const [pcForm,         setPcForm]         = useState({ user_id: '', amount: '', notes: '' })
+  const [pcSaving,       setPcSaving]       = useState(false)
+  const [pcError,        setPcError]        = useState('')
+  const [pcStatusTarget, setPcStatusTarget] = useState(null)    // { paycheck, nextStatus }
+  const [pcStatusSaving, setPcStatusSaving] = useState(false)
+  const [employees,      setEmployees]      = useState([])
+
   const p = periods[period]
 
   const loadSummary = () => {
@@ -108,6 +129,13 @@ export default function AdminPayroll() {
       .finally(() => setLoadingAdj(false))
   }
 
+  const loadFlatRatePayments = () => {
+    setLoadingFR(true)
+    listFlatRatePayments({ period_start: p.start, period_end: p.end })
+      .then((d) => setFlatRatePayments(d.flat_rate_payments ?? []))
+      .finally(() => setLoadingFR(false))
+  }
+
   const loadContractorInvoices = () => {
     setLoadingInvs(true)
     listInvoices({ period_start: p.start, period_end: p.end })
@@ -115,12 +143,63 @@ export default function AdminPayroll() {
       .finally(() => setLoadingInvs(false))
   }
 
+  const loadPaychecks = () => {
+    setLoadingPay(true)
+    listPaychecks().then((d) => setPaychecks(d.paychecks ?? [])).finally(() => setLoadingPay(false))
+  }
+
   useEffect(() => {
     loadSummary()
     loadAdjustments()
     loadContractorInvoices()
+    loadFlatRatePayments()
     getPeriodLoanTotals(p.start, p.end).then(setLoanDeductions).catch(() => setLoanDeductions({}))
+    setFrPrintOpen(false)  // close flat rate print if period changes mid-open
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period])
+
+  useEffect(() => {
+    loadPaychecks()
+    listEmployees({ role: 'employee', active: 1 }).then((d) => setEmployees(d.employees ?? [])).catch(() => {})
+  }, [])
+
+  const handleCreatePaycheck = async (e) => {
+    e.preventDefault()
+    if (!pcForm.user_id) { setPcError('Select an employee.'); return }
+    setPcSaving(true); setPcError('')
+    try {
+      await createPaycheck({
+        user_id:      parseInt(pcForm.user_id),
+        period_start: p.start,
+        period_end:   p.end,
+        amount:       pcForm.amount ? parseFloat(pcForm.amount) : null,
+        notes:        pcForm.notes || null,
+      })
+      setPcModal(false)
+      setPcForm({ user_id: '', amount: '', notes: '' })
+      loadPaychecks()
+    } catch (err) {
+      setPcError(err?.response?.data?.error ?? 'Failed to create paycheck.')
+    }
+    setPcSaving(false)
+  }
+
+  const handlePcStatus = async () => {
+    if (!pcStatusTarget) return
+    setPcStatusSaving(true)
+    try {
+      await updatePaycheck({ id: pcStatusTarget.paycheck.id, status: pcStatusTarget.nextStatus })
+      setPcStatusTarget(null)
+      loadPaychecks()
+    } catch {}
+    setPcStatusSaving(false)
+  }
+
+  const handleDeletePaycheck = async (id) => {
+    if (!window.confirm('Delete this paycheck record?')) return
+    await deletePaycheck(id)
+    loadPaychecks()
+  }
 
   // ── Drill-down ───────────────────────────────────────────────────
   const openDrillDown = async (emp) => {
@@ -152,7 +231,7 @@ export default function AdminPayroll() {
         amount: parseFloat(bonusForm.amount), description: bonusForm.description.trim(),
         period_start: p.start, period_end: p.end,
       }
-      bonusModal.id ? await updateAdjustment(bonusModal.id, payload) : await createAdjustment(payload)
+      if (bonusModal.id) { await updateAdjustment(bonusModal.id, payload) } else { await createAdjustment(payload) }
       setBonusModal(null); loadSummary(); loadAdjustments()
     } catch (err) {
       setBonusError(err?.response?.data?.error ?? 'Could not save. Try again.')
@@ -165,6 +244,50 @@ export default function AdminPayroll() {
       await deleteAdjustment(deleteAdj.id)
       setDeleteAdj(null); loadSummary(); loadAdjustments()
     } finally { setDeletingAdj(false) }
+  }
+
+  // ── Flat rate payments CRUD ──────────────────────────────────────
+  const handleCreateFlatRate = async (e) => {
+    e.preventDefault()
+    if (!frForm.user_id)    { setFrError('Select an employee.'); return }
+    if (!frForm.amount || isNaN(parseFloat(frForm.amount))) { setFrError('Enter a valid amount.'); return }
+    if (!frForm.description.trim()) { setFrError('Enter a description.'); return }
+    setFrSaving(true); setFrError('')
+    try {
+      await createFlatRatePayment({
+        user_id:      parseInt(frForm.user_id),
+        amount:       parseFloat(frForm.amount),
+        description:  frForm.description.trim(),
+        period_start: p.start,
+        period_end:   p.end,
+      })
+      setFrModal(false)
+      setFrForm({ user_id: '', amount: '', description: '' })
+      loadFlatRatePayments()
+    } catch (err) {
+      setFrError(err?.response?.data?.error ?? 'Could not save. Try again.')
+    } finally {
+      setFrSaving(false)
+    }
+  }
+
+  const handleFrMarkIssued = async (fr) => {
+    try {
+      await updateFlatRatePayment(fr.id, { status: 'issued' })
+      loadFlatRatePayments()
+    } catch (err) {
+      alert(err?.response?.data?.error ?? 'Could not mark as issued. Try again.')
+    }
+  }
+
+  const handleDeleteFlatRate = async (fr) => {
+    if (!window.confirm(`Delete flat rate payment for ${fr.user_name}?`)) return
+    try {
+      await deleteFlatRatePayment(fr.id)
+      loadFlatRatePayments()
+    } catch (err) {
+      alert(err?.response?.data?.error ?? 'Could not delete. Try again.')
+    }
   }
 
   // ── Contractor invoice status ────────────────────────────────────
@@ -189,7 +312,7 @@ export default function AdminPayroll() {
     const active = (d.employees ?? []).filter((e) => e.is_active)
     const amounts = {}; const checked = {}
     active.forEach((e) => { amounts[e.id] = e.gas_weekly_allowance ?? 70; checked[e.id] = false })
-    summary.forEach((s) => { if ((s.approved_hours ?? 0) > 0) checked[s.user_id] = true })
+    summary.forEach((s) => { if (((s.regular_hours ?? 0) + (s.overtime_hours ?? 0)) > 0) checked[s.user_id] = true })
     setGasEmployees(active); setGasAmounts(amounts); setGasChecked(checked); setGasModal(true)
   }
 
@@ -221,9 +344,14 @@ export default function AdminPayroll() {
     else bonusByUser[uid] = (bonusByUser[uid] ?? 0) + parseFloat(a.amount ?? 0)
   })
 
+  const pendingPcCount = paychecks.filter((p) => p.status === 'processing').length
+  const pendingFRCount = flatRatePayments.filter((fr) => fr.status === 'pending').length
+
   const TABS = [
     { key: 'w2',          label: 'W-2 Employees' },
     { key: '1099',        label: '1099 Employees' },
+    { key: 'flat_rate',   label: 'Flat Rate', badge: pendingFRCount || null },
+    { key: 'paychecks',   label: 'Paychecks', badge: pendingPcCount || null },
     { key: 'contractors', label: 'Contractors', badge: pendingInvCount || null },
   ]
 
@@ -231,12 +359,19 @@ export default function AdminPayroll() {
     <div className="w-full">
       <PageHeader title="Payroll" subtitle="Review pay by period"
         actions={
-          tab !== 'contractors'
+          tab === 'w2' || tab === '1099'
             ? <div className="flex gap-2">
                 <Button variant="secondary" onClick={openGasReview}>Review Gas Allowances</Button>
                 <Button onClick={() => setPrintOpen(true)}>Print Checks</Button>
               </div>
-            : null
+            : tab === 'flat_rate'
+              ? <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => setFrPrintOpen(true)} disabled={flatRatePayments.length === 0}>Print Flat Rate Checks</Button>
+                  <Button onClick={() => { setFrForm({ user_id: '', amount: '', description: '' }); setFrError(''); setFrModal(true) }}>+ Add Payment</Button>
+                </div>
+            : tab === 'paychecks'
+              ? <Button onClick={() => { setPcForm({ user_id: '', amount: '', notes: '' }); setPcError(''); setPcModal(true) }}>+ Add Paycheck</Button>
+              : null
         }
       />
 
@@ -268,7 +403,7 @@ export default function AdminPayroll() {
       </div>
 
       {/* ── W-2 / 1099 tab content ─────────────────────────────────── */}
-      {tab !== 'contractors' && (
+      {(tab === 'w2' || tab === '1099') && (
         <>
           {/* Pay summary table */}
           {loading ? <div className="flex justify-center py-16"><Spinner size="lg" /></div> : (
@@ -297,7 +432,7 @@ export default function AdminPayroll() {
                       <tr key={emp.user_id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
                         onClick={() => openDrillDown(emp)}>
                         <td className="px-5 py-3 font-medium text-gray-900">{emp.name}</td>
-                        <td className="px-4 py-3 text-right text-gray-600">{formatHours(emp.approved_hours ?? 0)}</td>
+                        <td className="px-4 py-3 text-right text-gray-600">{formatHours((emp.regular_hours ?? 0) + (emp.overtime_hours ?? 0))}</td>
                         <td className="px-4 py-3 text-right">{formatCurrency(emp.base_gross ?? 0)}</td>
                         <td className="px-4 py-3 text-right text-amber-600 font-medium">
                           {gas > 0 ? formatCurrency(gas) : <span className="text-gray-300">—</span>}
@@ -315,7 +450,7 @@ export default function AdminPayroll() {
                   {filtered.length > 0 && (
                     <tr className="bg-gray-50 font-semibold text-sm">
                       <td className="px-5 py-3 text-gray-700">Totals</td>
-                      <td className="px-4 py-3 text-right">{formatHours(filtered.reduce((s, e) => s + (e.approved_hours ?? 0), 0))}</td>
+                      <td className="px-4 py-3 text-right">{formatHours(filtered.reduce((s, e) => s + (e.regular_hours ?? 0) + (e.overtime_hours ?? 0), 0))}</td>
                       <td className="px-4 py-3 text-right">{formatCurrency(filtered.reduce((s, e) => s + (e.base_gross ?? 0), 0))}</td>
                       <td className="px-4 py-3 text-right text-amber-600">
                         {formatCurrency(filtered.reduce((s, e) => s + (gasByUser[e.user_id] ?? 0), 0))}
@@ -399,6 +534,79 @@ export default function AdminPayroll() {
             )}
           </div>
         </>
+      )}
+
+      {/* ── Flat Rate tab content ─────────────────────────────────── */}
+      {tab === 'flat_rate' && (
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h3 className="font-semibold text-gray-900">Flat Rate Payments</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{p.label} · Separate checks for specific contracted work</p>
+          </div>
+
+          {loadingFR ? (
+            <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+          ) : flatRatePayments.length === 0 ? (
+            <div className="py-16 text-center">
+              <p className="text-sm text-gray-400 mb-3">No flat rate payments for this period.</p>
+              <Button size="sm" variant="secondary" onClick={() => { setFrForm({ user_id: '', amount: '', description: '' }); setFrError(''); setFrModal(true) }}>
+                Add one
+              </Button>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                  <th className="text-left px-5 py-3">Employee</th>
+                  <th className="text-left px-4 py-3">Description</th>
+                  <th className="text-right px-4 py-3">Amount</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="px-5 py-3 w-40" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {flatRatePayments.map((fr) => (
+                  <tr key={fr.id} className="hover:bg-gray-50">
+                    <td className="px-5 py-3 font-medium text-gray-900">{fr.user_name}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs max-w-[200px] truncate">{fr.description}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatCurrency(fr.amount)}</td>
+                    <td className="px-4 py-3">
+                      {fr.status === 'issued'
+                        ? <span className="inline-flex px-2 py-0.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-500">Issued</span>
+                        : <span className="inline-flex px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-100 text-amber-700">Pending</span>
+                      }
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-3 justify-end">
+                        {fr.status === 'pending' && (
+                          <button onClick={() => handleFrMarkIssued(fr)}
+                            className="text-xs font-semibold text-brand-500 hover:text-brand-700 transition-colors">
+                            Mark Issued
+                          </button>
+                        )}
+                        <button onClick={() => handleDeleteFlatRate(fr)}
+                          className="text-xs text-red-400 hover:text-red-600 transition-colors">
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {flatRatePayments.length > 0 && (
+                <tfoot>
+                  <tr className="bg-gray-50 border-t border-gray-100">
+                    <td colSpan={2} className="px-5 py-3 text-sm font-semibold text-gray-600">Total</td>
+                    <td className="px-4 py-3 text-right font-bold text-gray-900">
+                      {formatCurrency(flatRatePayments.reduce((s, fr) => s + parseFloat(fr.amount ?? 0), 0))}
+                    </td>
+                    <td colSpan={2} />
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          )}
+        </div>
       )}
 
       {/* ── Contractors tab content ────────────────────────────────── */}
@@ -583,6 +791,47 @@ export default function AdminPayroll() {
         </div>
       </Modal>
 
+      {/* Add flat rate payment */}
+      <Modal isOpen={frModal} onClose={() => setFrModal(false)} title={`Add Flat Rate Payment — ${p.label}`}>
+        <form onSubmit={handleCreateFlatRate} className="flex flex-col gap-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Employee</label>
+            <select value={frForm.user_id} onChange={(e) => setFrForm((f) => ({ ...f, user_id: e.target.value }))}
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
+              <option value="">— Select employee —</option>
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>{e.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Description</label>
+            <input type="text" value={frForm.description}
+              onChange={(e) => setFrForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="e.g. Office cleaning — Week of Jul 7"
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Amount ($)</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
+              <input type="number" min="0" step="0.01" value={frForm.amount}
+                onChange={(e) => setFrForm((f) => ({ ...f, amount: e.target.value }))}
+                placeholder="0.00"
+                className="w-full rounded-xl border border-gray-300 pl-7 pr-4 py-2.5 text-sm outline-none focus:border-brand-500" />
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-xl px-4 py-3 text-xs text-gray-500">
+            This creates a <strong>separate check</strong> for the employee. It does not affect their regular hourly pay for this period.
+          </div>
+          {frError && <p className="text-sm text-red-600">{frError}</p>}
+          <div className="flex gap-3 pt-1">
+            <Button type="button" variant="secondary" fullWidth onClick={() => setFrModal(false)}>Cancel</Button>
+            <Button type="submit" fullWidth loading={frSaving}>Add Payment</Button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Contractor invoice status */}
       <Modal isOpen={!!statusModal} onClose={() => setStatusModal(null)}
         title={`Update Invoice — ${statusModal?.contractor_name ?? ''}`}>
@@ -631,7 +880,7 @@ export default function AdminPayroll() {
         </div>
       </Modal>
 
-      {/* Print checks overlay */}
+      {/* Print checks overlay — hourly payroll */}
       {printOpen && (
         <PrintChecks
           employees={filtered}
@@ -642,6 +891,135 @@ export default function AdminPayroll() {
           onClose={() => setPrintOpen(false)}
         />
       )}
+
+      {/* Print checks overlay — flat rate */}
+      {frPrintOpen && (
+        <PrintChecks
+          employees={[]}
+          flatRatePayments={flatRatePayments}
+          period={p}
+          gasByUser={{}}
+          bonusByUser={{}}
+          loanDeductions={{}}
+          onClose={() => setFrPrintOpen(false)}
+        />
+      )}
+
+      {/* ── Paychecks tab content ───────────────────────────────────── */}
+      {tab === 'paychecks' && (
+        <div className="space-y-4 mt-4">
+          {loadingPay
+            ? <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+            : paychecks.length === 0
+              ? <div className="text-center py-16 text-gray-400 text-sm">No paycheck records yet. Click "+ Add Paycheck" to create one.</div>
+              : (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-100">
+                      <tr>
+                        {['Employee','Period','Amount','Status','Actions'].map((h) => (
+                          <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {paychecks.map((pc) => {
+                        const statusCfg = {
+                          processing: { label: 'Processing', color: 'bg-amber-100 text-amber-700', next: 'available',  nextLabel: 'Mark Available' },
+                          available:  { label: 'Available',  color: 'bg-green-100 text-green-700',  next: 'picked_up', nextLabel: 'Mark Picked Up' },
+                          picked_up:  { label: 'Picked Up',  color: 'bg-gray-100 text-gray-600',    next: null,         nextLabel: null },
+                        }[pc.status] ?? { label: pc.status, color: 'bg-gray-100 text-gray-600', next: null }
+
+                        return (
+                          <tr key={pc.id} className="hover:bg-gray-50">
+                            <td className="px-5 py-3.5 font-medium text-gray-900">{pc.employee_name}</td>
+                            <td className="px-5 py-3.5 text-gray-600 text-xs">
+                              {formatDate(pc.period_start)} – {formatDate(pc.period_end)}
+                            </td>
+                            <td className="px-5 py-3.5 font-medium">{pc.amount ? formatCurrency(pc.amount) : <span className="text-gray-400">—</span>}</td>
+                            <td className="px-5 py-3.5">
+                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusCfg.color}`}>{statusCfg.label}</span>
+                              {pc.status === 'available' && <span className="ml-2 text-xs text-gray-400">🔔 Notified</span>}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <div className="flex items-center gap-2">
+                                {statusCfg.next && (
+                                  <button
+                                    onClick={() => setPcStatusTarget({ paycheck: pc, nextStatus: statusCfg.next })}
+                                    className="text-xs font-semibold text-brand-500 hover:text-brand-700 transition-colors"
+                                  >
+                                    {statusCfg.nextLabel}
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDeletePaycheck(pc.id)}
+                                  className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )
+          }
+        </div>
+      )}
+
+      {/* Create paycheck modal */}
+      <Modal isOpen={pcModal} onClose={() => setPcModal(false)} title={`Add Paycheck — ${p.label}`}>
+        <form onSubmit={handleCreatePaycheck} className="flex flex-col gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
+            <select value={pcForm.user_id} onChange={(e) => setPcForm((f) => ({ ...f, user_id: e.target.value }))}
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
+              <option value="">— Select employee —</option>
+              {employees.map((e) => <option key={e.id} value={e.id}>{e.name} ({e.pay_type?.toUpperCase()})</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Amount (optional)</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+              <input type="number" min="0" step="0.01" placeholder="0.00"
+                value={pcForm.amount} onChange={(e) => setPcForm((f) => ({ ...f, amount: e.target.value }))}
+                className="w-full rounded-xl border border-gray-300 pl-7 pr-3 py-2.5 text-sm outline-none focus:border-brand-500" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+            <input type="text" placeholder="e.g. Week of June 30"
+              value={pcForm.notes} onChange={(e) => setPcForm((f) => ({ ...f, notes: e.target.value }))}
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500" />
+          </div>
+          {pcError && <p className="text-sm text-red-600">{pcError}</p>}
+          <div className="flex gap-3 pt-1">
+            <Button type="button" variant="secondary" fullWidth onClick={() => setPcModal(false)}>Cancel</Button>
+            <Button type="submit" fullWidth loading={pcSaving}>Create</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Confirm status change */}
+      <Modal isOpen={!!pcStatusTarget} onClose={() => setPcStatusTarget(null)}
+        title={pcStatusTarget?.nextStatus === 'available' ? 'Mark Paycheck Available?' : 'Mark as Picked Up?'}>
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-gray-600">
+            {pcStatusTarget?.nextStatus === 'available'
+              ? `This will mark ${pcStatusTarget?.paycheck?.employee_name}'s paycheck as available and send them a push notification.`
+              : `This will mark ${pcStatusTarget?.paycheck?.employee_name}'s paycheck as picked up.`
+            }
+          </p>
+          <div className="flex gap-3">
+            <Button variant="secondary" fullWidth onClick={() => setPcStatusTarget(null)}>Cancel</Button>
+            <Button fullWidth loading={pcStatusSaving} onClick={handlePcStatus}>Confirm</Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Gas review */}
       <Modal isOpen={gasModal} onClose={() => setGasModal(false)} title={`Gas Allowance Review — ${p.label}`} size="lg">

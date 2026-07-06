@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { format, startOfWeek, endOfWeek, subWeeks, parseISO } from 'date-fns'
 import PageHeader from '../../components/admin/PageHeader'
 import Button from '../../components/ui/Button'
-import Spinner from '../../components/ui/Spinner'
 import { listEmployees } from '../../api/employees'
 import { getSummary, getBreakdown, listAdjustments, getAnnualSummary } from '../../api/payroll'
 import { getPeriodLoanTotals } from '../../api/loans'
@@ -122,10 +121,10 @@ function DocHeader({ title, ein }) {
 
 // ─── Doc 1: Pay Stub ──────────────────────────────────────────────────────────
 function PayStubDoc({ emp, summary, adjustments, loanDed, period, ein }) {
-  const gasAdjs   = adjustments.filter((a) => a.type === 'gas_allowance')
+  const _gasAdjs  = adjustments.filter((a) => a.type === 'gas_allowance')
   const otherAdjs = adjustments.filter((a) => a.type !== 'gas_allowance')
   const gasTotal  = summary.gas_total ?? 0
-  const bonusAmt  = otherAdjs.reduce((s, a) => s + parseFloat(a.amount), 0)
+  const _bonusAmt = otherAdjs.reduce((s, a) => s + parseFloat(a.amount), 0)
   const netPay    = Math.max((summary.estimated_total ?? 0) - loanDed, 0)
   const isSalary  = (summary.pay_structure ?? 'hourly') === 'salary'
 

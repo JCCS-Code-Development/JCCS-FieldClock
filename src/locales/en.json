@@ -17,7 +17,8 @@
   },
   "role": {
     "admin": "Admin",
-    "employee": "Employee"
+    "employee": "Employee",
+    "contractor": "Contractor"
   },
   "lang": {
     "switchTo": "Español",
@@ -53,7 +54,8 @@
     "currentLocation": "Current Location",
     "mustBeOnline": "You must be online to clock in or out.",
     "clockOutFailed": "Clock-out failed. You are still clocked in.",
-    "clockInFailed": "Clock-in failed. Try again."
+    "clockInFailed": "Clock-in failed. Try again.",
+    "switchJob": "Switch to This Job"
   },
   "status": {
     "working": "Working",
@@ -121,7 +123,18 @@
     "regularHours": "Regular",
     "overtimeHours": "Overtime",
     "loanDeduction": "Loan Deduction",
-    "weeklyRate": "Weekly Salary"
+    "weeklyRate": "Weekly Salary",
+    "paycheck": {
+      "processing": "Processing",
+      "available": "Available — Ready for Pickup",
+      "pickedUp": "Picked Up",
+      "title": "Paycheck Status",
+      "none": "No paycheck records yet.",
+      "history": "Previous Paychecks",
+      "notificationsOn": "Notifications on — tap to turn off",
+      "enableNotifications": "Enable notifications for paycheck updates"
+    },
+    "todayMiles": "Today's Miles"
   },
   "timeoff": {
     "title": "Time Off",
@@ -171,7 +184,8 @@
       "tooShort": "Password must be at least 6 characters.",
       "mismatch": "Passwords do not match.",
       "failed": "Could not set password. Try again."
-    }
+    },
+    "passwordRequired": "Password is required."
   },
   "dashboard": {
     "overview": "Today's overview",
@@ -183,13 +197,11 @@
     "currentlyClockedIn": "Currently Clocked In"
   },
   "common": {
-    "cancel": "Cancel",
-    "save": "Save",
     "loading": "Loading…",
-    "error": "Something went wrong.",
-    "start": "Start",
-    "end": "End",
-    "admin": "Admin"
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "deleting": "Deleting…",
+    "uploading": "Uploading…"
   },
   "pendingDocs": {
     "banner_one": "{{count}} required document needs your signature",
@@ -220,5 +232,62 @@
     "immutable": "Once submitted, this document cannot be modified.",
     "agreeCheck": "I have read and fully understand this document. I agree to its terms and conditions.",
     "pendingLabel": "Pending"
+  },
+  "pendingContractorDocs": {
+    "banner_one": "{{count}} required document missing",
+    "banner_other": "{{count}} required documents missing",
+    "uploadNow": "Upload Now"
+  },
+  "contractor": {
+    "nav": {
+      "portal": "Contractor Portal",
+      "invoices": "My Invoices",
+      "documents": "Documents"
+    },
+    "invoice": {
+      "title": "My Invoices",
+      "subtitle": "Submit your weekly invoice and track payments",
+      "thisWeek": "This Week",
+      "lastWeek": "Last Week",
+      "submittedThisWeek": "Invoice submitted for this week. We'll notify you when your check is ready.",
+      "noneThisWeek": "No invoice submitted for this week yet.",
+      "noneForWeek": "No invoices for this week.",
+      "submit": "Submit Invoice",
+      "submitOne": "Submit one",
+      "payWeek": "Pay Week",
+      "amountOptional": "Invoice Amount (optional)",
+      "fileLabel": "Invoice File",
+      "fileHint": "Tap to choose a PDF or photo",
+      "fileTypes": "PDF, JPEG, PNG, WEBP · max 10 MB",
+      "history": "History",
+      "note": "Note",
+      "viewInvoice": "View invoice",
+      "deleteInvoice": "Delete invoice",
+      "deleteTitle": "Delete Invoice?",
+      "deleteConfirm": "This will permanently delete {{name}}. This cannot be undone.",
+      "readyForPickup": "Ready for pickup!",
+      "notificationsOn": "Notifications on — click to turn off",
+      "enableNotifications": "Enable push notifications",
+      "status": {
+        "submitted": "Submitted",
+        "under_review": "Under Review",
+        "check_ready": "Check Ready",
+        "paid": "Paid"
+      }
+    },
+    "docs": {
+      "title": "Legal Documents",
+      "subtitle": "Required documents for your contractor record. Once uploaded, documents are kept permanently on file.",
+      "w9": "W-9",
+      "w9Desc": "Request for Taxpayer Identification Number and Certification",
+      "workersComp": "Worker's Compensation",
+      "workersCompDesc": "Proof of workers' compensation insurance coverage",
+      "onFile": "On file",
+      "required": "Required",
+      "upload": "Upload",
+      "replace": "Replace",
+      "previousVersions": "Previous versions",
+      "footer": "Documents are stored securely and are only accessible to you and JCCS administrators. Once uploaded, documents cannot be deleted."
+    }
   }
 }

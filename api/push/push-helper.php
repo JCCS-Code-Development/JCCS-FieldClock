@@ -53,22 +53,25 @@ function push_vapid_jwt(string $endpoint): string {
 /**
  * Send push notification to one subscription row.
  * Returns true on success (HTTP 201/200), false otherwise.
+ * $type is sent as a JSON payload for browsers that support it;
+ * push services that reject non-encrypted payloads will fall back gracefully.
  */
-function send_push(array $sub): bool {
+function send_push(array $sub, string $type = 'check_ready'): bool {
     if (!defined('VAPID_PUBLIC_KEY') || !defined('VAPID_PRIVATE_KEY_PEM')) return false;
 
-    $jwt = push_vapid_jwt($sub['endpoint']);
+    $jwt     = push_vapid_jwt($sub['endpoint']);
+    $payload = json_encode(['type' => $type]);
 
     $ch = curl_init($sub['endpoint']);
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => '',           // empty payload — SW uses hardcoded message
+        CURLOPT_POSTFIELDS     => $payload,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 15,
         CURLOPT_HTTPHEADER     => [
             'Authorization: vapid t=' . $jwt . ', k=' . VAPID_PUBLIC_KEY,
-            'Content-Type: application/octet-stream',
-            'Content-Length: 0',
+            'Content-Type: application/json',
+            'Content-Length: ' . strlen($payload),
             'TTL: 86400',
             'Urgency: normal',
         ],
@@ -77,14 +80,44 @@ function send_push(array $sub): bool {
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
+    // Some push services require encrypted payloads and return 400/413 for raw JSON.
+    // On failure retry with empty payload so the notification still fires.
+    if ($code !== 201 && $code !== 200) {
+        $ch2 = curl_init($sub['endpoint']);
+        curl_setopt_array($ch2, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => '',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: vapid t=' . $jwt . ', k=' . VAPID_PUBLIC_KEY,
+                'Content-Type: application/octet-stream',
+                'Content-Length: 0',
+                'TTL: 86400',
+                'Urgency: normal',
+            ],
+        ]);
+        curl_exec($ch2);
+        $code = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+        curl_close($ch2);
+    }
+
     return $code === 201 || $code === 200;
 }
 
 /**
  * Send push to all subscriptions for a given user_id.
+ * $type: 'check_ready' (contractor invoice) | 'paycheck' (employee paycheck)
  */
-function push_to_user(PDO $pdo, int $user_id): void {
+function push_to_user(PDO $pdo, int $user_id, string $type = 'check_ready'): void {
     $stmt = $pdo->prepare('SELECT endpoint, p256dh, auth_key FROM push_subscriptions WHERE user_id = ?');
     $stmt->execute([$user_id]);
-    foreach ($stmt->fetchAll() as $sub) send_push($sub);
+    foreach ($stmt->fetchAll() as $sub) send_push($sub, $type);
+}
+
+/**
+ * Send push to all subscriptions for a given user_id with paycheck type.
+ */
+function push_paycheck_to_user(PDO $pdo, int $user_id): void {
+    push_to_user($pdo, $user_id, 'paycheck');
 }

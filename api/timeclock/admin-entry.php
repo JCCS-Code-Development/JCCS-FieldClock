@@ -6,7 +6,8 @@ require_once __DIR__ . '/../config/jwt.php';
 require_once __DIR__ . '/../middleware/auth.php';
 require_once __DIR__ . '/../middleware/validate.php';
 
-$auth = requireAdmin();
+$auth = requireAuth();
+requireAdmin($auth);
 $pdo  = getPDO();
 
 $COST_MAP = [
