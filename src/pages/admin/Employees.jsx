@@ -118,9 +118,14 @@ export default function AdminEmployees() {
     } finally { setSaving(false) }
   }
 
-  const handleDeactivate = async (id) => {
-    if (!confirm('Deactivate this employee?')) return
-    await deactivateEmployee(id); load()
+  const handleDeactivate = async (emp) => {
+    if (!confirm(`Deactivate ${emp.name}? They will no longer be able to log in.`)) return
+    try {
+      await deactivateEmployee(emp.id)
+      load()
+    } catch (err) {
+      alert(err?.response?.data?.error ?? 'Could not deactivate. Try again.')
+    }
   }
 
   const openPwModal = (emp) => { setPwModal(emp); setPwInput(''); setPwError('') }
@@ -183,7 +188,7 @@ export default function AdminEmployees() {
             <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openDocs(row) }}>Documents</Button>
           )}
           {row.is_active && (
-            <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDeactivate(row.id) }}>Deactivate</Button>
+            <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDeactivate(row) }}>Deactivate</Button>
           )}
         </div>
       ),

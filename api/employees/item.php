@@ -1,4 +1,14 @@
 <?php
+ini_set('display_errors', 0);
+set_exception_handler(function ($e) {
+    http_response_code(500);
+    echo json_encode(['error' => $e->getMessage()]);
+    exit;
+});
+set_error_handler(function ($severity, $message, $file, $line) {
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
 require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
@@ -6,42 +16,81 @@ require_once __DIR__ . '/../middleware/auth.php';
 require_once __DIR__ . '/../middleware/validate.php';
 
 $auth   = requireAuth();
+requireAdmin($auth);
 $pdo    = getPDO();
 $method = $_SERVER['REQUEST_METHOD'];
-$body   = $method !== 'GET' ? jsonBody() : [];
+$body   = $method !== 'GET' && $method !== 'DELETE' ? jsonBody() : [];
 $id     = isset($_GET['id']) ? (int)$_GET['id'] : (int)($body['id'] ?? 0);
+
+if ($id <= 0) {
+    http_response_code(422);
+    exit(json_encode(['error' => 'Missing employee id']));
+}
+
+// Verify employee exists
+$check = $pdo->prepare('SELECT id FROM users WHERE id = ? LIMIT 1');
+$check->execute([$id]);
+if (!$check->fetch()) {
+    http_response_code(404);
+    exit(json_encode(['error' => 'Employee not found']));
+}
 
 if ($method === 'GET') {
     $stmt = $pdo->prepare('SELECT id, name, email, phone, role, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance, is_active FROM users WHERE id = ?');
     $stmt->execute([$id]);
-    $emp = $stmt->fetch();
-    if (!$emp) { http_response_code(404); exit(json_encode(['error' => 'Not found'])); }
-    echo json_encode($emp);
+    echo json_encode($stmt->fetch());
 
 } elseif ($method === 'PUT') {
-    requireAdmin($auth);
-    $allowed = ['name','email','phone','role','pay_type','pay_rate','pay_structure','overtime_rate','gas_weekly_allowance'];
+    $allowed = ['name', 'email', 'phone', 'role', 'pay_type', 'pay_rate', 'pay_structure', 'overtime_rate', 'gas_weekly_allowance'];
     $sets = []; $params = [];
+
     foreach ($allowed as $f) {
-        if (array_key_exists($f, $body)) {
-            $sets[] = "$f = ?";
-            $v = $body[$f];
-            if (in_array($f, ['pay_rate','overtime_rate','gas_weekly_allowance'])) {
-                $params[] = $v === null || $v === '' ? null : (float)$v;
-            } else {
-                $params[] = sanitizeString((string)$v);
-            }
+        if (!array_key_exists($f, $body)) continue;
+
+        if (in_array($f, ['pay_rate', 'overtime_rate', 'gas_weekly_allowance'])) {
+            $params[] = ($body[$f] === null || $body[$f] === '') ? null : (float)$body[$f];
+        } elseif ($f === 'phone') {
+            $params[] = ($body[$f] === null || $body[$f] === '') ? null : sanitizeString((string)$body[$f]);
+        } else {
+            $params[] = sanitizeString((string)$body[$f]);
+        }
+        $sets[] = "$f = ?";
+    }
+
+    // Check duplicate email if being changed
+    if (array_key_exists('email', $body)) {
+        $dupEmail = $pdo->prepare('SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1');
+        $dupEmail->execute([sanitizeString($body['email']), $id]);
+        if ($dupEmail->fetch()) {
+            http_response_code(422);
+            exit(json_encode(['error' => 'An account with this email already exists.']));
         }
     }
-    if (!$sets) { echo json_encode(['message' => 'Nothing to update']); exit; }
+
+    // Check duplicate phone if being changed
+    if (array_key_exists('phone', $body) && $body['phone'] !== '' && $body['phone'] !== null) {
+        $dupPhone = $pdo->prepare('SELECT id FROM users WHERE phone = ? AND id != ? LIMIT 1');
+        $dupPhone->execute([sanitizeString($body['phone']), $id]);
+        if ($dupPhone->fetch()) {
+            http_response_code(422);
+            exit(json_encode(['error' => 'An account with this phone number already exists.']));
+        }
+    }
+
+    if (!$sets) {
+        echo json_encode(['message' => 'Nothing to update']);
+        exit;
+    }
+
     $params[] = $id;
     $pdo->prepare('UPDATE users SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
     echo json_encode(['message' => 'Updated']);
 
 } elseif ($method === 'DELETE') {
-    requireAdmin($auth);
     $pdo->prepare('UPDATE users SET is_active = 0 WHERE id = ?')->execute([$id]);
     echo json_encode(['message' => 'Deactivated']);
+
 } else {
     http_response_code(405);
+    echo json_encode(['error' => 'Method not allowed']);
 }
