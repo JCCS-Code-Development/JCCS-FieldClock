@@ -63,6 +63,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $jobId       = !empty($body['job_id'])   ? (int)$body['job_id'] : null;
     $notes       = !empty($body['notes'])    ? sanitizeString($body['notes']) : null;
 
+    // Check for overlapping entries for this user
+    if ($endTime) {
+        $overlap = $pdo->prepare(
+            'SELECT id FROM time_entries
+             WHERE user_id = ?
+               AND start_time < ?
+               AND (end_time IS NULL OR end_time > ?)
+             LIMIT 1'
+        );
+        $overlap->execute([$userId, $endTime, $startTime]);
+        if ($overlap->fetch()) {
+            http_response_code(422);
+            exit(json_encode(['error' => 'This entry overlaps with an existing entry for this employee. Please check the times.']));
+        }
+    }
+
     // Pull job coordinates so the location reflects the job site
     $startLat = $startLng = $endLat = $endLng = null;
     if ($jobId) {
@@ -135,6 +151,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     }
 
     if (empty($fields)) { http_response_code(422); exit(json_encode(['error' => 'No fields to update'])); }
+
+    // Check for overlaps if times are being changed
+    $newStart = $body['start_time'] ?? null;
+    $newEnd   = array_key_exists('end_time', $body) ? ($body['end_time'] ?: null) : null;
+    if ($newStart || $newEnd) {
+        // Get current entry to fill in whichever value isn't being changed
+        $cur = $pdo->prepare('SELECT user_id, start_time, end_time FROM time_entries WHERE id = ?');
+        $cur->execute([$id]);
+        $cur = $cur->fetch();
+        $checkStart = $newStart ?? $cur['start_time'];
+        $checkEnd   = $newEnd   ?? $cur['end_time'];
+        if ($checkEnd) {
+            $overlap = $pdo->prepare(
+                'SELECT id FROM time_entries
+                 WHERE user_id = ? AND id != ?
+                   AND start_time < ?
+                   AND (end_time IS NULL OR end_time > ?)
+                 LIMIT 1'
+            );
+            $overlap->execute([$cur['user_id'], $id, $checkEnd, $checkStart]);
+            if ($overlap->fetch()) {
+                http_response_code(422);
+                exit(json_encode(['error' => 'These times overlap with another entry for this employee.']));
+            }
+        }
+    }
 
     $params[] = $id;
     $pdo->prepare('UPDATE time_entries SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
