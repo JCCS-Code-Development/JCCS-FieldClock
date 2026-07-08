@@ -1,6 +1,15 @@
 <?php
+ini_set('display_errors', 0);
+set_exception_handler(function ($e) {
+    http_response_code(500);
+    echo json_encode(['error' => $e->getMessage()]);
+    exit;
+});
+set_error_handler(function ($severity, $message, $file, $line) {
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
 require_once __DIR__ . '/../config/cors.php';
-require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
 require_once __DIR__ . '/../middleware/auth.php';
@@ -31,6 +40,12 @@ function fetchEntry(PDO $pdo, int $id): array|false {
     return $s->fetch();
 }
 
+function fetchJobCoords(PDO $pdo, int $jobId): array|false {
+    $s = $pdo->prepare('SELECT latitude, longitude, address FROM jobs WHERE id = ? LIMIT 1');
+    $s->execute([$jobId]);
+    return $s->fetch();
+}
+
 // ── POST: create entry ───────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $body = jsonBody();
@@ -48,10 +63,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $jobId       = !empty($body['job_id'])   ? (int)$body['job_id'] : null;
     $notes       = !empty($body['notes'])    ? sanitizeString($body['notes']) : null;
 
+    // Pull job coordinates so the location reflects the job site
+    $startLat = $startLng = $endLat = $endLng = null;
+    if ($jobId) {
+        $job = fetchJobCoords($pdo, $jobId);
+        if ($job && $job['latitude'] && $job['longitude']) {
+            $startLat = $job['latitude'];
+            $startLng = $job['longitude'];
+            if ($endTime) {
+                $endLat = $job['latitude'];
+                $endLng = $job['longitude'];
+            }
+        }
+    }
+
     $pdo->prepare(
-        'INSERT INTO time_entries (user_id, job_id, status_label, cost_category, start_time, end_time, approval_status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, \'approved\', ?)'
-    )->execute([$userId, $jobId, $statusLabel, $costCat, $startTime, $endTime, $notes]);
+        'INSERT INTO time_entries
+            (user_id, job_id, status_label, cost_category, start_time, end_time,
+             start_lat, start_lng, end_lat, end_lng, approval_status, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'approved\', ?)'
+    )->execute([$userId, $jobId, $statusLabel, $costCat, $startTime, $endTime,
+                $startLat, $startLng, $endLat, $endLng, $notes]);
 
     echo json_encode(['entry' => fetchEntry($pdo, (int)$pdo->lastInsertId())]);
     exit;
@@ -78,7 +110,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $fields[] = 'cost_category = ?'; $params[] = $COST_MAP[$body['status_label']] ?? 'direct_labor';
     }
     if (array_key_exists('job_id', $body)) {
-        $fields[] = 'job_id = ?'; $params[] = !empty($body['job_id']) ? (int)$body['job_id'] : null;
+        $newJobId = !empty($body['job_id']) ? (int)$body['job_id'] : null;
+        $fields[] = 'job_id = ?'; $params[] = $newJobId;
+
+        // Update coordinates to match the selected job
+        if ($newJobId) {
+            $job = fetchJobCoords($pdo, $newJobId);
+            if ($job && $job['latitude'] && $job['longitude']) {
+                $fields[] = 'start_lat = ?'; $params[] = $job['latitude'];
+                $fields[] = 'start_lng = ?'; $params[] = $job['longitude'];
+                $fields[] = 'end_lat = ?';   $params[] = $job['latitude'];
+                $fields[] = 'end_lng = ?';   $params[] = $job['longitude'];
+            }
+        } else {
+            // Job cleared — clear coordinates too
+            $fields[] = 'start_lat = ?'; $params[] = null;
+            $fields[] = 'start_lng = ?'; $params[] = null;
+            $fields[] = 'end_lat = ?';   $params[] = null;
+            $fields[] = 'end_lng = ?';   $params[] = null;
+        }
     }
     if (array_key_exists('notes', $body)) {
         $fields[] = 'notes = ?'; $params[] = !empty($body['notes']) ? sanitizeString($body['notes']) : null;
