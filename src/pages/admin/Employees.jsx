@@ -195,6 +195,14 @@ export default function AdminEmployees() {
     },
   ]
 
+  const ROLE_ORDER = ['admin', 'employee', 'contractor']
+  const ROLE_LABELS = { admin: 'Admins', employee: 'Employees', contractor: 'Contractors' }
+  const grouped = ROLE_ORDER.map(role => ({
+    role,
+    label: ROLE_LABELS[role],
+    rows: employees.filter(e => e.role === role),
+  })).filter(g => g.rows.length > 0)
+
   return (
     <div className="w-full">
       <PageHeader
@@ -204,7 +212,19 @@ export default function AdminEmployees() {
       />
       {loading
         ? <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-        : <DataTable columns={columns} data={employees} emptyMessage="No employees yet." />
+        : (
+          <div className="flex flex-col gap-8">
+            {grouped.length === 0 && (
+              <p className="text-center text-gray-400 py-16 text-sm">No employees yet.</p>
+            )}
+            {grouped.map(({ role, label, rows }) => (
+              <div key={role}>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">{label}</h3>
+                <DataTable columns={columns} data={rows} />
+              </div>
+            ))}
+          </div>
+        )
       }
 
       {/* Create / Edit modal */}
