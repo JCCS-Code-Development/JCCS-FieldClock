@@ -23,13 +23,16 @@ function amountToWords(amount) {
   return `${words} and ${String(cents).padStart(2, '0')}/100`
 }
 
-// Same physical positions as payroll checks (calibrated to check stock)
+// Positions calibrated to Check_Perfect_Template.key
 const CHECK = {
-  date:     { top: '1.104in', right: '0.771in' },
-  payTo:    { top: '1.615in', left:  '1.312in' },
-  dollarAmt:{ top: '1.594in', right: '0.771in' },
-  words:    { top: '1.885in', left:  '1.312in' },
-  memo:     { top: '2.500in', left:  '1.417in' },
+  date:      { top: '0.42in',  right: '0.72in'  },
+  payTo:     { top: '0.82in',  left:  '0.44in'  },
+  dollarAmt: { top: '0.82in',  right: '0.72in'  },
+  words:     { top: '1.13in',  left:  '0.44in'  },
+  addrName:  { top: '1.54in',  left:  '0.71in'  },
+  addrLine1: { top: '1.73in',  left:  '0.71in'  },
+  addrLine2: { top: '1.90in',  left:  '0.71in'  },
+  memo:      { top: '2.20in',  left:  '0.44in'  },
 }
 const SEC  = { check: 3.44, stub: 7.22 }
 
@@ -99,9 +102,20 @@ function RecordHeader({ ck, copyLabel, today }) {
   )
 }
 
+function splitAddress(addr) {
+  if (!addr) return ['', '']
+  const lines = addr.split('\n').map(s => s.trim()).filter(Boolean)
+  if (lines.length >= 2) return [lines[0], lines.slice(1).join(', ')]
+  // single line: split at last comma to separate street from city/state
+  const lastComma = addr.lastIndexOf(',', addr.lastIndexOf(',') - 1)
+  if (lastComma > 0) return [addr.slice(0, lastComma).trim(), addr.slice(lastComma + 1).trim()]
+  return [addr, '']
+}
+
 function VendorCheckPage({ ck }) {
   const amount = parseFloat(ck.amount)
   const today  = format(parseISO(ck.check_date), 'MM/dd/yyyy')
+  const [addrLine1, addrLine2] = splitAddress(ck.vendor_address)
 
   return (
     <div className="check-page" style={{ width:'8.5in', height:'11in', position:'relative', background:'#fff', boxShadow:'0 6px 32px rgba(0,0,0,0.18)', flexShrink:0 }}>
@@ -121,11 +135,15 @@ function VendorCheckPage({ ck }) {
       <CutLine topIn={SEC.stub}  label="Detach — Vendor Copy" />
 
       {/* ── CHECK FIELDS ── */}
-      <div style={{ position:'absolute', top:CHECK.date.top, right:CHECK.date.right, fontSize:'11pt', fontFamily:'Calibri,"Helvetica Neue",Arial,sans-serif', color:'#000' }}>{today}</div>
-      <div style={{ position:'absolute', top:CHECK.payTo.top, left:CHECK.payTo.left, fontSize:'11pt', fontFamily:'Calibri,"Helvetica Neue",Arial,sans-serif', fontWeight:600, color:'#000', maxWidth:'4.7in', overflow:'hidden', whiteSpace:'nowrap' }}>{ck.vendor_name}</div>
+      <div style={{ position:'absolute', top:CHECK.date.top,      right:CHECK.date.right,      fontSize:'11pt', fontFamily:'Calibri,"Helvetica Neue",Arial,sans-serif', color:'#000' }}>{today}</div>
+      <div style={{ position:'absolute', top:CHECK.payTo.top,     left:CHECK.payTo.left,       fontSize:'11pt', fontFamily:'Calibri,"Helvetica Neue",Arial,sans-serif', fontWeight:600, color:'#000', maxWidth:'5in', overflow:'hidden', whiteSpace:'nowrap' }}>{ck.vendor_name}</div>
       <div style={{ position:'absolute', top:CHECK.dollarAmt.top, right:CHECK.dollarAmt.right, fontSize:'11pt', fontFamily:'Calibri,"Helvetica Neue",Arial,sans-serif', fontWeight:700, color:'#000', letterSpacing:'0.04em' }}>{formatCurrency(amount).replace('$','')}</div>
-      <div style={{ position:'absolute', top:CHECK.words.top, left:CHECK.words.left, fontSize:'11pt', fontFamily:'Calibri,"Helvetica Neue",Arial,sans-serif', color:'#000', maxWidth:'6.1in', overflow:'hidden', whiteSpace:'nowrap' }}>{amountToWords(amount)}</div>
-      <div style={{ position:'absolute', top:CHECK.memo.top, left:CHECK.memo.left, fontSize:'9.5pt', fontFamily:'Calibri,"Helvetica Neue",Arial,sans-serif', color:'#000' }}>{ck.memo || ''}</div>
+      <div style={{ position:'absolute', top:CHECK.words.top,     left:CHECK.words.left,       fontSize:'11pt', fontFamily:'Calibri,"Helvetica Neue",Arial,sans-serif', color:'#000', maxWidth:'6.2in', overflow:'hidden', whiteSpace:'nowrap' }}>{amountToWords(amount)}</div>
+      {/* Address block — vendor name + street + city/state (shows through windowed envelope) */}
+      <div style={{ position:'absolute', top:CHECK.addrName.top,  left:CHECK.addrName.left,    fontSize:'10.5pt', fontFamily:'Calibri,"Helvetica Neue",Arial,sans-serif', color:'#000' }}>{ck.vendor_name}</div>
+      {addrLine1 && <div style={{ position:'absolute', top:CHECK.addrLine1.top, left:CHECK.addrLine1.left, fontSize:'10.5pt', fontFamily:'Calibri,"Helvetica Neue",Arial,sans-serif', color:'#000' }}>{addrLine1}</div>}
+      {addrLine2 && <div style={{ position:'absolute', top:CHECK.addrLine2.top, left:CHECK.addrLine2.left, fontSize:'10.5pt', fontFamily:'Calibri,"Helvetica Neue",Arial,sans-serif', color:'#000' }}>{addrLine2}</div>}
+      {ck.memo && <div style={{ position:'absolute', top:CHECK.memo.top, left:CHECK.memo.left, fontSize:'9.5pt', fontFamily:'Calibri,"Helvetica Neue",Arial,sans-serif', color:'#000' }}>{ck.memo}</div>}
 
       {/* ── COMPANY RECORD (section 2) ── */}
       <div style={{ position:'absolute', top:`${SEC.check + 0.14}in`, bottom:`${11 - SEC.stub + 0.08}in`, left:'0.5in', right:'0.5in', display:'flex', flexDirection:'column' }}>
