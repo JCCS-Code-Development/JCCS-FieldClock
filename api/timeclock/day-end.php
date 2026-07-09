@@ -21,6 +21,7 @@ $lat  = isset($body['lat']) ? (float)$body['lat'] : null;
 $lng  = isset($body['lng']) ? (float)$body['lng'] : null;
 $acc  = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
 $pdo  = getPDO();
+requireHourly($auth, $pdo);
 
 $pdo->beginTransaction();
 try {

@@ -21,6 +21,7 @@ $lat  = isset($body['lat']) ? (float)$body['lat'] : null;
 $lng  = isset($body['lng']) ? (float)$body['lng'] : null;
 $acc  = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
 $pdo  = getPDO();
+requireHourly($auth, $pdo);
 $last = $pdo->prepare('SELECT job_id FROM time_entries WHERE user_id = ? ORDER BY start_time DESC LIMIT 1');
 $last->execute([$auth['user_id']]);
 $jobId = $last->fetch()['job_id'] ?? null;

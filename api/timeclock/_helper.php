@@ -1,4 +1,16 @@
 <?php
+// Block salaried employees from all timeclock actions
+function requireHourly(array $auth, PDO $pdo): void {
+    $stmt = $pdo->prepare('SELECT pay_structure FROM users WHERE id = ?');
+    $stmt->execute([$auth['user_id']]);
+    $user = $stmt->fetch();
+    if ($user && ($user['pay_structure'] ?? 'hourly') === 'salary') {
+        http_response_code(403);
+        echo json_encode(['error' => 'Salaried employees do not use the timeclock']);
+        exit;
+    }
+}
+
 // Close the current open entry and return its id (or null if none)
 function closeOpenEntry(PDO $pdo, int $userId, ?float $lat, ?float $lng): ?int {
     $stmt = $pdo->prepare('SELECT id FROM time_entries WHERE user_id = ? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1');

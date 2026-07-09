@@ -17,6 +17,7 @@ require_once __DIR__ . '/_helper.php';
 
 $auth = requireAuth();
 $pdo  = getPDO();
+requireHourly($auth, $pdo);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405); exit;

@@ -424,7 +424,7 @@ export default function AdminTimesheets() {
 
   useEffect(() => {
     listEmployees().then(d => {
-      const emps = d.employees ?? []
+      const emps = (d.employees ?? []).filter(e => e.pay_structure !== 'salary')
       setEmployees(emps)
       if (emps.length > 0) setSelectedEmp(emps[0])
     })

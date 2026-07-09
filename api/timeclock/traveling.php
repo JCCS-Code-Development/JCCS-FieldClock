@@ -26,6 +26,7 @@ $lng   = isset($body['lng'])      ? (float)$body['lng']      : null;
 $acc   = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
 
 $pdo = getPDO();
+requireHourly($auth, $pdo);
 
 // Verify assignment
 $assigned = $pdo->prepare('SELECT 1 FROM job_assignments WHERE job_id = ? AND user_id = ?');

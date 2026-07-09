@@ -25,6 +25,7 @@ $jobId = isset($body['job_id'])   ? (int)$body['job_id']     : null;
 $notes = isset($body['notes'])    ? trim($body['notes'])      : null;
 
 $pdo = getPDO();
+requireHourly($auth, $pdo);
 
 // Verify job exists and is active if provided
 if ($jobId) {
