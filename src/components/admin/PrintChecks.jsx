@@ -302,8 +302,17 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
   const [regSaving, setRegSaving]       = useState(false)
   const [regStatus, setRegStatus]       = useState(null) // null | 'saved' | 'error'
 
-  const today       = format(new Date(), 'MM/dd/yyyy')
-  const issuedDate  = format(new Date(), 'yyyy-MM-dd')
+  // Default check date to the Friday of the pay period week (period.end is Sunday → subtract 2 days)
+  const defaultFriday = (() => {
+    try {
+      const sun = new Date(period.end + 'T12:00')
+      return new Date(sun.getTime() - 2 * 86400000)
+    } catch { return new Date() }
+  })()
+  const [checkDateISO, setCheckDateISO] = useState(format(defaultFriday, 'yyyy-MM-dd'))
+
+  const today      = (() => { try { return format(new Date(checkDateISO + 'T12:00'), 'MM/dd/yyyy') } catch { return checkDateISO } })()
+  const issuedDate = checkDateISO
   const periodLabel = (() => {
     try {
       return `${format(new Date(period.start + 'T12:00'), 'MM/dd/yyyy')} – ${format(new Date(period.end + 'T12:00'), 'MM/dd/yyyy')}`
@@ -362,6 +371,24 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
             {flatRatePayments.length > 0 && employees.length > 0 && ` (${employees.length} hourly + ${flatRatePayments.length} flat rate)`}
           </p>
         </div>
+
+        {/* Editable check date */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+          <label style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Check Date
+          </label>
+          <input
+            type="date"
+            value={checkDateISO}
+            onChange={e => setCheckDateISO(e.target.value)}
+            style={{
+              background: '#1e293b', border: '1px solid #334155', borderRadius: 6,
+              padding: '5px 10px', fontSize: 13, color: '#f1f5f9',
+              outline: 'none', cursor: 'pointer',
+            }}
+          />
+        </div>
+
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={onClose} style={{
             padding: '8px 16px', borderRadius: 8, border: '1px solid #334155',
