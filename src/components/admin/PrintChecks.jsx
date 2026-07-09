@@ -42,13 +42,6 @@ const CHECK = {
 // Section cut points (inches from paper top)
 const SEC = { check: 3.44, stub: 7.22 }
 
-// Employee stub check-register fields (PPTX section 3 positions + 0.5" margin offset)
-const STUB = {
-  name:   { top: '7.365in', left:  '1.719in' },  // stub payee name
-  amount: { top: '7.646in', right: '0.771in' },  // stub net pay — right-aligned with check amount
-  period: { top: '7.875in', left:  '1.719in' },  // stub pay period / date
-}
-
 // ── Cut / tear line ───────────────────────────────────────────────────────
 function CutLine({ topIn, label }) {
   return (
@@ -68,153 +61,241 @@ function CutLine({ topIn, label }) {
   )
 }
 
-// ── Paystub earnings/deductions table ─────────────────────────────────────
-function PaystubTable({ emp, gas, bonus, loanDed, netPay }) {
+// ── Earnings Statement styles ─────────────────────────────────────────────
+const ES = {
+  headerBg:  '#b5a642',
+  headerTxt: '#ffffff',
+  accent:    '#7a6920',
+  border:    '#c8b870',
+  footerBg:  '#f0e9d0',
+  font:      'Arial, "Helvetica Neue", sans-serif',
+}
+const esH = (extra = {}) => ({
+  background: ES.headerBg, color: ES.headerTxt,
+  fontFamily: ES.font, fontSize: '7pt', fontWeight: 700,
+  padding: '3pt 5pt', border: `0.5pt solid ${ES.border}`,
+  textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center',
+  ...extra,
+})
+const esC = (extra = {}) => ({
+  fontFamily: ES.font, fontSize: '8pt', color: '#333',
+  padding: '3pt 6pt', border: `0.5pt solid ${ES.border}`,
+  verticalAlign: 'middle', ...extra,
+})
+
+// ── Earnings Statement (employee & employer copies) ───────────────────────
+function EarningsStatement({ emp, periodStart, periodEnd, checkDate, checkNum, gas, bonus, loanDed, netPay, copyLabel }) {
   const isSalary = (emp.pay_structure ?? 'hourly') === 'salary'
   const isW2     = emp.pay_type === 'w2'
   const rate     = parseFloat(emp.pay_rate     ?? 0)
   const otRate   = parseFloat(emp.overtime_rate ?? rate * 1.5)
   const regHrs   = parseFloat(emp.regular_hours  ?? 0)
   const otHrs    = parseFloat(emp.overtime_hours ?? 0)
+  const basePay  = parseFloat(emp.base_gross ?? 0)
 
-  const rows = []
+  const fmtPeriod = (() => {
+    try {
+      return `${format(new Date(periodStart + 'T12:00'), 'MM/dd/yy')} – ${format(new Date(periodEnd + 'T12:00'), 'MM/dd/yy')}`
+    } catch { return `${periodStart} – ${periodEnd}` }
+  })()
+
+  const earningsRows = []
   if (isSalary) {
     const wks = emp.weeks_worked ?? 1
-    rows.push({ label: `Weekly Salary${wks > 1 ? ` × ${wks} wks` : ''}`, detail: `${formatCurrency(rate)}/wk`, amount: emp.base_gross ?? 0 })
+    earningsRows.push({ label: `Weekly Salary${wks > 1 ? ` ×${wks}` : ''}`, rate: formatCurrency(rate), hours: '—', total: basePay })
   } else if (isW2) {
-    rows.push({ label: 'Regular Pay', detail: `${regHrs.toFixed(2)} hrs × ${formatCurrency(rate)}/hr`, amount: regHrs * rate })
+    earningsRows.push({ label: 'Regular Earnings', rate: `${formatCurrency(rate)}/hr`, hours: regHrs.toFixed(2), total: regHrs * rate })
     if (otHrs > 0)
-      rows.push({ label: 'Overtime (1.5×)', detail: `${otHrs.toFixed(2)} hrs × ${formatCurrency(otRate)}/hr`, amount: otHrs * otRate, ot: true })
+      earningsRows.push({ label: 'Overtime Pay (1.5×)', rate: `${formatCurrency(otRate)}/hr`, hours: otHrs.toFixed(2), total: otHrs * otRate, ot: true })
   } else {
-    rows.push({ label: 'Gross Pay', detail: `${(regHrs + otHrs).toFixed(2)} hrs × ${formatCurrency(rate)}/hr`, amount: emp.base_gross ?? 0 })
+    earningsRows.push({ label: 'Contract Pay', rate: `${formatCurrency(rate)}/hr`, hours: (regHrs + otHrs).toFixed(2), total: basePay })
   }
 
-  const hasAdds = gas > 0 || bonus > 0
-  const hasDeds = loanDed > 0
+  const adjRows = []
+  if (gas > 0)     adjRows.push({ label: 'Gas Allowance',      amount: gas,     sign: '+', red: false })
+  if (bonus > 0)   adjRows.push({ label: 'Bonus / Adjustment', amount: bonus,   sign: '+', red: false })
+  if (loanDed > 0) adjRows.push({ label: 'Loan Deduction',     amount: loanDed, sign: '−', red: true  })
 
-  const cell = (extra = {}) => ({
-    padding: '2.5pt 7pt', fontSize: '8pt', fontFamily: 'Arial, sans-serif',
-    borderBottom: '0.5pt solid #f0f0f0', color: '#374151', ...extra,
-  })
+  const bodyRows = Math.max(earningsRows.length, adjRows.length, 2)
 
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead>
-        <tr style={{ background: '#f8f9fa' }}>
-          <th style={{ ...cell({ fontWeight: 700, fontSize: '7pt', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1pt solid #e5e7eb' }), textAlign: 'left', width: '42%' }}>Description</th>
-          <th style={{ ...cell({ fontWeight: 700, fontSize: '7pt', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1pt solid #e5e7eb' }), textAlign: 'left' }}>Detail</th>
-          <th style={{ ...cell({ fontWeight: 700, fontSize: '7pt', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1pt solid #e5e7eb' }), textAlign: 'right', width: '22%' }}>Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r, i) => (
-          <tr key={i}>
-            <td style={{ ...cell(), fontWeight: r.ot ? 500 : 600 }}>{r.label}</td>
-            <td style={{ ...cell({ color: '#6b7280' }) }}>{r.detail}</td>
-            <td style={{ ...cell({ textAlign: 'right', fontWeight: 600, color: '#111827' }) }}>{formatCurrency(r.amount)}</td>
-          </tr>
-        ))}
+    <div style={{ fontFamily: ES.font, display: 'flex', flexDirection: 'column', gap: '5pt' }}>
 
-        {hasAdds && (
-          <tr><td colSpan={3} style={{ ...cell({ background: '#f8f9fa', fontSize: '7pt', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2pt 7pt' }) }}>Additions</td></tr>
-        )}
-        {gas > 0 && (
-          <tr>
-            <td style={cell()}>Gas Allowance</td>
-            <td style={{ ...cell({ color: '#6b7280' }) }}>{(emp.weeks_worked ?? 1) > 1 ? `${formatCurrency(parseFloat(emp.gas_weekly_allowance ?? 0))}/wk × ${emp.weeks_worked} wks` : ''}</td>
-            <td style={{ ...cell({ textAlign: 'right', fontWeight: 600, color: '#166534' }) }}>+{formatCurrency(gas)}</td>
-          </tr>
-        )}
-        {bonus > 0 && (
-          <tr>
-            <td style={cell()}>Bonus / Adjustment</td>
-            <td style={{ ...cell({ color: '#6b7280' }) }}></td>
-            <td style={{ ...cell({ textAlign: 'right', fontWeight: 600, color: '#166534' }) }}>+{formatCurrency(bonus)}</td>
-          </tr>
-        )}
-
-        {hasDeds && (
-          <tr><td colSpan={3} style={{ ...cell({ background: '#f8f9fa', fontSize: '7pt', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2pt 7pt' }) }}>Deductions</td></tr>
-        )}
-        {loanDed > 0 && (
-          <tr>
-            <td style={cell()}>Loan Deduction</td>
-            <td style={{ ...cell({ color: '#6b7280' }) }}></td>
-            <td style={{ ...cell({ textAlign: 'right', fontWeight: 600, color: '#991b1b' }) }}>−{formatCurrency(loanDed)}</td>
-          </tr>
-        )}
-
-        <tr style={{ background: '#eff6ff' }}>
-          <td colSpan={2} style={{ ...cell({ fontWeight: 700, fontSize: '9pt', color: '#1e40af', borderBottom: '1pt solid #bfdbfe', borderTop: '1pt solid #bfdbfe' }) }}>NET PAY</td>
-          <td style={{ ...cell({ textAlign: 'right', fontWeight: 700, fontSize: '10pt', color: '#1e40af', borderBottom: '1pt solid #bfdbfe', borderTop: '1pt solid #bfdbfe' }) }}>{formatCurrency(netPay)}</td>
-        </tr>
-      </tbody>
-    </table>
-  )
-}
-
-// ── Paystub section header ────────────────────────────────────────────────
-function StubHeader({ emp, periodLabel, copyLabel, today }) {
-  return (
-    <div style={{
-      display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-      borderBottom: '1.5pt solid #e2e8f0', paddingBottom: '0.09in', marginBottom: '0.1in',
-    }}>
-      <div>
-        <p style={{ fontSize: '9.5pt', fontWeight: 700, fontFamily: 'Arial, sans-serif', color: '#0f172a', margin: 0 }}>
-          JCCS Services LLC — Pay Statement
-        </p>
-        <p style={{ fontSize: '8pt', fontFamily: 'Arial, sans-serif', color: '#475569', margin: '2pt 0 0' }}>
-          <strong>{emp.name}</strong>
-          &ensp;·&ensp;{emp.pay_type?.toUpperCase() ?? 'W-2'}
-          &ensp;·&ensp;Pay Period: {periodLabel}
-        </p>
+      {/* Company / statement header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: '11pt', color: ES.accent, fontFamily: ES.font }}>JCCS Services LLC</p>
+          <p style={{ margin: '1pt 0 0', fontSize: '7.5pt', color: '#888', fontFamily: ES.font }}>Miami, FL</p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: '10.5pt', color: '#222', fontFamily: ES.font }}>Earnings Statement</p>
+          <p style={{ margin: '2pt 0 0', fontSize: '8pt', color: '#555', fontFamily: ES.font }}>
+            Check Number:&nbsp;<strong>{checkNum || '___________'}</strong>
+          </p>
+          <p style={{ margin: '3pt 0 0', fontSize: '6.5pt', color: '#aaa', fontFamily: ES.font, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{copyLabel}</p>
+        </div>
       </div>
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <p style={{
-          fontSize: '6.5pt', fontFamily: 'Arial, sans-serif', color: '#94a3b8',
-          textTransform: 'uppercase', letterSpacing: '0.12em', margin: 0,
-        }}>
-          {copyLabel}
-        </p>
-        <p style={{ fontSize: '7.5pt', fontFamily: 'Arial, sans-serif', color: '#64748b', margin: '2pt 0 0' }}>
-          Check Date: {today}
-        </p>
-      </div>
+
+      {/* Employee info table */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
+        <thead>
+          <tr>
+            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>Employee Information</th>
+            <th style={{ ...esH({ width: '16%' }) }}>Pay Date</th>
+            <th style={{ ...esH({ width: '30%' }) }}>Pay Period</th>
+            <th style={{ ...esH({ width: '16%' }) }}>Pay Schedule</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ ...esC({ textAlign: 'left', verticalAlign: 'top', padding: '5pt 6pt' }) }}>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: '9pt', color: ES.accent }}>{emp.name}</p>
+              <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>{isW2 ? 'W-2 Employee' : '1099 Contractor'}</p>
+            </td>
+            <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{checkDate}</td>
+            <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{fmtPeriod}</td>
+            <td style={{ ...esC({ textAlign: 'center', fontWeight: 700 }) }}>Weekly</td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Earnings + Additions/Deductions table */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
+        <thead>
+          <tr>
+            <th style={{ ...esH({ textAlign: 'left', paddingLeft: '6pt', width: '29%' }) }}>Earnings</th>
+            <th style={{ ...esH({ width: '16%' }) }}>Rate</th>
+            <th style={{ ...esH({ width: '10%' }) }}>Hours</th>
+            <th style={{ ...esH({ textAlign: 'right', paddingRight: '6pt', width: '13%' }) }}>Total</th>
+            <th style={{ ...esH({ textAlign: 'left', paddingLeft: '6pt', width: '20%', borderLeft: `1pt solid #8a7318` }) }}>Additions / Deductions</th>
+            <th style={{ ...esH({ textAlign: 'right', paddingRight: '6pt', width: '12%' }) }}>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: bodyRows }, (_, i) => {
+            const er  = earningsRows[i]
+            const adj = adjRows[i]
+            return (
+              <tr key={i} style={{ borderBottom: `0.5pt solid ${ES.border}`, background: i % 2 ? '#fdf9ee' : '#fff' }}>
+                <td style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt', color: er?.ot ? '#92400e' : '#222', fontWeight: er?.ot ? 600 : 400 })}}>
+                  {er?.label ?? ''}
+                </td>
+                <td style={{ ...esC({ textAlign: 'center', color: '#555', fontSize: '7.5pt' })}}>
+                  {er?.rate ?? ''}
+                </td>
+                <td style={{ ...esC({ textAlign: 'center' })}}>
+                  {er?.hours ?? ''}
+                </td>
+                <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: er ? 600 : 400 })}}>
+                  {er ? formatCurrency(er.total) : ''}
+                </td>
+                <td style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt', borderLeft: `0.5pt solid ${ES.border}`, color: adj?.red ? '#991b1b' : '#166534' })}}>
+                  {adj?.label ?? ''}
+                </td>
+                <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: adj ? 600 : 400, color: adj?.red ? '#991b1b' : '#166534' })}}>
+                  {adj ? `${adj.sign}${formatCurrency(adj.amount)}` : ''}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+        <tfoot>
+          <tr style={{ background: ES.footerBg, borderTop: `1pt solid ${ES.border}` }}>
+            <td colSpan={3} style={{ ...esC({ fontWeight: 700, textAlign: 'left', paddingLeft: '6pt', color: ES.accent, background: ES.footerBg }) }}>Gross Pay</td>
+            <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 700, color: ES.accent, background: ES.footerBg }) }}>
+              {formatCurrency(basePay)}
+            </td>
+            <td style={{ ...esC({ fontWeight: 700, textAlign: 'left', paddingLeft: '6pt', borderLeft: `0.5pt solid ${ES.border}`, color: '#1e40af', background: ES.footerBg }) }}>
+              Net Pay
+            </td>
+            <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 700, color: '#1e40af', background: ES.footerBg }) }}>
+              {formatCurrency(netPay)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   )
 }
 
-// ── Flat rate paystub table (simple single-row) ───────────────────────────
-function FlatRateStubTable({ fr }) {
-  const cell = (extra = {}) => ({
-    padding: '2.5pt 7pt', fontSize: '8pt', fontFamily: 'Arial, sans-serif',
-    borderBottom: '0.5pt solid #f0f0f0', color: '#374151', ...extra,
-  })
+// ── Flat rate earnings statement ──────────────────────────────────────────
+function FlatRateEarningsStatement({ fr, checkDate, checkNum, periodStart, periodEnd, copyLabel }) {
+  const amount = parseFloat(fr.amount)
+  const fmtPeriod = (() => {
+    try {
+      return `${format(new Date(periodStart + 'T12:00'), 'MM/dd/yy')} – ${format(new Date(periodEnd + 'T12:00'), 'MM/dd/yy')}`
+    } catch { return `${periodStart} – ${periodEnd}` }
+  })()
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead>
-        <tr style={{ background: '#f8f9fa' }}>
-          <th style={{ ...cell({ fontWeight: 700, fontSize: '7pt', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1pt solid #e5e7eb' }), textAlign: 'left' }}>Description</th>
-          <th style={{ ...cell({ fontWeight: 700, fontSize: '7pt', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1pt solid #e5e7eb' }), textAlign: 'right', width: '28%' }}>Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td style={{ ...cell(), fontWeight: 600 }}>{fr.description}</td>
-          <td style={{ ...cell({ textAlign: 'right', fontWeight: 600, color: '#111827' }) }}>{formatCurrency(parseFloat(fr.amount))}</td>
-        </tr>
-        <tr style={{ background: '#eff6ff' }}>
-          <td style={{ ...cell({ fontWeight: 700, fontSize: '9pt', color: '#1e40af', borderBottom: '1pt solid #bfdbfe', borderTop: '1pt solid #bfdbfe' }) }}>NET PAY</td>
-          <td style={{ ...cell({ textAlign: 'right', fontWeight: 700, fontSize: '10pt', color: '#1e40af', borderBottom: '1pt solid #bfdbfe', borderTop: '1pt solid #bfdbfe' }) }}>{formatCurrency(parseFloat(fr.amount))}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div style={{ fontFamily: ES.font, display: 'flex', flexDirection: 'column', gap: '5pt' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: '11pt', color: ES.accent, fontFamily: ES.font }}>JCCS Services LLC</p>
+          <p style={{ margin: '1pt 0 0', fontSize: '7.5pt', color: '#888', fontFamily: ES.font }}>Miami, FL</p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: '10.5pt', color: '#222', fontFamily: ES.font }}>Earnings Statement</p>
+          <p style={{ margin: '2pt 0 0', fontSize: '8pt', color: '#555', fontFamily: ES.font }}>
+            Check Number:&nbsp;<strong>{checkNum || '___________'}</strong>
+          </p>
+          <p style={{ margin: '3pt 0 0', fontSize: '6.5pt', color: '#aaa', fontFamily: ES.font, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{copyLabel}</p>
+        </div>
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
+        <thead>
+          <tr>
+            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>Payee Information</th>
+            <th style={{ ...esH({ width: '16%' }) }}>Pay Date</th>
+            <th style={{ ...esH({ width: '30%' }) }}>Pay Period</th>
+            <th style={{ ...esH({ width: '16%' }) }}>Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ ...esC({ textAlign: 'left', verticalAlign: 'top', padding: '5pt 6pt' }) }}>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: '9pt', color: ES.accent }}>{fr.user_name}</p>
+              <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>1099 Contractor</p>
+            </td>
+            <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{checkDate}</td>
+            <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{fmtPeriod}</td>
+            <td style={{ ...esC({ textAlign: 'center', fontWeight: 700 }) }}>Flat Rate</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
+        <thead>
+          <tr>
+            <th style={{ ...esH({ textAlign: 'left', paddingLeft: '6pt', width: '70%' }) }}>Description</th>
+            <th style={{ ...esH({ textAlign: 'right', paddingRight: '6pt', width: '30%' }) }}>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt', fontWeight: 500 }) }}>{fr.description}</td>
+            <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 600 }) }}>{formatCurrency(amount)}</td>
+          </tr>
+          {[0, 1].map(i => (
+            <tr key={i} style={{ background: '#fdf9ee' }}>
+              <td style={{ ...esC({ paddingLeft: '6pt' }) }}>&nbsp;</td>
+              <td style={esC()}>&nbsp;</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr style={{ background: ES.footerBg, borderTop: `1pt solid ${ES.border}` }}>
+            <td style={{ ...esC({ fontWeight: 700, textAlign: 'left', paddingLeft: '6pt', color: '#1e40af', background: ES.footerBg }) }}>Net Pay</td>
+            <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 700, color: '#1e40af', background: ES.footerBg }) }}>{formatCurrency(amount)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   )
 }
 
 // ── Flat rate check page ──────────────────────────────────────────────────
-function FlatRateCheckPage({ fr, today, periodLabel }) {
+function FlatRateCheckPage({ fr, today, periodStart, periodEnd, checkNum }) {
   const amount = parseFloat(fr.amount)
   return (
     <div className="check-page" style={{
@@ -233,10 +314,10 @@ function FlatRateCheckPage({ fr, today, periodLabel }) {
       </div>
       <div className="no-print" style={{
         position: 'absolute', top: `${SEC.check}in`, left: 0, right: 0,
-        height: `${SEC.stub - SEC.check}in`, background: 'rgba(245,158,11,0.04)', pointerEvents: 'none',
+        height: `${SEC.stub - SEC.check}in`, background: 'rgba(16,185,129,0.04)', pointerEvents: 'none',
       }}>
-        <span style={{ position: 'absolute', top: 18, left: 10, fontSize: 8, color: '#fcd34d', fontFamily: 'sans-serif', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-          Employer Copy — Flat Rate
+        <span style={{ position: 'absolute', top: 18, left: 10, fontSize: 8, color: '#6ee7b7', fontFamily: 'sans-serif', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+          Employee Copy — Flat Rate
         </span>
       </div>
       <div className="no-print" style={{
@@ -244,12 +325,12 @@ function FlatRateCheckPage({ fr, today, periodLabel }) {
         background: 'rgba(59,130,246,0.04)', pointerEvents: 'none',
       }}>
         <span style={{ position: 'absolute', top: 18, left: 10, fontSize: 8, color: '#93c5fd', fontFamily: 'sans-serif', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-          Employee Copy
+          Employer Copy
         </span>
       </div>
 
-      <CutLine topIn={SEC.check} label="Detach — Employer Paystub" />
-      <CutLine topIn={SEC.stub}  label="Detach — Employee Copy" />
+      <CutLine topIn={SEC.check} label="Detach — Employee Copy" />
+      <CutLine topIn={SEC.stub}  label="Detach — Employer Copy" />
 
       {/* Check fields */}
       <div style={{ position: 'absolute', top: CHECK.date.top, right: CHECK.date.right, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{today}</div>
@@ -258,21 +339,16 @@ function FlatRateCheckPage({ fr, today, periodLabel }) {
       <div style={{ position: 'absolute', top: CHECK.words.top, left: CHECK.words.left, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000', maxWidth: '6.1in', overflow: 'hidden', whiteSpace: 'nowrap' }}>{amountToWords(amount)}</div>
       <div style={{ position: 'absolute', top: CHECK.memo.top, left: CHECK.memo.left, fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{fr.user_name}</div>
 
-      {/* Employer copy */}
-      <div style={{ position: 'absolute', top: `${SEC.check + 0.35}in`, bottom: `${11 - SEC.stub + 0.3}in`, left: '0.75in', right: '0.75in', display: 'flex', flexDirection: 'column' }}>
-        <StubHeader emp={{ name: fr.user_name, pay_type: 'Flat Rate' }} periodLabel={periodLabel} copyLabel="Employer Copy" today={today} />
-        <FlatRateStubTable fr={fr} />
+      {/* Employee copy (middle) */}
+      <div style={{ position: 'absolute', top: `${SEC.check + 0.35}in`, bottom: `${11 - SEC.stub + 0.3}in`, left: '0.75in', right: '0.75in' }}>
+        <FlatRateEarningsStatement fr={fr} checkDate={today} checkNum={checkNum}
+          periodStart={periodStart} periodEnd={periodEnd} copyLabel="Employee Copy" />
       </div>
 
-      {/* Stub register fields */}
-      <div style={{ position: 'absolute', top: STUB.name.top, left: STUB.name.left, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 600, color: '#000' }}>{fr.user_name}</div>
-      <div style={{ position: 'absolute', top: STUB.amount.top, right: STUB.amount.right, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000', letterSpacing: '0.04em' }}>{formatCurrency(amount).replace('$', '')}</div>
-      <div style={{ position: 'absolute', top: STUB.period.top, left: STUB.period.left, fontSize: '9pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>Pay Period: {periodLabel}</div>
-
-      {/* Employee copy */}
-      <div style={{ position: 'absolute', top: '8.25in', bottom: '0.5in', left: '0.75in', right: '0.75in', display: 'flex', flexDirection: 'column' }}>
-        <StubHeader emp={{ name: fr.user_name, pay_type: 'Flat Rate' }} periodLabel={periodLabel} copyLabel="Employee Copy" today={today} />
-        <FlatRateStubTable fr={fr} />
+      {/* Employer copy (bottom) */}
+      <div style={{ position: 'absolute', top: `${SEC.stub + 0.35}in`, bottom: '0.5in', left: '0.75in', right: '0.75in' }}>
+        <FlatRateEarningsStatement fr={fr} checkDate={today} checkNum={checkNum}
+          periodStart={periodStart} periodEnd={periodEnd} copyLabel="Employer Copy" />
       </div>
     </div>
   )
@@ -411,7 +487,7 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
         padding: '7px 24px', fontSize: '11.5px', color: '#92400e',
         display: 'flex', gap: 20, flexWrap: 'wrap',
       }}>
-        <span><strong>Sections:</strong> Check stock (top) · Employer copy (middle) · Employee copy (bottom)</span>
+        <span><strong>Sections:</strong> Check stock (top) · Employee copy (middle) · Employer copy (bottom)</span>
         <span>To fine-tune field placement, edit the <code style={{ background: '#fde68a', padding: '0 3px', borderRadius: 3 }}>CHECK</code> constants in <code style={{ background: '#fde68a', padding: '0 3px', borderRadius: 3 }}>PrintChecks.jsx</code></span>
       </div>
 
@@ -530,7 +606,7 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                 pointerEvents: 'none',
               }}>
                 <span style={{ position: 'absolute', top: 18, left: 10, fontSize: 8, color: '#6ee7b7', fontFamily: 'sans-serif', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                  Employer Copy
+                  Employee Copy
                 </span>
               </div>
               <div className="no-print" style={{
@@ -539,13 +615,13 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                 pointerEvents: 'none',
               }}>
                 <span style={{ position: 'absolute', top: 18, left: 10, fontSize: 8, color: '#93c5fd', fontFamily: 'sans-serif', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                  Employee Copy
+                  Employer Copy
                 </span>
               </div>
 
               {/* ── Cut lines ────────────────────────────────────── */}
-              <CutLine topIn={SEC.check} label="Detach — Employer Paystub" />
-              <CutLine topIn={SEC.stub}  label="Detach — Employee Copy" />
+              <CutLine topIn={SEC.check} label="Detach — Employee Copy" />
+              <CutLine topIn={SEC.stub}  label="Detach — Employer Copy" />
 
               {/* ══ CHECK FIELDS (overlay on pre-printed check stock) ══ */}
 
@@ -583,50 +659,34 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                 fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
               }}>{emp.name}</div>
 
-              {/* ══ EMPLOYER COPY (section 2) ══ */}
+              {/* ══ EMPLOYEE COPY (section 2 — middle) ══ */}
               <div style={{
                 position: 'absolute',
                 top: `${SEC.check + 0.35}in`,
                 bottom: `${11 - SEC.stub + 0.3}in`,
                 left: '0.75in', right: '0.75in',
-                display: 'flex', flexDirection: 'column',
               }}>
-                <StubHeader emp={emp} periodLabel={periodLabel} copyLabel="Employer Copy" today={today} />
-                <PaystubTable emp={emp} gas={gas} bonus={bonus} loanDed={loanDed} netPay={netPay} />
+                <EarningsStatement
+                  emp={emp} periodStart={period.start} periodEnd={period.end}
+                  checkDate={today} checkNum={checkNums[`u-${emp.user_id}`] ?? ''}
+                  gas={gas} bonus={bonus} loanDed={loanDed} netPay={netPay}
+                  copyLabel="Employee Copy"
+                />
               </div>
 
-              {/* ══ EMPLOYEE COPY — check-register stub fields (exact PPTX positions) ══ */}
-
-              {/* Employee name */}
-              <div style={{
-                position: 'absolute', top: STUB.name.top, left: STUB.name.left,
-                fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif',
-                fontWeight: 600, color: '#000',
-              }}>{emp.name}</div>
-
-              {/* Net pay amount */}
-              <div style={{
-                position: 'absolute', top: STUB.amount.top, right: STUB.amount.right,
-                fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif',
-                fontWeight: 700, color: '#000', letterSpacing: '0.04em',
-              }}>{formatCurrency(netPay).replace('$', '')}</div>
-
-              {/* Pay period */}
-              <div style={{
-                position: 'absolute', top: STUB.period.top, left: STUB.period.left,
-                fontSize: '9pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
-              }}>Pay Period: {periodLabel}</div>
-
-              {/* ══ EMPLOYEE COPY — detailed paystub (below stub register fields) ══ */}
+              {/* ══ EMPLOYER COPY (section 3 — bottom) ══ */}
               <div style={{
                 position: 'absolute',
-                top: '8.25in',
+                top: `${SEC.stub + 0.35}in`,
                 bottom: '0.5in',
                 left: '0.75in', right: '0.75in',
-                display: 'flex', flexDirection: 'column',
               }}>
-                <StubHeader emp={emp} periodLabel={periodLabel} copyLabel="Employee Copy" today={today} />
-                <PaystubTable emp={emp} gas={gas} bonus={bonus} loanDed={loanDed} netPay={netPay} />
+                <EarningsStatement
+                  emp={emp} periodStart={period.start} periodEnd={period.end}
+                  checkDate={today} checkNum={checkNums[`u-${emp.user_id}`] ?? ''}
+                  gas={gas} bonus={bonus} loanDed={loanDed} netPay={netPay}
+                  copyLabel="Employer Copy"
+                />
               </div>
 
             </div>
@@ -635,7 +695,9 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
 
         {/* Flat rate check pages */}
         {flatRatePayments.map((fr) => (
-          <FlatRateCheckPage key={`fr-${fr.id}`} fr={fr} today={today} periodLabel={periodLabel} />
+          <FlatRateCheckPage key={`fr-${fr.id}`} fr={fr} today={today}
+            periodStart={period.start} periodEnd={period.end}
+            checkNum={checkNums[`fr-${fr.id}`] ?? ''} />
         ))}
       </div>
     </div>,

@@ -1,4 +1,4 @@
-export default function StatsCard({ label, value, icon, color = 'blue', onClick }) {
+export default function StatsCard({ label, value, icon, color = 'blue', onClick, compact = false }) {
   const colors = {
     blue:   'bg-blue-50   text-blue-600',
     green:  'bg-green-50  text-green-600',
@@ -9,12 +9,26 @@ export default function StatsCard({ label, value, icon, color = 'blue', onClick 
     violet: 'bg-violet-50 text-violet-600',
     sky:    'bg-sky-50    text-sky-600',
   }
+  const cls = colors[color] ?? colors.blue
+  const base = `bg-white rounded-2xl border border-gray-100 flex items-center ${onClick ? 'cursor-pointer hover:border-brand-300 transition-colors' : ''}`
+
+  if (compact) {
+    return (
+      <div className={`${base} p-3 gap-3`} onClick={onClick}>
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cls}`}>
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-base font-bold text-gray-900 leading-none truncate">{value}</p>
+          <p className="text-xs text-gray-500 mt-0.5 leading-tight">{label}</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div
-      className={`bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-4 ${onClick ? 'cursor-pointer hover:border-brand-300 transition-colors' : ''}`}
-      onClick={onClick}
-    >
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${colors[color] ?? colors.blue}`}>
+    <div className={`${base} p-5 gap-4`} onClick={onClick}>
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${cls}`}>
         {icon}
       </div>
       <div>

@@ -180,10 +180,10 @@ export default function MyPay() {
         ))}
       </div>
 
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
         {TABS.map(([val, label]) => (
           <button key={val} onClick={() => setTab(val)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${tab === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${tab === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             {label}
           </button>
         ))}
@@ -272,33 +272,33 @@ export default function MyPay() {
                     return (
                       <>
                         {/* ── Stat cards ── */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <StatsCard
+                      <div className="grid grid-cols-2 gap-2">
+                        <StatsCard compact
                           label={t('pay.todayHours')}
                           value={formatHours(data.today_hours ?? 0)}
                           icon={ClockIcon}
                           color="blue"
                         />
-                        <StatsCard
+                        <StatsCard compact
                           label={selectedPeriod === 0 ? t('pay.weekHours') : t('pay.approvedHours')}
                           value={formatHours(data.approved_hours ?? 0)}
                           icon={CalendarIcon}
                           color="indigo"
                         />
-                        <StatsCard
+                        <StatsCard compact
                           label={t('pay.rate')}
                           value={isSalary ? formatCurrency(rate) : `${formatCurrency(rate)}/hr`}
                           icon={RateIcon}
                           color="purple"
                         />
-                        <StatsCard
+                        <StatsCard compact
                           label={t('pay.estimatedGross')}
                           value={formatCurrency(data.estimated_total ?? 0)}
                           icon={GrossIcon}
                           color="green"
                         />
                         {todayMiles !== null && (
-                          <StatsCard
+                          <StatsCard compact
                             label={t('pay.todayMiles')}
                             value={`${todayMiles.toFixed(1)} mi`}
                             icon={MileageIcon}
