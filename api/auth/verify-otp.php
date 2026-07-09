@@ -38,13 +38,14 @@ $stmt->execute([$user['id'], $refreshToken, JWT_REFRESH_EXPIRY]);
 echo json_encode([
     'token'        => $token,
     'refreshToken' => $refreshToken,
-    'user'         => [
-        'id'       => $user['id'],
-        'name'     => $user['name'],
-        'email'    => $user['email'],
-        'phone'    => $user['phone'],
-        'role'     => $user['role'],
-        'pay_type' => $user['pay_type'],
+    'user'          => [
+        'id'            => $user['id'],
+        'name'          => $user['name'],
+        'email'         => $user['email'],
+        'phone'         => $user['phone'],
+        'role'          => $user['role'],
+        'pay_type'      => $user['pay_type'],
+        'pay_structure' => $user['pay_structure'] ?? 'hourly',
     ],
 ]);
 exit;
