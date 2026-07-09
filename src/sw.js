@@ -1,8 +1,13 @@
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
+import { clientsClaim } from 'workbox-core'
 import { registerRoute } from 'workbox-routing'
 import { NetworkFirst, CacheFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
+
+// Take over immediately when a new SW is installed — no waiting for tabs to close
+self.skipWaiting()
+clientsClaim()
 
 cleanupOutdatedCaches()
 precacheAndRoute(self.__WB_MANIFEST)
