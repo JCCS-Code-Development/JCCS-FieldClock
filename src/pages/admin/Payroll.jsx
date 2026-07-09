@@ -432,7 +432,11 @@ export default function AdminPayroll() {
                       <tr key={emp.user_id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
                         onClick={() => openDrillDown(emp)}>
                         <td className="px-5 py-3 font-medium text-gray-900">{emp.name}</td>
-                        <td className="px-4 py-3 text-right text-gray-600">{formatHours((emp.regular_hours ?? 0) + (emp.overtime_hours ?? 0))}</td>
+                        <td className="px-4 py-3 text-right text-gray-600">
+                          {emp.pay_structure === 'salary'
+                            ? <span className="text-xs font-semibold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">Salary</span>
+                            : formatHours((emp.regular_hours ?? 0) + (emp.overtime_hours ?? 0))}
+                        </td>
                         <td className="px-4 py-3 text-right">{formatCurrency(emp.base_gross ?? 0)}</td>
                         <td className="px-4 py-3 text-right text-amber-600 font-medium">
                           {gas > 0 ? formatCurrency(gas) : <span className="text-gray-300">—</span>}

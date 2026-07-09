@@ -48,9 +48,19 @@ foreach ($adjRows->fetchAll() as $adj) {
 
 // User info
 // Include all users — even deactivated ones may have entries in this period
-$users = $pdo->query('SELECT id, name, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance FROM users')->fetchAll();
+$users = $pdo->query('SELECT id, name, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance, is_active FROM users')->fetchAll();
 $userMap = [];
 foreach ($users as $u) { $userMap[$u['id']] = $u; }
+
+// Number of weeks in the requested period (used for salaried employees who don't clock in)
+$weeksInPeriod = max(1, (int) round((strtotime($end) - strtotime($start) + 86400) / (7 * 86400)));
+
+// Seed salaried employees who have no time entries so they always appear in payroll
+foreach ($userMap as $uid => $u) {
+    if (($u['pay_structure'] ?? 'hourly') === 'salary' && $u['is_active'] && !isset($byUser[$uid])) {
+        $byUser[$uid] = [];
+    }
+}
 
 $summary = [];
 foreach ($byUser as $uid => $data) {
@@ -74,9 +84,11 @@ foreach ($byUser as $uid => $data) {
 
     if ($isSalary) {
         // Fixed weekly salary — pay_rate is the weekly amount regardless of hours
-        $totalHours = $totalMinutes / 60;
-        $regHours   = $totalHours;
-        $baseGross  = (float)($u['pay_rate'] ?? 0) * $weeksWorked;
+        // Use $weeksInPeriod when the employee has no time entries (doesn't clock in)
+        $weeksForPay = $weeksWorked > 0 ? $weeksWorked : $weeksInPeriod;
+        $regHours    = 0;
+        $baseGross   = (float)($u['pay_rate'] ?? 0) * $weeksForPay;
+        $weeksWorked = $weeksForPay;
     } elseif ($u['pay_type'] === 'w2') {
         foreach ($weeks as $weekData) {
             $weekMins = array_sum($weekData);
