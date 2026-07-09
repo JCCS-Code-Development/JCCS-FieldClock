@@ -191,11 +191,11 @@ export default function AdminLayout() {
 
       <div className="flex-1 flex flex-col min-w-0 lg:ml-60 overflow-hidden">
         <OfflineBanner />
-        <header className="lg:hidden bg-brand-900 text-white flex items-center justify-between px-4 py-3 sticky top-0 z-30">
-          <button onClick={() => setDrawerOpen(true)} className="p-1 text-brand-100/80"><MenuIcon /></button>
-          <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-7 w-auto"
+        <header className="lg:hidden bg-brand-900 text-white grid grid-cols-3 items-center px-4 py-3 sticky top-0 z-30">
+          <button onClick={() => setDrawerOpen(true)} className="p-1 text-brand-100/80 justify-self-start"><MenuIcon /></button>
+          <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-7 w-auto justify-self-center"
             style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
-          <LiveClock className="text-white/80" />
+          <div className="justify-self-end"><LiveClock className="text-white/80" /></div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 w-full">
           <div className="max-w-7xl mx-auto w-full">

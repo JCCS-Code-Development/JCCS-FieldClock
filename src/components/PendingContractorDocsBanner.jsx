@@ -25,7 +25,8 @@ export default function PendingContractorDocsBanner() {
   return (
     <div
       role="alert"
-      className="flex items-center justify-between gap-3 px-4 py-2.5 bg-amber-500 text-white text-sm font-medium cursor-pointer hover:bg-amber-600 transition-colors"
+      className="lg:hidden fixed inset-x-0 z-20 flex items-center justify-between gap-3 px-4 py-3 bg-orange-500 text-white text-sm font-semibold cursor-pointer active:bg-orange-600 transition-colors shadow-lg"
+      style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
       onClick={() => navigate('/contractor/documents')}
     >
       <div className="flex items-center gap-2">

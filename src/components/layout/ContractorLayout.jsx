@@ -101,7 +101,7 @@ export default function ContractorLayout() {
   const close = () => setDrawerOpen(false)
 
   return (
-    <div className="flex min-h-svh bg-gray-50">
+    <div className="flex h-svh bg-gray-50 overflow-hidden">
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-60 bg-brand-900 text-white shrink-0 fixed top-0 bottom-0 left-0 z-20">
@@ -125,16 +125,15 @@ export default function ContractorLayout() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-60">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-60 overflow-hidden">
         <OfflineBanner />
-        <PendingContractorDocsBanner />
 
         {/* Mobile top header */}
-        <header className="lg:hidden bg-brand-900 text-white flex items-center justify-between px-4 py-3 sticky top-0 z-30">
-          <button onClick={() => setDrawerOpen(true)} className="p-1 text-brand-100/80"><MenuIcon /></button>
-          <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-7 w-auto"
+        <header className="lg:hidden bg-brand-900 text-white grid grid-cols-3 items-center px-4 py-3 sticky top-0 z-30">
+          <button onClick={() => setDrawerOpen(true)} className="p-1 text-brand-100/80 justify-self-start"><MenuIcon /></button>
+          <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-7 w-auto justify-self-center"
             style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
-          <div className="w-8" />
+          <div className="w-8 justify-self-end" />
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-24 lg:pb-6 w-full">
@@ -142,6 +141,9 @@ export default function ContractorLayout() {
             <Outlet />
           </div>
         </main>
+
+        {/* Document reminder — fixed just above the bottom nav on mobile */}
+        <PendingContractorDocsBanner />
 
         {/* Mobile bottom nav */}
         <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 flex z-30">

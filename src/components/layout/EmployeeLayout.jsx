@@ -136,7 +136,7 @@ export default function EmployeeLayout() {
   const innerProps = { user, statusLabel, dotColor, onLogout: handleLogout, t }
 
   return (
-    <div className="flex min-h-svh bg-gray-50">
+    <div className="flex h-svh bg-gray-50 overflow-hidden">
 
       {/* ── Desktop sidebar ──────────────────────────────── */}
       <aside className="hidden lg:flex flex-col w-60 bg-brand-900 text-white shrink-0 fixed top-0 bottom-0 left-0 z-20">
@@ -181,23 +181,25 @@ export default function EmployeeLayout() {
       )}
 
       {/* ── Content area ─────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-60">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-60 overflow-hidden">
         <OfflineBanner />
 
         {/* Mobile top bar */}
-        <header className="lg:hidden bg-brand-900 text-white flex items-center justify-between px-4 py-3 sticky top-0 z-30">
-          <button onClick={() => setDrawerOpen(true)} className="p-1 text-brand-100/80"><MenuIcon /></button>
-          <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-7 w-auto"
+        <header className="lg:hidden bg-brand-900 text-white grid grid-cols-3 items-center px-4 py-3 sticky top-0 z-30">
+          <button onClick={() => setDrawerOpen(true)} className="p-1 text-brand-100/80 justify-self-start"><MenuIcon /></button>
+          <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-7 w-auto justify-self-center"
             style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
-          <LiveClock className="text-white/80" />
+          <div className="justify-self-end"><LiveClock className="text-white/80" /></div>
         </header>
 
-        <PendingDocsBanner />
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-6 flex flex-col">
           <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col p-4 lg:p-6">
             <Outlet />
           </div>
         </main>
+
+        {/* Document reminder — fixed just above the bottom nav on mobile */}
+        <PendingDocsBanner />
 
         {/* Mobile bottom nav */}
         <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 flex z-30"
