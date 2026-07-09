@@ -259,7 +259,7 @@ function FlatRateCheckPage({ fr, today, periodLabel }) {
       <div style={{ position: 'absolute', top: CHECK.memo.top, left: CHECK.memo.left, fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{fr.user_name}</div>
 
       {/* Employer copy */}
-      <div style={{ position: 'absolute', top: `${SEC.check + 0.14}in`, bottom: `${11 - SEC.stub + 0.08}in`, left: '0.75in', right: '0.75in', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'absolute', top: `${SEC.check + 0.35}in`, bottom: `${11 - SEC.stub + 0.3}in`, left: '0.75in', right: '0.75in', display: 'flex', flexDirection: 'column' }}>
         <StubHeader emp={{ name: fr.user_name, pay_type: 'Flat Rate' }} periodLabel={periodLabel} copyLabel="Employer Copy" today={today} />
         <FlatRateStubTable fr={fr} />
       </div>
@@ -270,7 +270,7 @@ function FlatRateCheckPage({ fr, today, periodLabel }) {
       <div style={{ position: 'absolute', top: STUB.period.top, left: STUB.period.left, fontSize: '9pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>Pay Period: {periodLabel}</div>
 
       {/* Employee copy */}
-      <div style={{ position: 'absolute', top: '8.06in', bottom: '0.3in', left: '0.75in', right: '0.75in', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'absolute', top: '8.25in', bottom: '0.5in', left: '0.75in', right: '0.75in', display: 'flex', flexDirection: 'column' }}>
         <StubHeader emp={{ name: fr.user_name, pay_type: 'Flat Rate' }} periodLabel={periodLabel} copyLabel="Employee Copy" today={today} />
         <FlatRateStubTable fr={fr} />
       </div>
@@ -559,8 +559,8 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
               {/* ══ EMPLOYER COPY (section 2) ══ */}
               <div style={{
                 position: 'absolute',
-                top: `${SEC.check + 0.14}in`,
-                bottom: `${11 - SEC.stub + 0.08}in`,
+                top: `${SEC.check + 0.35}in`,
+                bottom: `${11 - SEC.stub + 0.3}in`,
                 left: '0.75in', right: '0.75in',
                 display: 'flex', flexDirection: 'column',
               }}>
@@ -593,8 +593,8 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
               {/* ══ EMPLOYEE COPY — detailed paystub (below stub register fields) ══ */}
               <div style={{
                 position: 'absolute',
-                top: '8.06in',
-                bottom: '0.3in',
+                top: '8.25in',
+                bottom: '0.5in',
                 left: '0.75in', right: '0.75in',
                 display: 'flex', flexDirection: 'column',
               }}>
