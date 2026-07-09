@@ -26,6 +26,7 @@ import AdminVendors from './pages/admin/Vendors'
 import AdminDocuments from './pages/admin/AdminDocuments'
 import AdminHR from './pages/admin/HRDocuments'
 import AdminReports from './pages/admin/Reports'
+import CheckRegistry from './pages/admin/CheckRegistry'
 
 import InvoicePortal from './pages/contractor/InvoicePortal'
 import LegalDocuments from './pages/contractor/LegalDocuments'
@@ -78,6 +79,7 @@ export default function App() {
             <Route path="/admin/documents"  element={<AdminDocuments />}  />
             <Route path="/admin/hr"         element={<AdminHR />}         />
             <Route path="/admin/reports"    element={<AdminReports />}    />
+            <Route path="/admin/checks"     element={<CheckRegistry />}   />
           </Route>
         </Route>
       </Route>

@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { formatCurrency } from '../../utils/format'
 import { format } from 'date-fns'
+import { registerChecks } from '../../api/checks'
 
 // ── Amount → words ────────────────────────────────────────────────────────
 const ONES = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
@@ -296,13 +297,50 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
     return () => document.getElementById('print-checks-css')?.remove()
   }, [])
 
+  const [checkNums, setCheckNums]       = useState({})
+  const [regOpen, setRegOpen]           = useState(false)
+  const [regSaving, setRegSaving]       = useState(false)
+  const [regStatus, setRegStatus]       = useState(null) // null | 'saved' | 'error'
+
   const today       = format(new Date(), 'MM/dd/yyyy')
+  const issuedDate  = format(new Date(), 'yyyy-MM-dd')
   const periodLabel = (() => {
     try {
       return `${format(new Date(period.start + 'T12:00'), 'MM/dd/yyyy')} – ${format(new Date(period.end + 'T12:00'), 'MM/dd/yyyy')}`
     } catch { return period.label }
   })()
   const totalChecks = employees.length + flatRatePayments.length
+
+  // Flat list of all checks for the registration panel
+  const allPayees = [
+    ...employees.map(e => ({ key: `u-${e.user_id}`, name: e.name, amount: e.estimated_total ?? 0, user_id: e.user_id })),
+    ...flatRatePayments.map(fr => ({ key: `fr-${fr.id}`, name: fr.user_name, amount: parseFloat(fr.amount), user_id: null })),
+  ]
+
+  const handleRegister = async () => {
+    setRegSaving(true)
+    setRegStatus(null)
+    try {
+      const toSave = allPayees
+        .filter(p => checkNums[p.key]?.trim())
+        .map(p => ({
+          check_number:     checkNums[p.key].trim(),
+          payee_name:       p.name,
+          user_id:          p.user_id,
+          amount:           p.amount,
+          pay_period_start: period.start,
+          pay_period_end:   period.end,
+          issued_date:      issuedDate,
+        }))
+      if (!toSave.length) { setRegSaving(false); return }
+      await registerChecks(toSave)
+      setRegStatus('saved')
+    } catch {
+      setRegStatus('error')
+    } finally {
+      setRegSaving(false)
+    }
+  }
 
   return createPortal(
     <div id="print-checks-root"
@@ -348,6 +386,83 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
       }}>
         <span><strong>Sections:</strong> Check stock (top) · Employer copy (middle) · Employee copy (bottom)</span>
         <span>To fine-tune field placement, edit the <code style={{ background: '#fde68a', padding: '0 3px', borderRadius: 3 }}>CHECK</code> constants in <code style={{ background: '#fde68a', padding: '0 3px', borderRadius: 3 }}>PrintChecks.jsx</code></span>
+      </div>
+
+      {/* ── Check number registration panel ─────────────────────── */}
+      <div className="no-print" style={{ background: '#1e293b', borderBottom: '1px solid #334155', padding: '0 24px' }}>
+        <button
+          onClick={() => { setRegOpen(o => !o); setRegStatus(null) }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '10px 0', width: '100%', background: 'none', border: 'none',
+            color: '#cbd5e1', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+          }}>
+          <span style={{ fontSize: 16 }}>{regOpen ? '▾' : '▸'}</span>
+          Register Check Numbers
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#64748b', fontWeight: 400 }}>
+            Enter physical check numbers to track in the registry
+          </span>
+        </button>
+
+        {regOpen && (
+          <div style={{ paddingBottom: 16 }}>
+            {/* Column headers */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr auto 140px',
+              gap: 8, marginBottom: 6, padding: '0 2px',
+            }}>
+              <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Payee</span>
+              <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Amount</span>
+              <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 4 }}>Check #</span>
+            </div>
+
+            {allPayees.map(p => (
+              <div key={p.key} style={{
+                display: 'grid', gridTemplateColumns: '1fr auto 140px',
+                gap: 8, alignItems: 'center', marginBottom: 6,
+              }}>
+                <span style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p.name}
+                </span>
+                <span style={{ fontSize: 12, color: '#94a3b8', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  {formatCurrency(p.amount)}
+                </span>
+                <input
+                  type="text"
+                  value={checkNums[p.key] ?? ''}
+                  onChange={e => setCheckNums(prev => ({ ...prev, [p.key]: e.target.value }))}
+                  placeholder="e.g. 1042"
+                  style={{
+                    background: '#0f172a', border: '1px solid #334155', borderRadius: 6,
+                    padding: '5px 10px', fontSize: 13, color: '#f1f5f9',
+                    outline: 'none', width: '100%', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            ))}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+              <button
+                onClick={handleRegister}
+                disabled={regSaving || !allPayees.some(p => checkNums[p.key]?.trim())}
+                style={{
+                  padding: '8px 20px', borderRadius: 8,
+                  background: regStatus === 'saved' ? '#16a34a' : '#6366f1',
+                  color: '#fff', border: 'none', cursor: 'pointer',
+                  fontWeight: 600, fontSize: 13, opacity: regSaving ? 0.7 : 1,
+                  transition: 'background 0.2s',
+                }}>
+                {regSaving ? 'Saving…' : regStatus === 'saved' ? '✓ Saved to Registry' : 'Save to Registry'}
+              </button>
+              {regStatus === 'error' && (
+                <span style={{ fontSize: 12, color: '#f87171' }}>Failed — check for duplicate check numbers</span>
+              )}
+              {regStatus === 'saved' && (
+                <span style={{ fontSize: 12, color: '#4ade80' }}>Check numbers saved. View in Check Registry.</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Check pages ──────────────────────────────────────────── */}
