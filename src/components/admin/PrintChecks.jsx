@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { formatCurrency } from '../../utils/format'
 import { format } from 'date-fns'
 
@@ -254,10 +255,10 @@ function FlatRateCheckPage({ fr, today, periodLabel }) {
       <div style={{ position: 'absolute', top: CHECK.payTo.top, left: CHECK.payTo.left, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 600, color: '#000', maxWidth: '4.7in', overflow: 'hidden', whiteSpace: 'nowrap' }}>{fr.user_name}</div>
       <div style={{ position: 'absolute', top: CHECK.dollarAmt.top, right: CHECK.dollarAmt.right, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000', letterSpacing: '0.04em' }}>{formatCurrency(amount).replace('$', '')}</div>
       <div style={{ position: 'absolute', top: CHECK.words.top, left: CHECK.words.left, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000', maxWidth: '6.1in', overflow: 'hidden', whiteSpace: 'nowrap' }}>{amountToWords(amount)}</div>
-      <div style={{ position: 'absolute', top: CHECK.memo.top, left: CHECK.memo.left, fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{fr.description}</div>
+      <div style={{ position: 'absolute', top: CHECK.memo.top, left: CHECK.memo.left, fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{fr.user_name}</div>
 
       {/* Employer copy */}
-      <div style={{ position: 'absolute', top: `${SEC.check + 0.14}in`, bottom: `${11 - SEC.stub + 0.08}in`, left: '0.5in', right: '0.5in', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'absolute', top: `${SEC.check + 0.14}in`, bottom: `${11 - SEC.stub + 0.08}in`, left: '0.75in', right: '0.75in', display: 'flex', flexDirection: 'column' }}>
         <StubHeader emp={{ name: fr.user_name, pay_type: 'Flat Rate' }} periodLabel={periodLabel} copyLabel="Employer Copy" today={today} />
         <FlatRateStubTable fr={fr} />
       </div>
@@ -268,7 +269,7 @@ function FlatRateCheckPage({ fr, today, periodLabel }) {
       <div style={{ position: 'absolute', top: STUB.period.top, left: STUB.period.left, fontSize: '9pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>Pay Period: {periodLabel}</div>
 
       {/* Employee copy */}
-      <div style={{ position: 'absolute', top: '8.06in', bottom: '0.3in', left: '0.5in', right: '0.5in', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'absolute', top: '8.06in', bottom: '0.3in', left: '0.75in', right: '0.75in', display: 'flex', flexDirection: 'column' }}>
         <StubHeader emp={{ name: fr.user_name, pay_type: 'Flat Rate' }} periodLabel={periodLabel} copyLabel="Employee Copy" today={today} />
         <FlatRateStubTable fr={fr} />
       </div>
@@ -303,7 +304,7 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
   })()
   const totalChecks = employees.length + flatRatePayments.length
 
-  return (
+  return createPortal(
     <div id="print-checks-root"
       style={{ position: 'fixed', inset: 0, background: '#d1d5db', zIndex: 9999, overflowY: 'auto' }}>
 
@@ -434,18 +435,18 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                 maxWidth: '6.1in', overflow: 'hidden', whiteSpace: 'nowrap',
               }}>{amountToWords(netPay)}</div>
 
-              {/* Memo */}
+              {/* Memo — employee name so it shows through envelope window */}
               <div style={{
                 position: 'absolute', top: CHECK.memo.top, left: CHECK.memo.left,
                 fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
-              }}>Payroll — {period.label}</div>
+              }}>{emp.name}</div>
 
               {/* ══ EMPLOYER COPY (section 2) ══ */}
               <div style={{
                 position: 'absolute',
                 top: `${SEC.check + 0.14}in`,
                 bottom: `${11 - SEC.stub + 0.08}in`,
-                left: '0.5in', right: '0.5in',
+                left: '0.75in', right: '0.75in',
                 display: 'flex', flexDirection: 'column',
               }}>
                 <StubHeader emp={emp} periodLabel={periodLabel} copyLabel="Employer Copy" today={today} />
@@ -479,7 +480,7 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                 position: 'absolute',
                 top: '8.06in',
                 bottom: '0.3in',
-                left: '0.5in', right: '0.5in',
+                left: '0.75in', right: '0.75in',
                 display: 'flex', flexDirection: 'column',
               }}>
                 <StubHeader emp={emp} periodLabel={periodLabel} copyLabel="Employee Copy" today={today} />
@@ -495,6 +496,7 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
           <FlatRateCheckPage key={`fr-${fr.id}`} fr={fr} today={today} periodLabel={periodLabel} />
         ))}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
