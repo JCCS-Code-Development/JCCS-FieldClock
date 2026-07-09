@@ -145,7 +145,7 @@ export default function EmployeeLayout() {
 
       {/* ── Mobile drawer ────────────────────────────────── */}
       {drawerOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden" onClick={close}>
+        <div className="fixed inset-0 z-[1100] lg:hidden" onClick={close}>
           <div className="absolute inset-0 bg-black/50" />
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-brand-900 text-white flex flex-col"
             onClick={(e) => e.stopPropagation()}>

@@ -197,11 +197,49 @@ export default function AdminLayout() {
             style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
           <div className="justify-self-end"><LiveClock className="text-white/80" /></div>
         </header>
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 w-full">
+        <main className="flex-1 overflow-y-auto px-4 pt-4 pb-20 lg:p-6 w-full">
           <div className="max-w-7xl mx-auto w-full">
             <Outlet />
           </div>
         </main>
+
+        {/* Mobile bottom nav */}
+        <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 flex z-30"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <NavLink to="/admin" end
+            className={({ isActive }) =>
+              `flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-medium transition-colors ${isActive ? 'text-brand-500' : 'text-gray-400'}`
+            }>
+            <DashboardIcon />
+            <span>Home</span>
+          </NavLink>
+          <NavLink to="/admin/jobs"
+            className={({ isActive }) =>
+              `flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-medium transition-colors ${isActive ? 'text-brand-500' : 'text-gray-400'}`
+            }>
+            <JobsIcon />
+            <span>Jobs</span>
+          </NavLink>
+          <NavLink to="/admin/timesheets"
+            className={({ isActive }) =>
+              `flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-medium transition-colors ${isActive ? 'text-brand-500' : 'text-gray-400'}`
+            }>
+            <TimesheetIcon />
+            <span>Timesheets</span>
+          </NavLink>
+          <NavLink to="/admin/payroll"
+            className={({ isActive }) =>
+              `flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-medium transition-colors ${isActive ? 'text-brand-500' : 'text-gray-400'}`
+            }>
+            <PayrollIcon />
+            <span>Payroll</span>
+          </NavLink>
+          <button onClick={() => setDrawerOpen(true)}
+            className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-medium text-gray-400 active:text-brand-500 transition-colors">
+            <MenuIcon />
+            <span>More</span>
+          </button>
+        </nav>
       </div>
     </div>
   )
