@@ -72,37 +72,47 @@ function totalMins(entries) {
     .reduce((s, e) => s + entryMins(e), 0)
 }
 
-function groupByDay(entries) {
-  const map = {}
-  for (const e of entries) {
-    const day = format(new Date(e.start_time), 'yyyy-MM-dd')
-    if (!map[day]) map[day] = []
-    map[day].push(e)
-  }
-  return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]))
-}
-
 // ── Entry edit / create modal ────────────────────────────────────
-function EntryModal({ entry, defaultDate, userId, jobs, onSave, onClose }) {
-  const isNew = !entry?.id
-  const toLocal = (dt) => dt ? format(new Date(dt), "yyyy-MM-dd'T'HH:mm") : ''
+function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClose }) {
+  const isNew    = !entry?.id
+  const isAnyDay = defaultDate === '__any__'
+
+  const initDate  = isAnyDay
+    ? (weekDays?.[0] ?? '')
+    : (defaultDate && defaultDate !== '__any__')
+      ? defaultDate
+      : (entry?.start_time ? format(new Date(entry.start_time), 'yyyy-MM-dd') : '')
+  const initStart = isNew ? '08:00' : (entry?.start_time ? format(new Date(entry.start_time), 'HH:mm') : '')
+  const initEnd   = isNew ? '17:00' : (entry?.end_time   ? format(new Date(entry.end_time),   'HH:mm') : '')
 
   const [statusLabel, setStatusLabel] = useState(entry?.status_label ?? 'working')
-  const [startTime,   setStartTime]   = useState(isNew ? (defaultDate ? defaultDate + 'T08:00' : '') : toLocal(entry.start_time))
-  const [endTime,     setEndTime]     = useState(isNew ? (defaultDate ? defaultDate + 'T17:00' : '') : toLocal(entry.end_time))
+  const [entryDate,   setEntryDate]   = useState(initDate)
+  const [startTime,   setStartTime]   = useState(initStart)
+  const [endTime,     setEndTime]     = useState(initEnd)
   const [jobId,       setJobId]       = useState(entry?.job_id ? String(entry.job_id) : '')
   const [notes,       setNotes]       = useState(entry?.notes ?? '')
   const [error,       setError]       = useState('')
   const [saving,      setSaving]      = useState(false)
 
+  const duration = useMemo(() => {
+    if (!startTime || !endTime) return null
+    const [sh, sm] = startTime.split(':').map(Number)
+    const [eh, em] = endTime.split(':').map(Number)
+    const mins = (eh * 60 + em) - (sh * 60 + sm)
+    if (mins <= 0) return null
+    const h = Math.floor(mins / 60), m = mins % 60
+    return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`
+  }, [startTime, endTime])
+
   const handleSave = async () => {
-    if (!startTime) { setError('Start time is required'); return }
+    if (!entryDate) { setError('Please select a day.'); return }
+    if (!startTime) { setError('Start time is required.'); return }
     setSaving(true); setError('')
     try {
       const payload = {
         status_label: statusLabel,
-        start_time:   startTime.replace('T', ' ') + ':00',
-        end_time:     endTime ? endTime.replace('T', ' ') + ':00' : null,
+        start_time:   `${entryDate} ${startTime}:00`,
+        end_time:     endTime ? `${entryDate} ${endTime}:00` : null,
         job_id:       jobId ? parseInt(jobId) : null,
         notes:        notes.trim() || null,
       }
@@ -114,25 +124,78 @@ function EntryModal({ entry, defaultDate, userId, jobs, onSave, onClose }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
+      {/* Day indicator / picker */}
+      {isAnyDay ? (
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Select Day</label>
+          <div className="grid grid-cols-7 gap-1">
+            {(weekDays ?? []).map(d => (
+              <button key={d} onClick={() => setEntryDate(d)}
+                className={`py-2 rounded-xl text-center border-2 transition-colors ${
+                  entryDate === d ? 'border-brand-500 bg-brand-500 text-white' : 'border-gray-200 text-gray-600 hover:border-brand-300'
+                }`}>
+                <p className="text-[10px] font-bold uppercase leading-tight">{format(parseISO(d), 'EEE')}</p>
+                <p className="text-sm font-bold">{format(parseISO(d), 'd')}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-brand-50 rounded-2xl px-4 py-3 text-center">
+          <p className="text-xs text-brand-400 font-semibold uppercase tracking-widest mb-0.5">
+            {isNew ? 'New Entry' : 'Edit Entry'}
+          </p>
+          <p className="text-base font-bold text-brand-900">
+            {entryDate ? format(parseISO(entryDate), 'EEEE, MMMM d') : ''}
+          </p>
+        </div>
+      )}
+
+      {/* Entry type */}
       <div>
-        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Type</label>
-        <div className="flex flex-wrap gap-2">
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Type</label>
+        <div className="grid grid-cols-3 gap-2">
           {STATUS_OPTIONS.map(opt => (
             <button key={opt.value} onClick={() => setStatusLabel(opt.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-colors ${statusLabel === opt.value
-                ? 'border-brand-500 bg-brand-50 text-brand-700'
-                : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+              className={`py-2.5 rounded-xl text-xs font-semibold border-2 transition-colors ${
+                statusLabel === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}>
               {opt.label}
             </button>
           ))}
         </div>
       </div>
+
+      {/* Time inputs */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Clock In</label>
+          <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
+            className="w-full rounded-2xl border-2 border-gray-200 px-3 py-3.5 text-xl font-bold text-gray-900 text-center outline-none focus:border-brand-500 transition-colors" />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Clock Out</label>
+          <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
+            className="w-full rounded-2xl border-2 border-gray-200 px-3 py-3.5 text-xl font-bold text-gray-900 text-center outline-none focus:border-brand-500 transition-colors" />
+        </div>
+      </div>
+
+      {/* Duration pill */}
+      {duration && (
+        <div className="flex justify-center">
+          <span className="bg-green-50 text-green-700 font-semibold text-sm px-5 py-1.5 rounded-full border border-green-200">
+            {duration} total
+          </span>
+        </div>
+      )}
+
+      {/* Job */}
       <div>
         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Project / Job</label>
         <div className="relative">
           <select value={jobId} onChange={e => setJobId(e.target.value)}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 pr-8 text-sm outline-none focus:border-brand-500 appearance-none bg-white">
+            className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 pr-8 text-sm outline-none focus:border-brand-500 appearance-none bg-white transition-colors">
             <option value="">— No project assigned —</option>
             {(jobs ?? []).map(j => (
               <option key={j.id} value={j.id}>{j.name}{j.client_name ? ` · ${j.client_name}` : ''}</option>
@@ -141,27 +204,16 @@ function EntryModal({ entry, defaultDate, userId, jobs, onSave, onClose }) {
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Clock In</label>
-          <input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500" />
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Clock Out</label>
-          <input type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500" />
-        </div>
-      </div>
+
+      {/* Notes */}
       <div>
-        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
-          Adjustment Comment
-        </label>
-        <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)}
-          placeholder="Reason for adjustment (e.g. Employee forgot to clock out)"
-          className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 resize-none" />
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Adjustment Note</label>
+        <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
+          placeholder="e.g. Employee forgot to clock out"
+          className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500 transition-colors" />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {error && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{error}</p>}
       <div className="flex gap-3 pt-1">
         <Button variant="secondary" fullWidth onClick={onClose}>Cancel</Button>
         <Button fullWidth loading={saving} onClick={handleSave}>{isNew ? 'Add Entry' : 'Save Changes'}</Button>
@@ -172,84 +224,95 @@ function EntryModal({ entry, defaultDate, userId, jobs, onSave, onClose }) {
 
 // ── Day group ────────────────────────────────────────────────────
 function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
-  const dayMins  = totalMins(entries)
-  const dayLabel = format(parseISO(day), 'EEEE, MMMM d')
+  const dayMins   = totalMins(entries)
+  const dayLabel  = format(parseISO(day), 'EEEE, MMMM d')
+  const isWeekend = [0, 6].includes(parseISO(day).getDay())
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
-        <p className="text-sm font-bold text-gray-900">{dayLabel}</p>
+    <div className={`bg-white rounded-2xl border border-gray-100 overflow-hidden${isWeekend && entries.length === 0 ? ' opacity-60' : ''}`}>
+      <div className={`flex items-center justify-between px-4 py-3 border-b border-gray-100 ${isWeekend ? 'bg-gray-50/70' : 'bg-gray-50'}`}>
+        <div>
+          <p className="text-sm font-bold text-gray-900">{dayLabel}</p>
+          {isWeekend && <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide leading-none mt-0.5">Weekend</p>}
+        </div>
         <div className="flex items-center gap-3">
           {miles > 0 && (
             <span className="text-sm font-semibold text-sky-600">{miles.toFixed(1)} mi</span>
           )}
-          <span className={`text-sm font-semibold ${dayMins > 0 ? 'text-brand-600' : 'text-gray-400'}`}>
-            {fmtDur(dayMins)} total
-          </span>
+          {dayMins > 0 && (
+            <span className="text-sm font-semibold text-brand-600">{fmtDur(dayMins)} total</span>
+          )}
           <button onClick={() => onAdd(day)}
             className="flex items-center gap-1.5 text-xs text-brand-500 hover:text-brand-700 font-semibold transition-colors bg-brand-50 hover:bg-brand-100 px-2.5 py-1.5 rounded-lg">
             <PlusIcon /> Add
           </button>
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left border-b border-gray-100">
-              <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-32">Type</th>
-              <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Location</th>
-              <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-24">Start</th>
-              <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-24">End</th>
-              <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-16">Hrs</th>
-              <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Comment</th>
-              <th className="px-4 py-2 w-16"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {entries.map(entry => {
-              const mins    = entryMins(entry)
-              const isDayEnd = entry.cost_category === 'day_end'
-              const loc     = entry.job_name ?? (entry.notes?.startsWith('Location:') ? entry.notes.replace('Location: ', '') : null)
-              const comment = entry.notes?.startsWith('Adjustment:') ? entry.notes.replace('Adjustment: ', '')
-                            : entry.notes?.startsWith('Location:')   ? ''
-                            : (entry.notes ?? '')
+      {entries.length === 0 && (
+        <div className="px-4 py-3 text-center">
+          <p className="text-xs text-gray-300">No entries — tap Add to log a shift</p>
+        </div>
+      )}
+      {entries.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left border-b border-gray-100">
+                <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-32">Type</th>
+                <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Location</th>
+                <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-24">Start</th>
+                <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-24">End</th>
+                <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-16">Hrs</th>
+                <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Comment</th>
+                <th className="px-4 py-2 w-16"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {entries.map(entry => {
+                const mins     = entryMins(entry)
+                const isDayEnd = entry.cost_category === 'day_end'
+                const loc      = entry.job_name ?? (entry.notes?.startsWith('Location:') ? entry.notes.replace('Location: ', '') : null)
+                const comment  = entry.notes?.startsWith('Adjustment:') ? entry.notes.replace('Adjustment: ', '')
+                               : entry.notes?.startsWith('Location:')   ? ''
+                               : (entry.notes ?? '')
 
-              return (
-                <tr key={entry.id} className={`group ${isDayEnd ? 'opacity-40' : ''}`}>
-                  <td className="px-4 py-2.5">
-                    <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${STATUS_COLORS[entry.status_label] ?? 'bg-gray-100 text-gray-500'}`}>
-                      {STATUS_OPTIONS.find(o => o.value === entry.status_label)?.label ?? entry.status_label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-600 text-xs max-w-[140px] truncate">{loc || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-2.5 text-gray-700 font-mono text-xs">{formatTime(entry.start_time)}</td>
-                  <td className="px-4 py-2.5 text-xs">
-                    {entry.end_time
-                      ? <span className="text-gray-700 font-mono">{formatTime(entry.end_time)}</span>
-                      : <span className="text-orange-500 font-medium">Active</span>}
-                  </td>
-                  <td className="px-4 py-2.5 text-xs font-semibold text-gray-700">{isDayEnd ? '—' : fmtDur(mins)}</td>
-                  <td className="px-4 py-2.5 text-xs text-gray-400 max-w-[180px] truncate" title={comment}>
-                    {comment || <span className="text-gray-200">—</span>}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => onEdit(entry)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-brand-500 hover:bg-brand-50 transition-colors">
-                        <EditIcon />
-                      </button>
-                      <button onClick={() => onDelete(entry.id)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                        <TrashIcon />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+                return (
+                  <tr key={entry.id} className={`group ${isDayEnd ? 'opacity-40' : ''}`}>
+                    <td className="px-4 py-2.5">
+                      <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${STATUS_COLORS[entry.status_label] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {STATUS_OPTIONS.find(o => o.value === entry.status_label)?.label ?? entry.status_label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600 text-xs max-w-[140px] truncate">{loc || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-2.5 text-gray-700 font-mono text-xs">{formatTime(entry.start_time)}</td>
+                    <td className="px-4 py-2.5 text-xs">
+                      {entry.end_time
+                        ? <span className="text-gray-700 font-mono">{formatTime(entry.end_time)}</span>
+                        : <span className="text-orange-500 font-medium">Active</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs font-semibold text-gray-700">{isDayEnd ? '—' : fmtDur(mins)}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-400 max-w-[180px] truncate" title={comment}>
+                      {comment || <span className="text-gray-200">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => onEdit(entry)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-500 hover:bg-brand-50 transition-colors">
+                          <EditIcon />
+                        </button>
+                        <button onClick={() => onDelete(entry.id)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
@@ -418,7 +481,26 @@ export default function AdminTimesheets() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmp, dateFrom, dateTo])
 
-  const dayGroups  = useMemo(() => groupByDay(entries), [entries])
+  const weekDays = useMemo(() => {
+    const days = []
+    let d = parseISO(dateFrom)
+    const end = parseISO(dateTo)
+    while (d <= end) {
+      days.push(format(d, 'yyyy-MM-dd'))
+      d = new Date(d.getTime() + 86400000)
+    }
+    return days
+  }, [dateFrom, dateTo])
+
+  const dayEntriesMap = useMemo(() => {
+    const map = {}
+    for (const e of entries) {
+      const day = format(new Date(e.start_time), 'yyyy-MM-dd')
+      if (!map[day]) map[day] = []
+      map[day].push(e)
+    }
+    return map
+  }, [entries])
   const periodMins = useMemo(() => totalMins(entries), [entries])
   const grossEst   = selectedEmp ? ((periodMins / 60) * (selectedEmp.pay_rate ?? 0)).toFixed(2) : '0.00'
   const hasGas     = selectedEmp?.gas_weekly_allowance != null && parseFloat(selectedEmp.gas_weekly_allowance) > 0
@@ -581,20 +663,17 @@ export default function AdminTimesheets() {
             {tab === 'log' && (
               loadingEnt
                 ? <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-                : dayGroups.length === 0
-                  ? <div className="bg-white rounded-2xl border border-gray-100 flex items-center justify-center py-16">
-                      <div className="text-center">
-                        <p className="text-gray-400 text-sm mb-3">No entries for this period</p>
-                        <Button size="sm" onClick={() => setAddDate(dateTo)}>Add Entry</Button>
-                      </div>
-                    </div>
-                  : <div className="flex flex-col gap-3">
-                      {dayGroups.map(([day, dayEntries]) => (
-                        <DayGroup key={day} day={day} entries={dayEntries}
-                          miles={weekMiles[day] ?? 0}
-                          onEdit={setEditModal} onDelete={setDeleteId} onAdd={setAddDate} />
-                      ))}
-                    </div>
+                : <div className="flex flex-col gap-3">
+                    <button onClick={() => setAddDate('__any__')}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-brand-200 text-brand-500 font-semibold text-sm hover:bg-brand-50 hover:border-brand-300 active:bg-brand-100 transition-colors">
+                      <PlusIcon /> Add Shift for Any Day
+                    </button>
+                    {weekDays.map(day => (
+                      <DayGroup key={day} day={day} entries={dayEntriesMap[day] ?? []}
+                        miles={weekMiles[day] ?? 0}
+                        onEdit={setEditModal} onDelete={setDeleteId} onAdd={setAddDate} />
+                    ))}
+                  </div>
             )}
 
             {/* Change requests */}
@@ -670,17 +749,19 @@ export default function AdminTimesheets() {
       </Modal>
 
       {/* Edit modal */}
-      <Modal isOpen={!!editModal} onClose={() => setEditModal(null)} title="Edit Time Entry">
+      <Modal isOpen={!!editModal} onClose={() => setEditModal(null)}
+        title={editModal ? `Edit Entry — ${format(new Date(editModal.start_time), 'EEE, MMM d')}` : 'Edit Entry'}>
         {editModal && (
-          <EntryModal entry={editModal} userId={selectedEmp?.id} jobs={allJobs}
+          <EntryModal entry={editModal} weekDays={weekDays} userId={selectedEmp?.id} jobs={allJobs}
             onSave={handleSave} onClose={() => setEditModal(null)} />
         )}
       </Modal>
 
       {/* Add modal */}
-      <Modal isOpen={!!addDate} onClose={() => setAddDate(null)} title="Add Time Entry">
+      <Modal isOpen={!!addDate} onClose={() => setAddDate(null)}
+        title={addDate === '__any__' ? 'Add Shift' : addDate ? `New Entry — ${format(parseISO(addDate), 'EEE, MMM d')}` : 'Add Entry'}>
         {addDate && (
-          <EntryModal entry={null} defaultDate={addDate} userId={selectedEmp?.id} jobs={allJobs}
+          <EntryModal entry={null} defaultDate={addDate} weekDays={weekDays} userId={selectedEmp?.id} jobs={allJobs}
             onSave={handleSave} onClose={() => setAddDate(null)} />
         )}
       </Modal>

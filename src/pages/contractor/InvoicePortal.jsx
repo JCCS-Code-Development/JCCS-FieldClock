@@ -180,7 +180,7 @@ export default function InvoicePortal() {
   const thisWeekHasInvoice = weekInvoices.length > 0
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-2xl mx-auto space-y-4">
 
       {/* Header + push toggle */}
       <div className="flex items-center justify-between">
@@ -308,7 +308,7 @@ export default function InvoicePortal() {
       {offset === 0 && invoices.filter((i) => !weekInvoices.includes(i)).length > 0 && (
         <div className="border-t border-gray-200 pt-4">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('contractor.invoice.history')}</h2>
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-52 overflow-y-auto">
             {invoices.filter((i) => !weekInvoices.includes(i)).slice(0, 8).map((inv) => {
               const color = STATUS_COLORS[inv.status] ?? STATUS_COLORS.submitted
               return (
