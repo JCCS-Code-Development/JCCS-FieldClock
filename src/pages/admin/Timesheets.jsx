@@ -443,30 +443,56 @@ export default function AdminTimesheets() {
   }
 
   return (
-    <div className="flex gap-4 items-start w-full">
+    <div className="flex flex-col lg:flex-row gap-4 items-start w-full">
 
       {/* ── Employee list ────────────────────────────────────── */}
-      <aside className="w-52 shrink-0 sticky top-0 max-h-[calc(100vh-120px)] bg-white rounded-2xl border border-gray-100 flex flex-col overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 shrink-0">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Employees</p>
+      <aside className="w-full lg:w-52 lg:shrink-0 lg:sticky lg:top-0 lg:max-h-[calc(100vh-120px)] bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        {/* Desktop: vertical scrollable list */}
+        <div className="hidden lg:flex flex-col" style={{ maxHeight: 'calc(100vh - 120px)' }}>
+          <div className="px-4 py-3 border-b border-gray-100 shrink-0">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Employees</p>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto py-1">
+            {employees.map(emp => (
+              <button key={emp.id} onClick={() => setSelectedEmp(emp)}
+                className={`w-full text-left px-4 py-2.5 flex items-center gap-2.5 transition-colors ${
+                  selectedEmp?.id === emp.id ? 'bg-brand-50 text-brand-700' : 'text-gray-700 hover:bg-gray-50'
+                }`}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                  selectedEmp?.id === emp.id ? 'bg-brand-500 text-white' : 'bg-gray-200 text-gray-600'
+                }`}>
+                  {emp.name?.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium leading-tight truncate">{emp.name}</p>
+                  <p className="text-xs text-gray-400 capitalize">{emp.pay_type}</p>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="overflow-y-auto py-1">
-          {employees.map(emp => (
-            <button key={emp.id} onClick={() => setSelectedEmp(emp)}
-              className={`w-full text-left px-4 py-2.5 flex items-center gap-2.5 transition-colors ${
-                selectedEmp?.id === emp.id ? 'bg-brand-50 text-brand-700' : 'text-gray-700 hover:bg-gray-50'
-              }`}>
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                selectedEmp?.id === emp.id ? 'bg-brand-500 text-white' : 'bg-gray-200 text-gray-600'
-              }`}>
-                {emp.name?.charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium leading-tight truncate">{emp.name}</p>
-                <p className="text-xs text-gray-400 capitalize">{emp.pay_type}</p>
-              </div>
-            </button>
-          ))}
+        {/* Mobile: horizontal chip picker */}
+        <div className="lg:hidden">
+          <div className="px-4 py-2.5 border-b border-gray-100">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Employees</p>
+          </div>
+          <div className="flex gap-2 overflow-x-auto px-3 py-2.5" style={{ scrollbarWidth: 'none' }}>
+            {employees.map(emp => (
+              <button key={emp.id} onClick={() => setSelectedEmp(emp)}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                  selectedEmp?.id === emp.id
+                    ? 'bg-brand-500 text-white border-brand-500'
+                    : 'bg-white text-gray-700 border-gray-200'
+                }`}>
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                  selectedEmp?.id === emp.id ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'
+                }`}>
+                  {emp.name?.charAt(0).toUpperCase()}
+                </span>
+                {emp.name.split(' ')[0]}
+              </button>
+            ))}
+          </div>
         </div>
       </aside>
 
@@ -479,44 +505,46 @@ export default function AdminTimesheets() {
         ) : (
           <>
             {/* Employee header */}
-            <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex flex-wrap items-center gap-4">
-              <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-bold text-gray-900">{selectedEmp.name}</h2>
-                <p className="text-xs text-gray-400 capitalize">{selectedEmp.pay_type} · {selectedEmp.role}</p>
-              </div>
-              <div className="flex flex-wrap gap-5">
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Period Hours</p>
-                  <p className="text-xl font-bold text-gray-900">{(periodMins / 60).toFixed(1)}h</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Pay Rate</p>
-                  <p className="text-xl font-bold text-gray-900">${selectedEmp.pay_rate ?? 0}/hr</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Gross Est.</p>
-                  <p className="text-xl font-bold text-green-600">${grossEst}</p>
+            <div className="bg-white rounded-2xl border border-gray-100 px-4 py-4">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="min-w-0">
+                  <h2 className="text-base font-bold text-gray-900 leading-tight">{selectedEmp.name}</h2>
+                  <p className="text-xs text-gray-400 capitalize mt-0.5">{selectedEmp.pay_type} · {selectedEmp.role}</p>
                 </div>
                 {hasGas && (
-                  <div className="flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-xl text-xs font-semibold self-center">
-                    <GasIcon /> Gas ${selectedEmp.gas_weekly_allowance}/wk
+                  <div className="flex items-center gap-1 bg-amber-50 text-amber-700 px-2.5 py-1 rounded-xl text-xs font-semibold shrink-0">
+                    <GasIcon /> ${selectedEmp.gas_weekly_allowance}/wk
                   </div>
                 )}
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Hours</p>
+                  <p className="text-lg font-bold text-gray-900">{(periodMins / 60).toFixed(1)}h</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Rate</p>
+                  <p className="text-lg font-bold text-gray-900">${selectedEmp.pay_rate ?? 0}/hr</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Gross Est.</p>
+                  <p className="text-lg font-bold text-green-600">${grossEst}</p>
+                </div>
                 {totalWeekMiles > 0 && (
-                  <div className="text-center">
-                    <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Miles</p>
-                    <p className="text-xl font-bold text-sky-600">{totalWeekMiles.toFixed(1)} mi</p>
+                  <div className="bg-sky-50 rounded-xl px-3 py-2.5 text-center">
+                    <p className="text-[10px] text-sky-500 uppercase tracking-wide font-semibold mb-0.5">Miles</p>
+                    <p className="text-lg font-bold text-sky-600">{totalWeekMiles.toFixed(1)} mi</p>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Week navigator + tabs */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
+              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl overflow-hidden self-start">
                 <button onClick={() => setWeekOffset(w => w - 1)}
                   className="px-3 py-2 text-gray-500 hover:bg-gray-50 transition-colors text-sm font-medium">‹</button>
-                <span className="px-3 py-2 text-sm font-semibold text-gray-900 min-w-[160px] text-center border-x border-gray-200">
+                <span className="px-3 py-2 text-sm font-semibold text-gray-900 min-w-[120px] text-center border-x border-gray-200">
                   {weekLabel}
                 </span>
                 <button onClick={() => setWeekOffset(w => Math.min(w + 1, 0))}
@@ -524,21 +552,21 @@ export default function AdminTimesheets() {
                   disabled={weekOffset >= 0}>›</button>
               </div>
               <span className="text-xs text-gray-400">{dateFrom} – {dateTo}</span>
-              <div className="flex-1" />
-              <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+              <div className="sm:flex-1" />
+              <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
                 <button onClick={() => setTab('log')}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${tab === 'log' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors ${tab === 'log' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                   Time Log
                 </button>
                 <button onClick={() => setTab('changes')}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 ${tab === 'changes' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                  Change Requests
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${tab === 'changes' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  Changes
                   {pendingCount > 0 && (
                     <span className="bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">{pendingCount}</span>
                   )}
                 </button>
                 <button onClick={() => setTab('timeoff')}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 ${tab === 'timeoff' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${tab === 'timeoff' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                   Time Off
                   {timeOffReqs.filter(r => r.status === 'pending').length > 0 && (
                     <span className="bg-amber-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
