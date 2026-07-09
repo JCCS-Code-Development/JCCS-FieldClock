@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import PageHeader from '../../components/admin/PageHeader'
 import DataTable from '../../components/admin/DataTable'
 import Badge from '../../components/ui/Badge'
@@ -12,12 +12,10 @@ import JobsMap from '../../components/admin/JobsMap'
 
 const EMPTY = { name: '', client_name: '', address: '', latitude: '', longitude: '', clock_in_radius_meters: 300, status: 'active', notes: '' }
 
-async function geocode(address) {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`
-  const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
-  const data = await res.json()
-  if (data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
-  return null
+async function searchAddresses(query) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&countrycodes=us&q=${encodeURIComponent(query)}`
+  const res  = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'JCCS-FieldClock/1.0' } })
+  return res.json()
 }
 
 export default function AdminJobs() {
@@ -27,8 +25,11 @@ export default function AdminJobs() {
   const [modal, setModal] = useState(null) // null | 'create' | job object
   const [form, setForm] = useState(EMPTY)
   const [assignedIds, setAssignedIds] = useState([])
-  const [saving, setSaving] = useState(false)
-  const [geocoding, setGeocoding] = useState(false)
+  const [saving, setSaving]         = useState(false)
+  const [suggestions, setSuggestions] = useState([])
+  const [sugLoading, setSugLoading]   = useState(false)
+  const [showSug, setShowSug]         = useState(false)
+  const addrRef = useRef(null)
 
   const load = () => {
     setLoading(true)
@@ -45,12 +46,33 @@ export default function AdminJobs() {
     setModal(job)
   }
 
-  const handleAddressBlur = async () => {
-    if (!form.address.trim()) return
-    setGeocoding(true)
-    const coords = await geocode(form.address).catch(() => null)
-    if (coords) setForm((f) => ({ ...f, latitude: coords.lat, longitude: coords.lng }))
-    setGeocoding(false)
+  // Debounced address autocomplete
+  useEffect(() => {
+    const q = form.address.trim()
+    if (q.length < 4) { setSuggestions([]); setShowSug(false); return }
+    const timer = setTimeout(async () => {
+      setSugLoading(true)
+      try {
+        const data = await searchAddresses(q)
+        setSuggestions(data)
+        setShowSug(data.length > 0)
+      } catch { setSuggestions([]) }
+      finally { setSugLoading(false) }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [form.address])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => { if (addrRef.current && !addrRef.current.contains(e.target)) setShowSug(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const selectSuggestion = (s) => {
+    setForm(f => ({ ...f, address: s.display_name, latitude: parseFloat(s.lat), longitude: parseFloat(s.lon) }))
+    setSuggestions([])
+    setShowSug(false)
   }
 
   const handleSave = async () => {
@@ -117,17 +139,46 @@ export default function AdminJobs() {
           <div className="grid grid-cols-2 gap-3">
             <Input label="Job Name *" value={form.name} onChange={set('name')} className="col-span-2" />
             <Input label="Client Name *" value={form.client_name} onChange={set('client_name')} className="col-span-2" />
-            <div className="col-span-2 flex flex-col gap-1">
+            <div className="col-span-2 flex flex-col gap-1" ref={addrRef}>
               <label className="text-sm font-medium text-gray-700">Address *</label>
-              <div className="flex gap-2">
-                <input
-                  className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-                  value={form.address}
-                  onChange={set('address')}
-                  onBlur={handleAddressBlur}
-                  placeholder="123 Main St, City, State"
-                />
-                {geocoding && <div className="flex items-center"><Spinner size="sm" /></div>}
+              <div className="relative">
+                <div className="flex gap-2 items-center">
+                  <input
+                    className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                    value={form.address}
+                    onChange={(e) => { setForm(f => ({ ...f, address: e.target.value })); setShowSug(true) }}
+                    onFocus={() => suggestions.length > 0 && setShowSug(true)}
+                    placeholder="Start typing an address…"
+                    autoComplete="off"
+                  />
+                  {sugLoading && <Spinner size="sm" />}
+                </div>
+
+                {/* Autocomplete dropdown */}
+                {showSug && suggestions.length > 0 && (
+                  <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+                    {suggestions.map((s) => (
+                      <li
+                        key={s.place_id}
+                        onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s) }}
+                        className="px-4 py-3 text-sm text-gray-800 hover:bg-brand-50 cursor-pointer border-b border-gray-100 last:border-0 leading-snug"
+                      >
+                        <span className="font-medium">
+                          {s.address?.house_number ? `${s.address.house_number} ` : ''}
+                          {s.address?.road ?? s.address?.pedestrian ?? ''}
+                        </span>
+                        {s.address?.road && (
+                          <span className="block text-xs text-gray-400 mt-0.5">
+                            {[s.address?.city ?? s.address?.town ?? s.address?.village, s.address?.state, s.address?.postcode].filter(Boolean).join(', ')}
+                          </span>
+                        )}
+                        {!s.address?.road && (
+                          <span className="block text-xs text-gray-400 mt-0.5 truncate">{s.display_name}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               {form.latitude && (
                 <p className="text-xs text-gray-400">

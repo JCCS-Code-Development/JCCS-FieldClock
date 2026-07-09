@@ -17,11 +17,12 @@ import { formatCurrency, formatHours, formatDate, formatTime } from '../../utils
 import { format, startOfWeek, endOfWeek, subWeeks, differenceInCalendarDays, parseISO } from 'date-fns'
 
 const buildPeriods = (t) => Array.from({ length: 4 }, (_, i) => {
-  const now = new Date()
-  const start = startOfWeek(subWeeks(now, i), { weekStartsOn: 1 })
-  const end   = endOfWeek(subWeeks(now, i), { weekStartsOn: 1 })
+  const w     = i + 1 // start from last week, skip current week
+  const now   = new Date()
+  const start = startOfWeek(subWeeks(now, w), { weekStartsOn: 1 })
+  const end   = endOfWeek(subWeeks(now, w), { weekStartsOn: 1 })
   return {
-    label: i === 0 ? t('pay.thisWeek') : i === 1 ? t('pay.lastWeek') : `${format(start, 'MMM d')} – ${format(end, 'MMM d')}`,
+    label: i === 0 ? t('pay.lastWeek') : `${format(start, 'MMM d')} – ${format(end, 'MMM d')}`,
     start: format(start, 'yyyy-MM-dd'),
     end:   format(end,   'yyyy-MM-dd'),
   }
