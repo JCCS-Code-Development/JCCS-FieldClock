@@ -362,7 +362,7 @@ export default function MyPay() {
               ? <p className="text-center text-gray-400 py-12 text-sm">{t('pay.noEntries')}</p>
               : <div className="flex flex-col gap-2">
                   {entries.map((entry) => {
-                    const hasRequest = myRequests.some((r) => r.entry_id == entry.id && r.status === 'pending')
+                    const hasRequest = myRequests.some((r) => String(r.entry_id) === String(entry.id) && r.status === 'pending')
                     return (
                       <div key={entry.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center justify-between gap-3">
                         <div className="flex-1 min-w-0">

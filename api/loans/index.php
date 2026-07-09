@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 0);
+set_exception_handler(function ($e) { http_response_code(500); echo json_encode(['error' => $e->getMessage()]); exit; });
+set_error_handler(function ($s, $m, $f, $l) { throw new ErrorException($m, 0, $s, $f, $l); });
 require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
@@ -22,10 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 'SELECT l.user_id, COALESCE(SUM(lp.amount), 0) AS period_deduction
                  FROM loan_payments lp
                  JOIN employee_loans l ON l.id = lp.loan_id
-                 WHERE lp.period_start >= ? AND lp.period_end <= ?
+                 WHERE lp.period_start <= ? AND lp.period_end >= ?
                  GROUP BY l.user_id'
             );
-            $stmt->execute([$ps, $pe]);
+            $stmt->execute([$pe, $ps]);
             $byUser = [];
             foreach ($stmt->fetchAll() as $r) {
                 $byUser[(int)$r['user_id']] = (float)$r['period_deduction'];
@@ -37,9 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 'SELECT COALESCE(SUM(lp.amount), 0) AS period_deduction
                  FROM loan_payments lp
                  JOIN employee_loans l ON l.id = lp.loan_id
-                 WHERE lp.period_start >= ? AND lp.period_end <= ? AND l.user_id = ?'
+                 WHERE lp.period_start <= ? AND lp.period_end >= ? AND l.user_id = ?'
             );
-            $stmt->execute([$ps, $pe, $auth['user_id']]);
+            $stmt->execute([$pe, $ps, $auth['user_id']]);
             $row = $stmt->fetch();
             echo json_encode(['period_loan_deduction' => (float)($row['period_deduction'] ?? 0)]);
         }

@@ -151,7 +151,7 @@ export default function JobsMap({ jobs, onJobClick }) {
   }
 
   return (
-    <div className="mb-6 rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: 380 }}>
+    <div className="mb-6 rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: 380, position: 'relative', zIndex: 0 }}>
       <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
     </div>
   )

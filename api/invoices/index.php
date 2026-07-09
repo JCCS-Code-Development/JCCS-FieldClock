@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 0);
+set_exception_handler(function ($e) { http_response_code(500); echo json_encode(['error' => $e->getMessage()]); exit; });
+set_error_handler(function ($s, $m, $f, $l) { throw new ErrorException($m, 0, $s, $f, $l); });
 require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
@@ -24,7 +27,9 @@ if ($method === 'GET') {
 
     // Auto-number INV-YYYY-NNNN
     $year = date('Y');
-    $last = $pdo->query("SELECT MAX(CAST(SUBSTRING_INDEX(invoice_number, '-', -1) AS UNSIGNED)) as n FROM invoices WHERE invoice_number LIKE 'INV-$year-%'")->fetch();
+    $stmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING_INDEX(invoice_number, '-', -1) AS UNSIGNED)) as n FROM invoices WHERE invoice_number LIKE ?");
+    $stmt->execute(["INV-$year-%"]);
+    $last = $stmt->fetch();
     $seq  = str_pad(($last['n'] ?? 0) + 1, 4, '0', STR_PAD_LEFT);
     $num  = "INV-$year-$seq";
 

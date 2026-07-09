@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 0);
+set_exception_handler(function ($e) { http_response_code(500); echo json_encode(['error' => $e->getMessage()]); exit; });
+set_error_handler(function ($s, $m, $f, $l) { throw new ErrorException($m, 0, $s, $f, $l); });
 require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
@@ -36,7 +39,7 @@ foreach ($rows as $r) {
 
 // Adjustments
 $adjRows = $pdo->prepare(
-    "SELECT user_id, type, amount FROM pay_adjustments WHERE period_start >= :start AND period_end <= :end"
+    "SELECT user_id, type, amount FROM pay_adjustments WHERE period_start <= :end AND period_end >= :start"
 );
 $adjRows->execute([':start' => $start, ':end' => $end]);
 foreach ($adjRows->fetchAll() as $adj) {
