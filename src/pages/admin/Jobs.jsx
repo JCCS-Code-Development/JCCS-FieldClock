@@ -8,6 +8,7 @@ import Input from '../../components/ui/Input'
 import Spinner from '../../components/ui/Spinner'
 import { listJobs, createJob, updateJob, deleteJob, assignEmployees } from '../../api/jobs'
 import { listEmployees } from '../../api/employees'
+import JobsMap from '../../components/admin/JobsMap'
 
 const EMPTY = { name: '', client_name: '', address: '', latitude: '', longitude: '', clock_in_radius_meters: 300, status: 'active', notes: '' }
 
@@ -103,6 +104,10 @@ export default function AdminJobs() {
         subtitle="Manage active job sites"
         actions={<Button onClick={openCreate}>+ New Job</Button>}
       />
+
+      {!loading && jobs.length > 0 && (
+        <JobsMap jobs={jobs} onJobClick={openEdit} />
+      )}
 
       {loading ? <div className="flex justify-center py-16"><Spinner size="lg" /></div>
         : <DataTable columns={columns} data={jobs} emptyMessage="No jobs yet." />}

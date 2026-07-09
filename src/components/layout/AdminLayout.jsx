@@ -154,7 +154,7 @@ export default function AdminLayout() {
   )
 
   return (
-    <div className="flex min-h-svh bg-gray-50">
+    <div className="flex h-svh bg-gray-50 overflow-hidden">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-60 bg-brand-900 text-white shrink-0 fixed top-0 bottom-0 left-0 z-20">
         <SidebarContent />
@@ -189,7 +189,7 @@ export default function AdminLayout() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-60">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-60 overflow-hidden">
         <OfflineBanner />
         <header className="lg:hidden bg-brand-900 text-white flex items-center justify-between px-4 py-3 sticky top-0 z-30">
           <button onClick={() => setDrawerOpen(true)} className="p-1 text-brand-100/80"><MenuIcon /></button>
