@@ -424,7 +424,7 @@ export default function AdminTimesheets() {
 
   useEffect(() => {
     listEmployees().then(d => {
-      const emps = (d.employees ?? []).filter(e => e.pay_structure !== 'salary')
+      const emps = d.employees ?? []
       setEmployees(emps)
       if (emps.length > 0) setSelectedEmp(emps[0])
     })
@@ -501,8 +501,13 @@ export default function AdminTimesheets() {
     }
     return map
   }, [entries])
-  const periodMins = useMemo(() => totalMins(entries), [entries])
-  const grossEst   = selectedEmp ? ((periodMins / 60) * (selectedEmp.pay_rate ?? 0)).toFixed(2) : '0.00'
+  const periodMins   = useMemo(() => totalMins(entries), [entries])
+  const isSalary     = selectedEmp?.pay_structure === 'salary'
+  const grossEst     = selectedEmp
+    ? isSalary
+      ? parseFloat(selectedEmp.pay_rate ?? 0).toFixed(2)
+      : ((periodMins / 60) * (selectedEmp.pay_rate ?? 0)).toFixed(2)
+    : '0.00'
   const hasGas     = selectedEmp?.gas_weekly_allowance != null && parseFloat(selectedEmp.gas_weekly_allowance) > 0
   const totalWeekMiles = Object.values(weekMiles).reduce((s, m) => s + m, 0)
   const pendingCount = requests.length
@@ -547,7 +552,9 @@ export default function AdminTimesheets() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium leading-tight truncate">{emp.name}</p>
-                  <p className="text-xs text-gray-400 capitalize">{emp.pay_type}</p>
+                  <p className="text-xs text-gray-400 capitalize">
+                    {emp.pay_structure === 'salary' ? 'Salary' : emp.pay_type}
+                  </p>
                 </div>
               </button>
             ))}
@@ -602,14 +609,17 @@ export default function AdminTimesheets() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Hours</p>
-                  <p className="text-lg font-bold text-gray-900">{(periodMins / 60).toFixed(1)}h</p>
+                  {isSalary
+                    ? <p className="text-xs font-semibold text-indigo-500 mt-1.5">Fixed</p>
+                    : <p className="text-lg font-bold text-gray-900">{(periodMins / 60).toFixed(1)}h</p>
+                  }
                 </div>
                 <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Rate</p>
-                  <p className="text-lg font-bold text-gray-900">${selectedEmp.pay_rate ?? 0}/hr</p>
+                  <p className="text-lg font-bold text-gray-900">${selectedEmp.pay_rate ?? 0}{isSalary ? '/wk' : '/hr'}</p>
                 </div>
                 <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Gross Est.</p>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">{isSalary ? 'Weekly Pay' : 'Gross Est.'}</p>
                   <p className="text-lg font-bold text-green-600">${grossEst}</p>
                 </div>
                 {totalWeekMiles > 0 && (
@@ -661,19 +671,28 @@ export default function AdminTimesheets() {
 
             {/* Time log */}
             {tab === 'log' && (
-              loadingEnt
-                ? <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-                : <div className="flex flex-col gap-3">
-                    <button onClick={() => setAddDate('__any__')}
-                      className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-brand-200 text-brand-500 font-semibold text-sm hover:bg-brand-50 hover:border-brand-300 active:bg-brand-100 transition-colors">
-                      <PlusIcon /> Add Shift for Any Day
-                    </button>
-                    {weekDays.map(day => (
-                      <DayGroup key={day} day={day} entries={dayEntriesMap[day] ?? []}
-                        miles={weekMiles[day] ?? 0}
-                        onEdit={setEditModal} onDelete={setDeleteId} onAdd={setAddDate} />
-                    ))}
+              isSalary
+                ? <div className="bg-white rounded-2xl border border-indigo-100 flex flex-col items-center justify-center py-16 gap-3">
+                    <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-2xl">💼</div>
+                    <p className="text-sm font-semibold text-indigo-700">Fixed Salary Employee</p>
+                    <p className="text-xs text-gray-400 text-center max-w-xs">
+                      {selectedEmp.name} is on a fixed weekly salary of ${selectedEmp.pay_rate ?? 0}.<br />
+                      Hours are not tracked for salaried employees.
+                    </p>
                   </div>
+                : loadingEnt
+                  ? <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+                  : <div className="flex flex-col gap-3">
+                      <button onClick={() => setAddDate('__any__')}
+                        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-brand-200 text-brand-500 font-semibold text-sm hover:bg-brand-50 hover:border-brand-300 active:bg-brand-100 transition-colors">
+                        <PlusIcon /> Add Shift for Any Day
+                      </button>
+                      {weekDays.map(day => (
+                        <DayGroup key={day} day={day} entries={dayEntriesMap[day] ?? []}
+                          miles={weekMiles[day] ?? 0}
+                          onEdit={setEditModal} onDelete={setDeleteId} onAdd={setAddDate} />
+                      ))}
+                    </div>
             )}
 
             {/* Change requests */}
