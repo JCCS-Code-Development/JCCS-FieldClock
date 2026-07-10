@@ -7,6 +7,7 @@ import Spinner from '../../components/ui/Spinner'
 import ClockPanel from '../../components/employee/ClockPanel'
 import { getStatus, dayStart, dayEnd } from '../../api/timeclock'
 import { useTimeclockStore } from '../../store/timeclockStore'
+import { useAuthStore } from '../../store/authStore'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { getPending } from '../../api/approvals'
 import { listJobs } from '../../api/jobs'
@@ -59,7 +60,6 @@ function CompactClock({ t }) {
           <p className="text-sm text-gray-500">{t('dashboard.yourClock')}</p>
         )}
       </div>
-      <span className="text-[10px] font-semibold text-gray-300 uppercase tracking-wide shrink-0">Your Clock</span>
     </div>
   )
 }
@@ -67,6 +67,8 @@ function CompactClock({ t }) {
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const { user } = useAuthStore()
+  const isHourly = user?.pay_structure === 'hourly'
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ clockedIn: [], pendingApprovals: 0, activeJobs: 0, pendingReview: 0 })
   const { setTimeclockData } = useTimeclockStore()
@@ -109,14 +111,16 @@ export default function AdminDashboard() {
         <p className="text-sm text-gray-500 mt-0.5">{t('dashboard.overview')}</p>
       </div>
 
-      {/* Your clock — compact on mobile, full panel on desktop */}
-      <div className="lg:hidden">
-        <CompactClock t={t} />
-      </div>
-      <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 p-6">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">{t('dashboard.yourClock')}</p>
-        <ClockPanel />
-      </div>
+      {/* Your clock — only for hourly admins */}
+      {isHourly && <>
+        <div className="lg:hidden">
+          <CompactClock t={t} />
+        </div>
+        <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 p-6">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">{t('dashboard.yourClock')}</p>
+          <ClockPanel />
+        </div>
+      </>}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">

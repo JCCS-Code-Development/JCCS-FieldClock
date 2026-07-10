@@ -37,7 +37,8 @@ function SidebarItem({ to, icon, label, end }) {
 }
 
 export default function AdminLayout() {
-  const [moreOpen, setMoreOpen] = useState(false)
+  const [moreOpen,    setMoreOpen]    = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const location   = useLocation()
   const navigate   = useNavigate()
   const { refreshToken, logout, user } = useAuthStore()
@@ -100,13 +101,16 @@ export default function AdminLayout() {
       <div className="flex-1 flex flex-col min-w-0 lg:ml-60 overflow-hidden">
         <OfflineBanner />
 
-        {/* Mobile top bar — slim, no hamburger */}
+        {/* Mobile top bar */}
         <header className="lg:hidden bg-brand-900 text-white flex items-center justify-between px-4 py-3 sticky top-0 z-30">
           <img src="/jccs-logo.jpg" alt="JCCS" className="h-7 w-auto"
             style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
           <div className="flex items-center gap-3">
-            <span className="text-xs text-brand-300/90 font-medium truncate max-w-[140px]">{user?.name}</span>
             <LiveClock className="text-white/60 text-xs" />
+            <button onClick={() => setProfileOpen(true)}
+              className="w-8 h-8 rounded-full bg-brand-500 flex items-center justify-center text-white text-sm font-bold shrink-0 active:bg-brand-400 transition-colors">
+              {user?.name?.charAt(0).toUpperCase()}
+            </button>
           </div>
         </header>
 
@@ -192,6 +196,39 @@ export default function AdminLayout() {
                   <LogoutIcon /> {t('nav.signOut')}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {/* ── Profile bottom sheet ─────────────────────────── */}
+        {profileOpen && (
+          <div className="fixed inset-0 z-[1100] lg:hidden flex flex-col justify-end"
+            onClick={() => setProfileOpen(false)}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="relative bg-white rounded-t-3xl overflow-hidden"
+              onClick={e => e.stopPropagation()}>
+              <div className="flex justify-center pt-3 pb-2">
+                <div className="w-10 h-1 rounded-full bg-gray-300" />
+              </div>
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+                <div className="w-11 h-11 rounded-full bg-brand-500 flex items-center justify-center text-white text-base font-bold shrink-0">
+                  {user?.name?.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">{user?.name}</p>
+                  <p className="text-xs text-gray-400">{t('role.admin')}</p>
+                </div>
+              </div>
+              <div className="px-5 py-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm font-medium text-gray-700">Language</span>
+                  <LangSwitcher className="text-gray-500" />
+                </div>
+                <button onClick={handleLogout}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-red-50 text-red-500 text-sm font-semibold active:bg-red-100 transition-colors">
+                  <LogoutIcon /> {t('nav.signOut')}
+                </button>
+              </div>
+              <div style={{ height: 'max(12px, env(safe-area-inset-bottom))' }} />
             </div>
           </div>
         )}
