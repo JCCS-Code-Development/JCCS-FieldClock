@@ -27,16 +27,24 @@ function amountToWords(amount) {
   return `${words} and ${String(cents).padStart(2, '0')}/100`
 }
 
-// ── Check field positions ─────────────────────────────────────────────────
-// Calibrated to Contractor_Check_Template.key / Employee_1099_Check_Template.key
-// Positions are from the physical paper edge (top-left corner).
-const CHECK = {
-  date:     { top: '1.104in', right: '0.771in' },  // date field
-  checkNum: { top: '1.38in',  right: '0.771in' },  // check number, below date
-  payTo:    { top: '1.615in', left:  '1.312in' },  // "Pay to the order of" name line
-  dollarAmt:{ top: '1.594in', right: '0.771in' },  // $ amount box
-  words:    { top: '1.885in', left:  '1.312in' },  // written-out amount line
-  memo:     { top: '2.500in', left:  '1.417in' },  // memo / for line
+// ── Check field positions — extracted from Keynote templates via PPTX export ─
+// All measurements in inches from the physical paper top-left corner.
+// Positions match Employee_1099_Check_Template.key
+const CHECK_EMP = {
+  date:     { top: '0.6832in', left: '6.9466in', w: '1.3322in' },
+  checkNum: { top: '1.1906in', left: '7.0050in', w: '1.2155in' },
+  payTo:    { top: '1.1906in', left: '0.9896in', w: '5.6981in' },
+  words:    { top: '1.5239in', left: '0.3137in', w: '7.0499in' },
+  memo:     { top: '2.3646in', left: '1.0544in', w: '2.5251in' },
+}
+// Positions match Contractor_Check_Template.key
+const CHECK_CON = {
+  date:     { top: '0.6832in', left: '6.9466in', w: '1.3322in' },
+  checkNum: { top: '1.1906in', left: '7.0050in', w: '1.2155in' },
+  payTo:    { top: '1.1973in', left: '0.9896in', w: '5.6981in' },
+  words:    { top: '1.5307in', left: '0.3137in', w: '7.0499in' },
+  memo:     { top: '2.2158in', left: '1.0211in', w: '2.5251in' },
+  address:  { top: '2.4164in', left: '1.0211in', w: '2.5251in' },
 }
 
 // Section cut points (inches from paper top)
@@ -303,13 +311,13 @@ function FlatRateCheckPage({ fr, today, periodStart, periodEnd, checkNum }) {
       <CutLine topIn={SEC.check} label="Detach — Employee Copy" />
       <CutLine topIn={SEC.stub}  label="Detach — Employer Copy" />
 
-      {/* Check fields */}
-      <div style={{ position: 'absolute', top: CHECK.date.top, right: CHECK.date.right, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{today}</div>
-      {checkNum && <div style={{ position: 'absolute', top: CHECK.checkNum.top, right: CHECK.checkNum.right, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000' }}>{checkNum}</div>}
-      <div style={{ position: 'absolute', top: CHECK.payTo.top, left: CHECK.payTo.left, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 600, color: '#000', maxWidth: '4.7in', overflow: 'hidden', whiteSpace: 'nowrap' }}>{fr.user_name}</div>
-      <div style={{ position: 'absolute', top: CHECK.dollarAmt.top, right: CHECK.dollarAmt.right, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000', letterSpacing: '0.04em' }}>{formatCurrency(amount).replace('$', '')}</div>
-      <div style={{ position: 'absolute', top: CHECK.words.top, left: CHECK.words.left, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000', maxWidth: '6.1in', overflow: 'hidden', whiteSpace: 'nowrap' }}>{amountToWords(amount)}</div>
-      <div style={{ position: 'absolute', top: CHECK.memo.top, left: CHECK.memo.left, fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{fr.user_name}</div>
+      {/* Check fields — positions from Contractor_Check_Template.key */}
+      <div style={{ position: 'absolute', top: CHECK_CON.date.top, left: CHECK_CON.date.left, width: CHECK_CON.date.w, textAlign: 'right', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{today}</div>
+      {checkNum && <div style={{ position: 'absolute', top: CHECK_CON.checkNum.top, left: CHECK_CON.checkNum.left, width: CHECK_CON.checkNum.w, textAlign: 'right', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000' }}>{checkNum}</div>}
+      <div style={{ position: 'absolute', top: CHECK_CON.payTo.top, left: CHECK_CON.payTo.left, width: CHECK_CON.payTo.w, overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 600, color: '#000' }}>{fr.user_name}</div>
+      <div style={{ position: 'absolute', top: CHECK_CON.words.top, left: CHECK_CON.words.left, width: CHECK_CON.words.w, overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{amountToWords(amount)}</div>
+      <div style={{ position: 'absolute', top: CHECK_CON.memo.top, left: CHECK_CON.memo.left, width: CHECK_CON.memo.w, fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{fr.user_name}</div>
+      <div style={{ position: 'absolute', top: CHECK_CON.address.top, left: CHECK_CON.address.left, width: CHECK_CON.address.w, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{fr.user_name}</div>
 
       {/* Employee copy (middle) */}
       <div style={{ position: 'absolute', top: `${SEC.check + 0.35}in`, bottom: `${11 - SEC.stub + 0.3}in`, left: '0.75in', right: '0.75in' }}>
@@ -616,48 +624,40 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
               <CutLine topIn={SEC.check} label="Detach — Employee Copy" />
               <CutLine topIn={SEC.stub}  label="Detach — Employer Copy" />
 
-              {/* ══ CHECK FIELDS (overlay on pre-printed check stock) ══ */}
+              {/* ══ CHECK FIELDS — positions from Employee_1099_Check_Template.key ══ */}
 
               {/* Date */}
               <div style={{
-                position: 'absolute', top: CHECK.date.top, right: CHECK.date.right,
-                fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
+                position: 'absolute', top: CHECK_EMP.date.top, left: CHECK_EMP.date.left, width: CHECK_EMP.date.w,
+                textAlign: 'right', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
               }}>{today}</div>
 
-              {/* Check number (below date) */}
+              {/* Check number */}
               {checkNums[`u-${emp.user_id}`] && (
                 <div style={{
-                  position: 'absolute', top: CHECK.checkNum.top, right: CHECK.checkNum.right,
-                  fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000',
+                  position: 'absolute', top: CHECK_EMP.checkNum.top, left: CHECK_EMP.checkNum.left, width: CHECK_EMP.checkNum.w,
+                  textAlign: 'right', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000',
                 }}>{checkNums[`u-${emp.user_id}`]}</div>
               )}
 
               {/* Pay To name */}
               <div style={{
-                position: 'absolute', top: CHECK.payTo.top, left: CHECK.payTo.left,
+                position: 'absolute', top: CHECK_EMP.payTo.top, left: CHECK_EMP.payTo.left, width: CHECK_EMP.payTo.w,
                 fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif',
-                fontWeight: 600, color: '#000',
-                maxWidth: '4.7in', overflow: 'hidden', whiteSpace: 'nowrap',
+                fontWeight: 600, color: '#000', overflow: 'hidden', whiteSpace: 'nowrap',
               }}>{emp.name}</div>
-
-              {/* $ amount (numeric, no $ sign — pre-printed on stock) */}
-              <div style={{
-                position: 'absolute', top: CHECK.dollarAmt.top, right: CHECK.dollarAmt.right,
-                fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif',
-                fontWeight: 700, color: '#000', letterSpacing: '0.04em',
-              }}>{formatCurrency(netPay).replace('$', '')}</div>
 
               {/* Amount in words */}
               <div style={{
-                position: 'absolute', top: CHECK.words.top, left: CHECK.words.left,
+                position: 'absolute', top: CHECK_EMP.words.top, left: CHECK_EMP.words.left, width: CHECK_EMP.words.w,
                 fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
-                maxWidth: '6.1in', overflow: 'hidden', whiteSpace: 'nowrap',
+                overflow: 'hidden', whiteSpace: 'nowrap',
               }}>{amountToWords(netPay)}</div>
 
-              {/* Memo — employee name so it shows through envelope window */}
+              {/* Memo — employee name for envelope window */}
               <div style={{
-                position: 'absolute', top: CHECK.memo.top, left: CHECK.memo.left,
-                fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
+                position: 'absolute', top: CHECK_EMP.memo.top, left: CHECK_EMP.memo.left, width: CHECK_EMP.memo.w,
+                fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
               }}>{emp.name}</div>
 
               {/* ══ EMPLOYEE COPY (section 2 — middle) ══ */}
