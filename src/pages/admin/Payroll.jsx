@@ -317,7 +317,6 @@ export default function AdminPayroll() {
     const active = (d.employees ?? []).filter((e) => e.is_active)
     const amounts = {}; const checked = {}
     active.forEach((e) => { amounts[e.id] = e.gas_weekly_allowance ?? 70; checked[e.id] = false })
-    summary.forEach((s) => { if (((s.regular_hours ?? 0) + (s.overtime_hours ?? 0)) > 0) checked[s.user_id] = true })
     setGasEmployees(active); setGasAmounts(amounts); setGasChecked(checked); setGasModal(true)
   }
 
