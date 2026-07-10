@@ -41,7 +41,8 @@ function SidebarItem({ to, icon: Icon, label, end, onClick }) {
 }
 
 export default function EmployeeLayout() {
-  const [profileOpen, setProfileOpen] = useState(false)
+  const [profileOpen,  setProfileOpen]  = useState(false)
+  const [refreshKey,   setRefreshKey]   = useState(0)
   const { statusLabel } = useTimeclockStore()
   const { user, refreshToken, logout } = useAuthStore()
   const navigate = useNavigate()
@@ -127,8 +128,9 @@ export default function EmployeeLayout() {
         <div className="lg:hidden h-[52px] shrink-0" />
 
         <PullToRefresh className="flex-1 flex flex-col"
-          style={{ paddingBottom: 'max(96px, calc(64px + env(safe-area-inset-bottom)))' }}>
-          <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col p-4 lg:p-6">
+          style={{ paddingBottom: 'max(96px, calc(64px + env(safe-area-inset-bottom)))' }}
+          onRefresh={() => setRefreshKey(k => k + 1)}>
+          <div key={refreshKey} className="max-w-4xl mx-auto w-full flex-1 flex flex-col p-4 lg:p-6">
             <Outlet />
           </div>
         </PullToRefresh>

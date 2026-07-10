@@ -40,6 +40,7 @@ function SidebarItem({ to, icon, label, end }) {
 export default function AdminLayout() {
   const [moreOpen,    setMoreOpen]    = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [refreshKey,  setRefreshKey]  = useState(0)
   const location   = useLocation()
   const navigate   = useNavigate()
   const { refreshToken, logout, user } = useAuthStore()
@@ -119,8 +120,9 @@ export default function AdminLayout() {
         <div className="lg:hidden h-[52px] shrink-0" />
 
         <PullToRefresh className="flex-1 px-4 pt-4 lg:p-6 w-full"
-          style={{ paddingBottom: 'max(96px, calc(64px + env(safe-area-inset-bottom)))' }}>
-          <div className="max-w-7xl mx-auto w-full">
+          style={{ paddingBottom: 'max(96px, calc(64px + env(safe-area-inset-bottom)))' }}
+          onRefresh={() => setRefreshKey(k => k + 1)}>
+          <div key={refreshKey} className="max-w-7xl mx-auto w-full">
             <Outlet />
           </div>
         </PullToRefresh>

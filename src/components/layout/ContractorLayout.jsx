@@ -30,6 +30,7 @@ function SidebarItem({ to, icon: Icon, label, onClick }) {
 
 export default function ContractorLayout() {
   const [profileOpen, setProfileOpen] = useState(false)
+  const [refreshKey,  setRefreshKey]  = useState(0)
   const { user, refreshToken, logout } = useAuthStore()
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -95,8 +96,9 @@ export default function ContractorLayout() {
         <div className="lg:hidden h-[52px] shrink-0" />
 
         <PullToRefresh className="flex-1 p-4 lg:p-6 w-full"
-          style={{ paddingBottom: 'max(96px, calc(64px + env(safe-area-inset-bottom)))' }}>
-          <div className="max-w-4xl mx-auto w-full">
+          style={{ paddingBottom: 'max(96px, calc(64px + env(safe-area-inset-bottom)))' }}
+          onRefresh={() => setRefreshKey(k => k + 1)}>
+          <div key={refreshKey} className="max-w-4xl mx-auto w-full">
             <Outlet />
           </div>
         </PullToRefresh>
