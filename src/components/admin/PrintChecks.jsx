@@ -27,28 +27,32 @@ function amountToWords(amount) {
   return `${words} and ${String(cents).padStart(2, '0')}/100`
 }
 
+// Vertical correction for check face fields (calibrated via test print).
+// Increase F if fields print too high; decrease if too low. 1mm = 0.0394in.
+const F = 0.098 // ~2.5mm down
+
 // ── Check field positions — extracted from Keynote templates via PPTX export ─
 // All measurements in inches from the physical paper top-left corner.
 // Positions match Employee_1099_Check_Template.key
 const CHECK_EMP = {
-  date:     { top: '0.6832in', left: '6.9466in', w: '1.3322in' },
-  checkNum: { top: '1.1906in', left: '7.0050in', w: '1.2155in' },
-  payTo:    { top: '1.1906in', left: '0.9896in', w: '5.6981in' },
-  words:    { top: '1.5239in', left: '0.3137in', w: '7.0499in' },
-  memo:     { top: '2.3646in', left: '1.0544in', w: '2.5251in' },
+  date:     { top: `${(0.6832 + F).toFixed(4)}in`, left: '6.9466in', w: '1.3322in' },
+  checkNum: { top: `${(1.1906 + F).toFixed(4)}in`, left: '7.0050in', w: '1.2155in' },
+  payTo:    { top: `${(1.1906 + F).toFixed(4)}in`, left: '0.9896in', w: '5.6981in' },
+  words:    { top: `${(1.5239 + F).toFixed(4)}in`, left: '0.3137in', w: '7.0499in' },
+  memo:     { top: `${(2.3646 + F).toFixed(4)}in`, left: '1.0544in', w: '2.5251in' },
 }
 // Positions match Contractor_Check_Template.key
 const CHECK_CON = {
-  date:     { top: '0.6832in', left: '6.9466in', w: '1.3322in' },
-  checkNum: { top: '1.1906in', left: '7.0050in', w: '1.2155in' },
-  payTo:    { top: '1.1973in', left: '0.9896in', w: '5.6981in' },
-  words:    { top: '1.5307in', left: '0.3137in', w: '7.0499in' },
-  memo:     { top: '2.2158in', left: '1.0211in', w: '2.5251in' },
-  address:  { top: '2.4164in', left: '1.0211in', w: '2.5251in' },
+  date:     { top: `${(0.6832 + F).toFixed(4)}in`, left: '6.9466in', w: '1.3322in' },
+  checkNum: { top: `${(1.1906 + F).toFixed(4)}in`, left: '7.0050in', w: '1.2155in' },
+  payTo:    { top: `${(1.1973 + F).toFixed(4)}in`, left: '0.9896in', w: '5.6981in' },
+  words:    { top: `${(1.5307 + F).toFixed(4)}in`, left: '0.3137in', w: '7.0499in' },
+  memo:     { top: `${(2.2158 + F).toFixed(4)}in`, left: '1.0211in', w: '2.5251in' },
+  address:  { top: `${(2.4164 + F).toFixed(4)}in`, left: '1.0211in', w: '2.5251in' },
 }
 
-// Section cut points (inches from paper top)
-const SEC = { check: 3.4676, stub: 7.0149, barcode: 10.5622 }
+// Section cut points (inches from paper top). barcode adjusted -1mm from calibration.
+const SEC = { check: 3.4676, stub: 7.0149, barcode: 10.5228 }
 
 // ── Cut / tear line ───────────────────────────────────────────────────────
 // height:0 + borderTop anchors the dashed line to EXACTLY topIn in both
