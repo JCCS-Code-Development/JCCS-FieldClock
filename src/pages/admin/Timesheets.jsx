@@ -254,64 +254,97 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
         </div>
       )}
       {entries.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left border-b border-gray-100">
-                <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-32">Type</th>
-                <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Location</th>
-                <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-24">Start</th>
-                <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-24">End</th>
-                <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-16">Hrs</th>
-                <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Comment</th>
-                <th className="px-4 py-2 w-16"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {entries.map(entry => {
-                const mins     = entryMins(entry)
-                const isDayEnd = entry.cost_category === 'day_end'
-                const loc      = entry.job_name ?? (entry.notes?.startsWith('Location:') ? entry.notes.replace('Location: ', '') : null)
-                const comment  = entry.notes?.startsWith('Adjustment:') ? entry.notes.replace('Adjustment: ', '')
-                               : entry.notes?.startsWith('Location:')   ? ''
-                               : (entry.notes ?? '')
+        <>
+          {/* ── Mobile entry cards ── */}
+          <div className="md:hidden divide-y divide-gray-50">
+            {entries.map(entry => {
+              const mins     = entryMins(entry)
+              const isDayEnd = entry.cost_category === 'day_end'
+              const loc      = entry.job_name ?? (entry.notes?.startsWith('Location:') ? entry.notes.replace('Location: ', '') : null)
+              const comment  = entry.notes?.startsWith('Adjustment:') ? entry.notes.replace('Adjustment: ', '')
+                             : entry.notes?.startsWith('Location:')   ? ''
+                             : (entry.notes ?? '')
+              return (
+                <div key={entry.id} className={`flex items-center gap-2.5 px-4 py-3 ${isDayEnd ? 'opacity-40' : ''}`}>
+                  <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold shrink-0 ${STATUS_COLORS[entry.status_label] ?? 'bg-gray-100 text-gray-500'}`}>
+                    {STATUS_OPTIONS.find(o => o.value === entry.status_label)?.label ?? entry.status_label}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-mono text-gray-700">
+                      {formatTime(entry.start_time)}{' → '}
+                      {entry.end_time ? formatTime(entry.end_time) : <span className="text-orange-500 not-font-mono">Active</span>}
+                    </p>
+                    {(loc || comment) && (
+                      <p className="text-xs text-gray-400 truncate mt-0.5">{loc || comment}</p>
+                    )}
+                  </div>
+                  <span className="text-xs font-semibold text-gray-700 shrink-0 w-10 text-right">{isDayEnd ? '' : fmtDur(mins)}</span>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <button onClick={() => onEdit(entry)} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-500 hover:bg-brand-50 transition-colors">
+                      <EditIcon />
+                    </button>
+                    <button onClick={() => onDelete(entry.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
 
-                return (
-                  <tr key={entry.id} className={`group ${isDayEnd ? 'opacity-40' : ''}`}>
-                    <td className="px-4 py-2.5">
-                      <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${STATUS_COLORS[entry.status_label] ?? 'bg-gray-100 text-gray-500'}`}>
-                        {STATUS_OPTIONS.find(o => o.value === entry.status_label)?.label ?? entry.status_label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-gray-600 text-xs max-w-[140px] truncate">{loc || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-4 py-2.5 text-gray-700 font-mono text-xs">{formatTime(entry.start_time)}</td>
-                    <td className="px-4 py-2.5 text-xs">
-                      {entry.end_time
-                        ? <span className="text-gray-700 font-mono">{formatTime(entry.end_time)}</span>
-                        : <span className="text-orange-500 font-medium">Active</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs font-semibold text-gray-700">{isDayEnd ? '—' : fmtDur(mins)}</td>
-                    <td className="px-4 py-2.5 text-xs text-gray-400 max-w-[180px] truncate" title={comment}>
-                      {comment || <span className="text-gray-200">—</span>}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => onEdit(entry)}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-500 hover:bg-brand-50 transition-colors">
-                          <EditIcon />
-                        </button>
-                        <button onClick={() => onDelete(entry.id)}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+          {/* ── Desktop table ── */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b border-gray-100">
+                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-32">Type</th>
+                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Location</th>
+                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-24">Start</th>
+                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-24">End</th>
+                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-16">Hrs</th>
+                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Comment</th>
+                  <th className="px-4 py-2 w-16"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {entries.map(entry => {
+                  const mins     = entryMins(entry)
+                  const isDayEnd = entry.cost_category === 'day_end'
+                  const loc      = entry.job_name ?? (entry.notes?.startsWith('Location:') ? entry.notes.replace('Location: ', '') : null)
+                  const comment  = entry.notes?.startsWith('Adjustment:') ? entry.notes.replace('Adjustment: ', '')
+                                 : entry.notes?.startsWith('Location:')   ? ''
+                                 : (entry.notes ?? '')
+                  return (
+                    <tr key={entry.id} className={`group ${isDayEnd ? 'opacity-40' : ''}`}>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${STATUS_COLORS[entry.status_label] ?? 'bg-gray-100 text-gray-500'}`}>
+                          {STATUS_OPTIONS.find(o => o.value === entry.status_label)?.label ?? entry.status_label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-600 text-xs max-w-[140px] truncate">{loc || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-2.5 text-gray-700 font-mono text-xs">{formatTime(entry.start_time)}</td>
+                      <td className="px-4 py-2.5 text-xs">
+                        {entry.end_time
+                          ? <span className="text-gray-700 font-mono">{formatTime(entry.end_time)}</span>
+                          : <span className="text-orange-500 font-medium">Active</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs font-semibold text-gray-700">{isDayEnd ? '—' : fmtDur(mins)}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-400 max-w-[180px] truncate" title={comment}>
+                        {comment || <span className="text-gray-200">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => onEdit(entry)} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-500 hover:bg-brand-50 transition-colors"><EditIcon /></button>
+                          <button onClick={() => onDelete(entry.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"><TrashIcon /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )
@@ -616,7 +649,8 @@ export default function AdminTimesheets() {
                 </div>
                 <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Rate</p>
-                  <p className="text-lg font-bold text-gray-900">${selectedEmp.pay_rate ?? 0}{isSalary ? '/wk' : '/hr'}</p>
+                  <p className="text-base font-bold text-gray-900 leading-tight">${selectedEmp.pay_rate ?? 0}</p>
+                  <p className="text-[10px] text-gray-400">{isSalary ? 'per week' : 'per hour'}</p>
                 </div>
                 <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">{isSalary ? 'Weekly Pay' : 'Gross Est.'}</p>

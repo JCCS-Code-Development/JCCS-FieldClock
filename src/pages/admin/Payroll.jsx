@@ -412,71 +412,115 @@ export default function AdminPayroll() {
       {/* ── W-2 / 1099 tab content ─────────────────────────────────── */}
       {(tab === 'w2' || tab === '1099') && (
         <>
-          {/* Pay summary table */}
+          {/* Pay summary */}
           {loading ? <div className="flex justify-center py-16"><Spinner size="lg" /></div> : (
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    <th className="text-left px-5 py-3">Employee</th>
-                    <th className="text-right px-4 py-3">Paid Hrs</th>
-                    <th className="text-right px-4 py-3">Base Pay</th>
-                    <th className="text-right px-4 py-3 text-amber-600">Gas</th>
-                    <th className="text-right px-4 py-3 text-red-500">Loan</th>
-                    <th className="text-right px-4 py-3 text-green-600">Bonus</th>
-                    <th className="text-right px-5 py-3">Gross</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 && (
-                    <tr><td colSpan={7} className="text-center py-12 text-gray-400">No data for this period.</td></tr>
-                  )}
-                  {filtered.map((emp) => {
-                    const gas   = gasByUser[emp.user_id]   ?? 0
-                    const loan  = loanDeductions[emp.user_id] ?? 0
-                    const bonus = bonusByUser[emp.user_id]  ?? 0
-                    return (
-                      <tr key={emp.user_id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => openDrillDown(emp)}>
-                        <td className="px-5 py-3 font-medium text-gray-900">{emp.name}</td>
-                        <td className="px-4 py-3 text-right text-gray-600">
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+
+              {/* ── Mobile cards (hidden md+) ── */}
+              <div className="md:hidden divide-y divide-gray-50">
+                {filtered.length === 0 && (
+                  <p className="text-center py-12 text-sm text-gray-400">No data for this period.</p>
+                )}
+                {filtered.map((emp) => {
+                  const gas   = gasByUser[emp.user_id]      ?? 0
+                  const loan  = loanDeductions[emp.user_id] ?? 0
+                  const bonus = bonusByUser[emp.user_id]    ?? 0
+                  return (
+                    <button key={emp.user_id} onClick={() => openDrillDown(emp)}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                      <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 font-bold text-sm flex items-center justify-center shrink-0">
+                        {emp.name?.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm truncate">{emp.name}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           {emp.pay_structure === 'salary'
                             ? <span className="text-xs font-semibold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">Salary</span>
-                            : formatHours((emp.regular_hours ?? 0) + (emp.overtime_hours ?? 0))}
-                        </td>
-                        <td className="px-4 py-3 text-right">{formatCurrency(emp.base_gross ?? 0)}</td>
-                        <td className="px-4 py-3 text-right text-amber-600 font-medium">
-                          {gas > 0 ? formatCurrency(gas) : <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-right text-red-500 font-medium">
-                          {loan > 0 ? <span>−{formatCurrency(loan)}</span> : <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-right text-green-600 font-medium">
-                          {bonus > 0 ? formatCurrency(bonus) : <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-5 py-3 text-right font-bold text-gray-900">{formatCurrency(emp.estimated_total ?? 0)}</td>
-                      </tr>
-                    )
-                  })}
-                  {filtered.length > 0 && (
-                    <tr className="bg-gray-50 font-semibold text-sm">
-                      <td className="px-5 py-3 text-gray-700">Totals</td>
-                      <td className="px-4 py-3 text-right">{formatHours(filtered.reduce((s, e) => s + (e.regular_hours ?? 0) + (e.overtime_hours ?? 0), 0))}</td>
-                      <td className="px-4 py-3 text-right">{formatCurrency(filtered.reduce((s, e) => s + (e.base_gross ?? 0), 0))}</td>
-                      <td className="px-4 py-3 text-right text-amber-600">
-                        {formatCurrency(filtered.reduce((s, e) => s + (gasByUser[e.user_id] ?? 0), 0))}
-                      </td>
-                      <td className="px-4 py-3 text-right text-red-500">
-                        −{formatCurrency(filtered.reduce((s, e) => s + (loanDeductions[e.user_id] ?? 0), 0))}
-                      </td>
-                      <td className="px-4 py-3 text-right text-green-600">
-                        {formatCurrency(filtered.reduce((s, e) => s + (bonusByUser[e.user_id] ?? 0), 0))}
-                      </td>
-                      <td className="px-5 py-3 text-right text-brand-500">{formatCurrency(filtered.reduce((s, e) => s + (e.estimated_total ?? 0), 0))}</td>
+                            : <span className="text-xs text-gray-400">{formatHours((emp.regular_hours ?? 0) + (emp.overtime_hours ?? 0))}</span>
+                          }
+                          {gas  > 0 && <span className="text-xs text-amber-600 font-medium">+{formatCurrency(gas)} gas</span>}
+                          {loan > 0 && <span className="text-xs text-red-500 font-medium">−{formatCurrency(loan)} loan</span>}
+                          {bonus> 0 && <span className="text-xs text-green-600 font-medium">+{formatCurrency(bonus)} bonus</span>}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-bold text-gray-900">{formatCurrency(emp.estimated_total ?? 0)}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{formatCurrency(emp.base_gross ?? 0)} base</p>
+                      </div>
+                    </button>
+                  )
+                })}
+                {filtered.length > 0 && (
+                  <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
+                    <span className="text-sm font-semibold text-gray-700">Totals</span>
+                    <div className="text-right">
+                      <p className="font-bold text-brand-500">{formatCurrency(filtered.reduce((s, e) => s + (e.estimated_total ?? 0), 0))}</p>
+                      <p className="text-xs text-gray-400">{formatCurrency(filtered.reduce((s, e) => s + (e.base_gross ?? 0), 0))} base</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Desktop table (hidden on mobile) ── */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      <th className="text-left px-5 py-3">Employee</th>
+                      <th className="text-right px-4 py-3">Paid Hrs</th>
+                      <th className="text-right px-4 py-3">Base Pay</th>
+                      <th className="text-right px-4 py-3 text-amber-600">Gas</th>
+                      <th className="text-right px-4 py-3 text-red-500">Loan</th>
+                      <th className="text-right px-4 py-3 text-green-600">Bonus</th>
+                      <th className="text-right px-5 py-3">Gross</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filtered.length === 0 && (
+                      <tr><td colSpan={7} className="text-center py-12 text-gray-400">No data for this period.</td></tr>
+                    )}
+                    {filtered.map((emp) => {
+                      const gas   = gasByUser[emp.user_id]      ?? 0
+                      const loan  = loanDeductions[emp.user_id] ?? 0
+                      const bonus = bonusByUser[emp.user_id]    ?? 0
+                      return (
+                        <tr key={emp.user_id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => openDrillDown(emp)}>
+                          <td className="px-5 py-3 font-medium text-gray-900">{emp.name}</td>
+                          <td className="px-4 py-3 text-right text-gray-600">
+                            {emp.pay_structure === 'salary'
+                              ? <span className="text-xs font-semibold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">Salary</span>
+                              : formatHours((emp.regular_hours ?? 0) + (emp.overtime_hours ?? 0))}
+                          </td>
+                          <td className="px-4 py-3 text-right">{formatCurrency(emp.base_gross ?? 0)}</td>
+                          <td className="px-4 py-3 text-right text-amber-600 font-medium">
+                            {gas > 0 ? formatCurrency(gas) : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-right text-red-500 font-medium">
+                            {loan > 0 ? <span>−{formatCurrency(loan)}</span> : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-right text-green-600 font-medium">
+                            {bonus > 0 ? formatCurrency(bonus) : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-5 py-3 text-right font-bold text-gray-900">{formatCurrency(emp.estimated_total ?? 0)}</td>
+                        </tr>
+                      )
+                    })}
+                    {filtered.length > 0 && (
+                      <tr className="bg-gray-50 font-semibold text-sm">
+                        <td className="px-5 py-3 text-gray-700">Totals</td>
+                        <td className="px-4 py-3 text-right">{formatHours(filtered.reduce((s, e) => s + (e.regular_hours ?? 0) + (e.overtime_hours ?? 0), 0))}</td>
+                        <td className="px-4 py-3 text-right">{formatCurrency(filtered.reduce((s, e) => s + (e.base_gross ?? 0), 0))}</td>
+                        <td className="px-4 py-3 text-right text-amber-600">{formatCurrency(filtered.reduce((s, e) => s + (gasByUser[e.user_id] ?? 0), 0))}</td>
+                        <td className="px-4 py-3 text-right text-red-500">−{formatCurrency(filtered.reduce((s, e) => s + (loanDeductions[e.user_id] ?? 0), 0))}</td>
+                        <td className="px-4 py-3 text-right text-green-600">{formatCurrency(filtered.reduce((s, e) => s + (bonusByUser[e.user_id] ?? 0), 0))}</td>
+                        <td className="px-5 py-3 text-right text-brand-500">{formatCurrency(filtered.reduce((s, e) => s + (e.estimated_total ?? 0), 0))}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
             </div>
           )}
 
@@ -503,45 +547,32 @@ export default function AdminPayroll() {
                 <Button size="sm" variant="secondary" onClick={() => openNewBonus()}>Add one</Button>
               </div>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                    <th className="text-left px-5 py-3">Employee</th>
-                    <th className="text-left px-4 py-3">Type</th>
-                    <th className="text-left px-4 py-3">Note</th>
-                    <th className="text-right px-5 py-3">Amount</th>
-                    <th className="px-5 py-3 w-20" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {adjustments.map((adj) => (
-                    <tr key={adj.id} className="group hover:bg-gray-50">
-                      <td className="px-5 py-3 font-medium text-gray-900">{adj.user_name}</td>
-                      <td className="px-4 py-3">
+              <div className="divide-y divide-gray-50">
+                {adjustments.map((adj) => (
+                  <div key={adj.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-gray-900">{adj.user_name}</span>
                         <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${adjColor(adj.type)}`}>
                           {adjLabel(adj.type)}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate">
-                        {adj.description || <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-5 py-3 text-right font-semibold text-green-600">{formatCurrency(adj.amount)}</td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                          <button onClick={() => openEditBonus(adj)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-brand-500 hover:bg-brand-50 transition-colors">
-                            <EditIcon />
-                          </button>
-                          <button onClick={() => setDeleteAdj(adj)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                            <TrashIcon />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                      {adj.description && <p className="text-xs text-gray-400 mt-0.5 truncate">{adj.description}</p>}
+                    </div>
+                    <span className="font-semibold text-green-600 text-sm shrink-0">{formatCurrency(adj.amount)}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => openEditBonus(adj)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-brand-500 hover:bg-brand-50 transition-colors">
+                        <EditIcon />
+                      </button>
+                      <button onClick={() => setDeleteAdj(adj)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </>
@@ -924,57 +955,42 @@ export default function AdminPayroll() {
             : paychecks.length === 0
               ? <div className="text-center py-16 text-gray-400 text-sm">No paycheck records yet. Click "+ Add Paycheck" to create one.</div>
               : (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-100">
-                      <tr>
-                        {['Employee','Period','Amount','Status','Actions'].map((h) => (
-                          <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {paychecks.map((pc) => {
-                        const statusCfg = {
-                          processing: { label: 'Processing', color: 'bg-amber-100 text-amber-700', next: 'available',  nextLabel: 'Mark Available' },
-                          available:  { label: 'Available',  color: 'bg-green-100 text-green-700',  next: 'picked_up', nextLabel: 'Mark Picked Up' },
-                          picked_up:  { label: 'Picked Up',  color: 'bg-gray-100 text-gray-600',    next: null,         nextLabel: null },
-                        }[pc.status] ?? { label: pc.status, color: 'bg-gray-100 text-gray-600', next: null }
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
+                  {paychecks.map((pc) => {
+                    const statusCfg = {
+                      processing: { label: 'Processing', color: 'bg-amber-100 text-amber-700', next: 'available',  nextLabel: 'Mark Available' },
+                      available:  { label: 'Available',  color: 'bg-green-100 text-green-700',  next: 'picked_up', nextLabel: 'Mark Picked Up' },
+                      picked_up:  { label: 'Picked Up',  color: 'bg-gray-100 text-gray-600',    next: null,        nextLabel: null },
+                    }[pc.status] ?? { label: pc.status, color: 'bg-gray-100 text-gray-600', next: null }
 
-                        return (
-                          <tr key={pc.id} className="hover:bg-gray-50">
-                            <td className="px-5 py-3.5 font-medium text-gray-900">{pc.employee_name}</td>
-                            <td className="px-5 py-3.5 text-gray-600 text-xs">
-                              {formatDate(pc.period_start)} – {formatDate(pc.period_end)}
-                            </td>
-                            <td className="px-5 py-3.5 font-medium">{pc.amount ? formatCurrency(pc.amount) : <span className="text-gray-400">—</span>}</td>
-                            <td className="px-5 py-3.5">
-                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusCfg.color}`}>{statusCfg.label}</span>
-                              {pc.status === 'available' && <span className="ml-2 text-xs text-gray-400">🔔 Notified</span>}
-                            </td>
-                            <td className="px-5 py-3.5">
-                              <div className="flex items-center gap-2">
-                                {statusCfg.next && (
-                                  <button
-                                    onClick={() => setPcStatusTarget({ paycheck: pc, nextStatus: statusCfg.next })}
-                                    className="text-xs font-semibold text-brand-500 hover:text-brand-700 transition-colors"
-                                  >
-                                    {statusCfg.nextLabel}
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => handleDeletePaycheck(pc.id)}
-                                  className="text-xs text-red-400 hover:text-red-600 transition-colors"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                    return (
+                      <div key={pc.id} className="flex items-center gap-3 px-4 py-3.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-gray-900">{pc.employee_name}</span>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusCfg.color}`}>{statusCfg.label}</span>
+                            {pc.status === 'available' && <span className="text-xs text-gray-400">🔔</span>}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-0.5">{formatDate(pc.period_start)} – {formatDate(pc.period_end)}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-semibold text-gray-900 text-sm">{pc.amount ? formatCurrency(pc.amount) : <span className="text-gray-400">—</span>}</p>
+                          <div className="flex items-center gap-2 justify-end mt-1">
+                            {statusCfg.next && (
+                              <button onClick={() => setPcStatusTarget({ paycheck: pc, nextStatus: statusCfg.next })}
+                                className="text-xs font-semibold text-brand-500 hover:text-brand-700 transition-colors">
+                                {statusCfg.nextLabel}
+                              </button>
+                            )}
+                            <button onClick={() => handleDeletePaycheck(pc.id)}
+                              className="text-xs text-red-400 hover:text-red-600 transition-colors">
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )
           }
