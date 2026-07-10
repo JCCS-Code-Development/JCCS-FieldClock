@@ -48,7 +48,7 @@ const CHECK_CON = {
 }
 
 // Section cut points (inches from paper top)
-const SEC = { check: 3.4676, stub: 7.0149 }
+const SEC = { check: 3.4676, stub: 7.0149, barcode: 10.5622 }
 
 // ── Cut / tear line ───────────────────────────────────────────────────────
 function CutLine({ topIn, label }) {
@@ -300,16 +300,25 @@ function FlatRateCheckPage({ fr, today, periodStart, periodEnd, checkNum }) {
         </span>
       </div>
       <div className="no-print" style={{
-        position: 'absolute', top: `${SEC.stub}in`, left: 0, right: 0, bottom: 0,
-        background: 'rgba(59,130,246,0.04)', pointerEvents: 'none',
+        position: 'absolute', top: `${SEC.stub}in`, left: 0, right: 0,
+        height: `${SEC.barcode - SEC.stub}in`, background: 'rgba(59,130,246,0.04)', pointerEvents: 'none',
       }}>
         <span style={{ position: 'absolute', top: 18, left: 10, fontSize: 8, color: '#93c5fd', fontFamily: 'sans-serif', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
           Employer Copy
         </span>
       </div>
+      <div className="no-print" style={{
+        position: 'absolute', top: `${SEC.barcode}in`, left: 0, right: 0, bottom: 0,
+        background: 'rgba(251,191,36,0.07)', pointerEvents: 'none',
+      }}>
+        <span style={{ position: 'absolute', top: 4, left: 10, fontSize: 8, color: '#d97706', fontFamily: 'sans-serif', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+          Trim strip
+        </span>
+      </div>
 
-      <CutLine topIn={SEC.check} label="Detach — Employee Copy" />
-      <CutLine topIn={SEC.stub}  label="Detach — Employer Copy" />
+      <CutLine topIn={SEC.check}   label="Detach — Employee Copy" />
+      <CutLine topIn={SEC.stub}    label="Detach — Employer Copy" />
+      <CutLine topIn={SEC.barcode} label="Trim" />
 
       {/* Check fields — positions from Contractor_Check_Template.key */}
       <div style={{ position: 'absolute', top: CHECK_CON.date.top, left: CHECK_CON.date.left, width: CHECK_CON.date.w, textAlign: 'right', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{today}</div>
@@ -327,7 +336,7 @@ function FlatRateCheckPage({ fr, today, periodStart, periodEnd, checkNum }) {
       </div>
 
       {/* Employer copy (bottom) */}
-      <div style={{ position: 'absolute', top: `${SEC.stub + 0.35}in`, bottom: '0.5in', left: '0.75in', right: '0.75in' }}>
+      <div style={{ position: 'absolute', top: `${SEC.stub + 0.35}in`, bottom: `${(11 - SEC.barcode + 0.15).toFixed(4)}in`, left: '0.75in', right: '0.75in' }}>
         <FlatRateEarningsStatement fr={fr} checkDate={today}
           periodStart={periodStart} periodEnd={periodEnd} />
       </div>
@@ -640,7 +649,8 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                 </span>
               </div>
               <div className="no-print" style={{
-                position: 'absolute', top: `${SEC.stub}in`, left: 0, right: 0, bottom: 0,
+                position: 'absolute', top: `${SEC.stub}in`, left: 0, right: 0,
+                height: `${SEC.barcode - SEC.stub}in`,
                 background: 'rgba(59,130,246,0.04)',
                 pointerEvents: 'none',
               }}>
@@ -648,10 +658,19 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                   Employer Copy
                 </span>
               </div>
+              <div className="no-print" style={{
+                position: 'absolute', top: `${SEC.barcode}in`, left: 0, right: 0, bottom: 0,
+                background: 'rgba(251,191,36,0.07)', pointerEvents: 'none',
+              }}>
+                <span style={{ position: 'absolute', top: 4, left: 10, fontSize: 8, color: '#d97706', fontFamily: 'sans-serif', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                  Trim strip
+                </span>
+              </div>
 
               {/* ── Cut lines ────────────────────────────────────── */}
-              <CutLine topIn={SEC.check} label="Detach — Employee Copy" />
-              <CutLine topIn={SEC.stub}  label="Detach — Employer Copy" />
+              <CutLine topIn={SEC.check}   label="Detach — Employee Copy" />
+              <CutLine topIn={SEC.stub}    label="Detach — Employer Copy" />
+              <CutLine topIn={SEC.barcode} label="Trim" />
 
               {/* ══ CHECK FIELDS — positions from Employee_1099_Check_Template.key ══ */}
 
@@ -705,7 +724,7 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
               <div style={{
                 position: 'absolute',
                 top: `${SEC.stub + 0.35}in`,
-                bottom: '0.5in',
+                bottom: `${(11 - SEC.barcode + 0.15).toFixed(4)}in`,
                 left: '0.75in', right: '0.75in',
               }}>
                 <EarningsStatement
