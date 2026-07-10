@@ -68,7 +68,6 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { user } = useAuthStore()
-  const isHourly = user?.pay_structure === 'hourly'
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ clockedIn: [], pendingApprovals: 0, activeJobs: 0, pendingReview: 0 })
   const { setTimeclockData } = useTimeclockStore()
@@ -112,16 +111,14 @@ export default function AdminDashboard() {
         <p className="text-sm text-gray-500 mt-0.5">{t('dashboard.overview')}</p>
       </div>
 
-      {/* Your clock — only for hourly admins */}
-      {isHourly && <>
-        <div className="lg:hidden">
-          <CompactClock t={t} />
-        </div>
-        <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 p-6">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">{t('dashboard.yourClock')}</p>
-          <ClockPanel />
-        </div>
-      </>}
+      {/* Your clock */}
+      <div className="lg:hidden">
+        <CompactClock t={t} />
+      </div>
+      <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 p-6">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">{t('dashboard.yourClock')}</p>
+        <ClockPanel />
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
