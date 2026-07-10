@@ -11,11 +11,16 @@ import { getPeriodLoanTotals } from '../../api/loans'
 import { listPaychecks, createPaycheck, updatePaycheck, deletePaycheck } from '../../api/paychecks'
 import PayPieChart from '../../components/ui/PayPieChart'
 import { formatCurrency, formatHours, formatDate } from '../../utils/format'
-import { format, startOfWeek, endOfWeek, subWeeks } from 'date-fns'
+import { format, startOfWeek, endOfWeek, subWeeks, startOfYear, differenceInWeeks } from 'date-fns'
 
-const periods = Array.from({ length: 8 }, (_, i) => {
-  const start = startOfWeek(subWeeks(new Date(), i + 1), { weekStartsOn: 1 })
-  const end   = endOfWeek(subWeeks(new Date(), i + 1), { weekStartsOn: 1 })
+const _today         = new Date()
+const _lastWeekStart = startOfWeek(subWeeks(_today, 1), { weekStartsOn: 1 })
+const _yearWeekStart = startOfWeek(startOfYear(_today), { weekStartsOn: 1 })
+const _numWeeks      = differenceInWeeks(_lastWeekStart, _yearWeekStart) + 1
+
+const periods = Array.from({ length: _numWeeks }, (_, i) => {
+  const start = startOfWeek(subWeeks(_today, i + 1), { weekStartsOn: 1 })
+  const end   = endOfWeek(subWeeks(_today, i + 1), { weekStartsOn: 1 })
   return {
     label: i === 0 ? 'Last Week' : `${format(start, 'MMM d')} – ${format(end, 'MMM d')}`,
     start: format(start, 'yyyy-MM-dd'),
@@ -376,13 +381,16 @@ export default function AdminPayroll() {
       />
 
       {/* Period selector */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-5">
-        {periods.map((p2, i) => (
-          <button key={i} onClick={() => setPeriod(i)}
-            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
-              period === i ? 'bg-brand-500 text-white border-brand-500' : 'bg-white text-gray-600 border-gray-200 hover:border-brand-300'
-            }`}>{p2.label}</button>
-        ))}
+      <div className="mb-5">
+        <select
+          value={period}
+          onChange={e => setPeriod(Number(e.target.value))}
+          className="w-full sm:w-64 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+        >
+          {periods.map((p2, i) => (
+            <option key={i} value={i}>{p2.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* 3-tab switcher */}
