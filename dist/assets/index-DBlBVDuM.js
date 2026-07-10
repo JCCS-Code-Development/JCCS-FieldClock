@@ -71,12 +71,12 @@ Error generating stack: `+e.message+`
           margin: 0 !important;
           background: white !important;
         }
-        #print-checks-root > div {
+        .no-print { display: none !important; }
+        #print-checks-root > div:not(.no-print) {
           padding: 0 !important;
           gap: 0 !important;
           display: block !important;
         }
-        .no-print { display: none !important; }
         .check-page {
           page-break-after: always;
           break-after: page;
