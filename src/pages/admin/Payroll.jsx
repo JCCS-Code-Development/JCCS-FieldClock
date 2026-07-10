@@ -444,8 +444,11 @@ export default function AdminPayroll() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-bold text-gray-900">{formatCurrency(emp.estimated_total ?? 0)}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{formatCurrency(emp.base_gross ?? 0)} base</p>
+                        <p className="font-bold text-gray-900">{formatCurrency(tab === 'w2' ? (emp.base_gross ?? 0) : (emp.estimated_total ?? 0))}</p>
+                        {tab === 'w2' && (gas + bonus) > 0
+                          ? <p className="text-xs text-amber-600 mt-0.5">+{formatCurrency(gas + bonus)} → 1099</p>
+                          : tab !== 'w2' && <p className="text-xs text-gray-400 mt-0.5">{formatCurrency(emp.base_gross ?? 0)} base</p>
+                        }
                       </div>
                     </button>
                   )
@@ -454,8 +457,12 @@ export default function AdminPayroll() {
                   <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
                     <span className="text-sm font-semibold text-gray-700">Totals</span>
                     <div className="text-right">
-                      <p className="font-bold text-brand-500">{formatCurrency(filtered.reduce((s, e) => s + (e.estimated_total ?? 0), 0))}</p>
-                      <p className="text-xs text-gray-400">{formatCurrency(filtered.reduce((s, e) => s + (e.base_gross ?? 0), 0))} base</p>
+                      <p className="font-bold text-brand-500">
+                        {formatCurrency(filtered.reduce((s, e) => s + ((tab === 'w2' ? e.base_gross : e.estimated_total) ?? 0), 0))}
+                      </p>
+                      {tab !== 'w2' && (
+                        <p className="text-xs text-gray-400">{formatCurrency(filtered.reduce((s, e) => s + (e.base_gross ?? 0), 0))} base</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -502,7 +509,7 @@ export default function AdminPayroll() {
                           <td className="px-4 py-3 text-right text-green-600 font-medium">
                             {bonus > 0 ? formatCurrency(bonus) : <span className="text-gray-300">—</span>}
                           </td>
-                          <td className="px-5 py-3 text-right font-bold text-gray-900">{formatCurrency(emp.estimated_total ?? 0)}</td>
+                          <td className="px-5 py-3 text-right font-bold text-gray-900">{formatCurrency(tab === 'w2' ? (emp.base_gross ?? 0) : (emp.estimated_total ?? 0))}</td>
                         </tr>
                       )
                     })}
@@ -514,7 +521,7 @@ export default function AdminPayroll() {
                         <td className="px-4 py-3 text-right text-amber-600">{formatCurrency(filtered.reduce((s, e) => s + (gasByUser[e.user_id] ?? 0), 0))}</td>
                         <td className="px-4 py-3 text-right text-red-500">−{formatCurrency(filtered.reduce((s, e) => s + (loanDeductions[e.user_id] ?? 0), 0))}</td>
                         <td className="px-4 py-3 text-right text-green-600">{formatCurrency(filtered.reduce((s, e) => s + (bonusByUser[e.user_id] ?? 0), 0))}</td>
-                        <td className="px-5 py-3 text-right text-brand-500">{formatCurrency(filtered.reduce((s, e) => s + (e.estimated_total ?? 0), 0))}</td>
+                        <td className="px-5 py-3 text-right text-brand-500">{formatCurrency(filtered.reduce((s, e) => s + ((tab === 'w2' ? e.base_gross : e.estimated_total) ?? 0), 0))}</td>
                       </tr>
                     )}
                   </tbody>
@@ -923,16 +930,32 @@ export default function AdminPayroll() {
       </Modal>
 
       {/* Print checks overlay — hourly payroll */}
-      {printOpen && (
-        <PrintChecks
-          employees={filtered}
-          period={p}
-          gasByUser={gasByUser}
-          bonusByUser={bonusByUser}
-          loanDeductions={loanDeductions}
-          onClose={() => setPrintOpen(false)}
-        />
-      )}
+      {printOpen && (() => {
+        // When printing 1099 checks, include W-2 employees' gas/bonus as additional flat-rate entries
+        const w2GasBonusExtras = tab === '1099'
+          ? summary
+              .filter(e => e.pay_type === 'w2')
+              .map(e => ({
+                id: `w2-extra-${e.user_id}`,
+                user_name: e.name,
+                user_id: e.user_id,
+                amount: (gasByUser[e.user_id] ?? 0) + (bonusByUser[e.user_id] ?? 0),
+                description: 'Gas Allowance / Bonus',
+              }))
+              .filter(e => e.amount > 0)
+          : []
+        return (
+          <PrintChecks
+            employees={filtered}
+            flatRatePayments={w2GasBonusExtras}
+            period={p}
+            gasByUser={gasByUser}
+            bonusByUser={bonusByUser}
+            loanDeductions={loanDeductions}
+            onClose={() => setPrintOpen(false)}
+          />
+        )
+      })()}
 
       {/* Print checks overlay — flat rate */}
       {frPrintOpen && (

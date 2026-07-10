@@ -101,7 +101,7 @@ const esC = (extra = {}) => ({
 })
 
 // ── Earnings Statement (employee & employer copies) ───────────────────────
-function EarningsStatement({ emp, periodStart, periodEnd, checkDate, gas, bonus, loanDed, netPay, isAdditionalCheck = false }) {
+function EarningsStatement({ emp, periodStart, periodEnd, checkDate, gas, bonus, loanDed, netPay }) {
   const isSalary = (emp.pay_structure ?? 'hourly') === 'salary'
   const isW2     = emp.pay_type === 'w2'
   const rate     = parseFloat(emp.pay_rate    ?? 0)
@@ -115,15 +115,13 @@ function EarningsStatement({ emp, periodStart, periodEnd, checkDate, gas, bonus,
   })()
 
   const earningsRows = []
-  if (!isAdditionalCheck) {
-    if (isSalary) {
-      const wks = emp.weeks_worked ?? 1
-      earningsRows.push({ label: `Weekly Salary${wks > 1 ? ` ×${wks}` : ''}`, rate: formatCurrency(rate), hours: '—', total: basePay })
-    } else if (isW2) {
-      earningsRows.push({ label: 'Regular Earnings', rate: `${formatCurrency(rate)}/hr`, hours: regHrs.toFixed(2), total: regHrs * rate })
-    } else {
-      earningsRows.push({ label: 'Contract Pay', rate: `${formatCurrency(rate)}/hr`, hours: regHrs.toFixed(2), total: basePay })
-    }
+  if (isSalary) {
+    const wks = emp.weeks_worked ?? 1
+    earningsRows.push({ label: `Weekly Salary${wks > 1 ? ` ×${wks}` : ''}`, rate: formatCurrency(rate), hours: '—', total: basePay })
+  } else if (isW2) {
+    earningsRows.push({ label: 'Regular Earnings', rate: `${formatCurrency(rate)}/hr`, hours: regHrs.toFixed(2), total: regHrs * rate })
+  } else {
+    earningsRows.push({ label: 'Contract Pay', rate: `${formatCurrency(rate)}/hr`, hours: regHrs.toFixed(2), total: basePay })
   }
 
   const adjRows = []
@@ -140,7 +138,7 @@ function EarningsStatement({ emp, periodStart, periodEnd, checkDate, gas, bonus,
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
         <thead>
           <tr>
-            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>{isAdditionalCheck ? 'W-2 Additional' : (isW2 ? 'Employee' : '1099 Employee')}</th>
+            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>{isW2 ? 'Employee' : '1099 Employee'}</th>
             <th style={{ ...esH({ width: '16%' }) }}>Pay Date</th>
             <th style={{ ...esH({ width: '30%' }) }}>Pay Period</th>
             <th style={{ ...esH({ width: '16%' }) }}>Pay Schedule</th>
@@ -150,7 +148,7 @@ function EarningsStatement({ emp, periodStart, periodEnd, checkDate, gas, bonus,
           <tr>
             <td style={{ ...esC({ textAlign: 'left', verticalAlign: 'top', padding: '5pt 6pt' }) }}>
               <p style={{ margin: 0, fontWeight: 700, fontSize: '9pt', color: ES.accent }}>{emp.name}</p>
-              <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>{isAdditionalCheck ? 'Gas / Bonus Payment' : (isW2 ? 'W-2 Employee' : '1099 Employee')}</p>
+              <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>{isW2 ? 'W-2 Employee' : '1099 Employee'}</p>
             </td>
             <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{checkDate}</td>
             <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{fmtPeriod}</td>
@@ -203,7 +201,7 @@ function EarningsStatement({ emp, periodStart, periodEnd, checkDate, gas, bonus,
           <tr style={{ background: ES.footerBg, borderTop: `1pt solid ${ES.border}` }}>
             <td colSpan={3} style={{ ...esC({ fontWeight: 700, textAlign: 'left', paddingLeft: '6pt', color: ES.accent, background: ES.footerBg }) }}>Gross Pay</td>
             <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 700, color: ES.accent, background: ES.footerBg }) }}>
-              {formatCurrency(isAdditionalCheck ? (gas + bonus) : basePay)}
+              {formatCurrency(basePay)}
             </td>
             <td style={{ ...esC({ fontWeight: 700, textAlign: 'left', paddingLeft: '6pt', borderLeft: `0.5pt solid ${ES.border}`, color: '#1e40af', background: ES.footerBg }) }}>
               Net Pay
@@ -411,22 +409,17 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
   const today      = (() => { try { return format(new Date(checkDateISO + 'T12:00'), 'MM/dd/yyyy') } catch { return checkDateISO } })()
   const issuedDate = checkDateISO
 
-  // Flat list of all payees.
-  // W-2 employees: additional check for gas/bonus only — base pay runs through ADP.
+  // W-2 employees: base pay check only (gas/bonus issued as separate 1099 checks).
   // 1099 employees: full estimated total in one check.
   const allPayees = [
     ...employees
       .filter(e => e.pay_type === 'w2')
-      .map(e => ({
-        key: `u-${e.user_id}`,
-        name: e.name,
-        amount: (gasByUser[e.user_id] ?? 0) + (bonusByUser[e.user_id] ?? 0),
-        user_id: e.user_id,
-      }))
+      .map(e => ({ key: `u-${e.user_id}`, name: e.name, amount: e.base_gross ?? 0, user_id: e.user_id }))
       .filter(e => e.amount > 0),
     ...employees
       .filter(e => e.pay_type !== 'w2')
-      .map(e => ({ key: `u-${e.user_id}`, name: e.name, amount: e.estimated_total ?? 0, user_id: e.user_id })),
+      .map(e => ({ key: `u-${e.user_id}`, name: e.name, amount: e.estimated_total ?? 0, user_id: e.user_id }))
+      .filter(e => e.amount > 0),
     ...flatRatePayments.map(fr => ({ key: `fr-${fr.id}`, name: fr.user_name, amount: parseFloat(fr.amount), user_id: null })),
   ]
 
@@ -638,11 +631,12 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
 
         {employees.filter(emp => selected.has(`u-${emp.user_id}`)).map((emp) => {
           const isW2    = emp.pay_type === 'w2'
-          const gas     = gasByUser[emp.user_id]      ?? 0
-          const bonus   = bonusByUser[emp.user_id]    ?? 0
+          // W-2 base check: gas/bonus go to a separate 1099 check — exclude here
+          const gas     = isW2 ? 0 : (gasByUser[emp.user_id]   ?? 0)
+          const bonus   = isW2 ? 0 : (bonusByUser[emp.user_id] ?? 0)
           const loanDed = isW2 ? 0 : (loanDeductions[emp.user_id] ?? 0)
           const netPay  = isW2
-            ? gas + bonus
+            ? (emp.base_gross ?? 0)
             : Math.max((emp.estimated_total ?? 0) - loanDed, 0)
 
           return (
@@ -741,7 +735,6 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                   emp={emp} periodStart={period.start} periodEnd={period.end}
                   checkDate={today}
                   gas={gas} bonus={bonus} loanDed={loanDed} netPay={netPay}
-                  isAdditionalCheck={isW2}
                 />
               </div>
 
@@ -757,7 +750,6 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                   emp={emp} periodStart={period.start} periodEnd={period.end}
                   checkDate={today}
                   gas={gas} bonus={bonus} loanDed={loanDed} netPay={netPay}
-                  isAdditionalCheck={isW2}
                 />
               </div>
 
