@@ -48,7 +48,7 @@ const CHECK_CON = {
 }
 
 // Section cut points (inches from paper top)
-const SEC = { check: 3.44, stub: 7.22 }
+const SEC = { check: 3.4676, stub: 7.0149 }
 
 // ── Cut / tear line ───────────────────────────────────────────────────────
 function CutLine({ topIn, label }) {
