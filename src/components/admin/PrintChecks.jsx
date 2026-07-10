@@ -343,10 +343,28 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
     style.textContent = `
       @media print {
         @page { size: 8.5in 11in; margin: 0; }
+        html, body { margin: 0 !important; padding: 0 !important; }
         body > *:not(#print-checks-root) { display: none !important; }
-        #print-checks-root { display: block !important; position: static !important; overflow: visible !important; }
+        #print-checks-root {
+          display: block !important;
+          position: static !important;
+          overflow: visible !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          background: white !important;
+        }
+        #print-checks-root > div {
+          padding: 0 !important;
+          gap: 0 !important;
+          display: block !important;
+        }
         .no-print { display: none !important; }
-        .check-page { page-break-after: always; break-after: page; }
+        .check-page {
+          page-break-after: always;
+          break-after: page;
+          box-shadow: none !important;
+          margin: 0 !important;
+        }
         .check-page:last-child { page-break-after: avoid; break-after: avoid; }
       }
     `
