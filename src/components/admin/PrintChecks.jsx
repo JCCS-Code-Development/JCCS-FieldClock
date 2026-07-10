@@ -84,7 +84,7 @@ const esC = (extra = {}) => ({
 })
 
 // ── Earnings Statement (employee & employer copies) ───────────────────────
-function EarningsStatement({ emp, periodStart, periodEnd, checkDate, checkNum, gas, bonus, loanDed, netPay, copyLabel }) {
+function EarningsStatement({ emp, periodStart, periodEnd, checkDate, gas, bonus, loanDed, netPay }) {
   const isSalary = (emp.pay_structure ?? 'hourly') === 'salary'
   const isW2     = emp.pay_type === 'w2'
   const rate     = parseFloat(emp.pay_rate     ?? 0)
@@ -120,21 +120,6 @@ function EarningsStatement({ emp, periodStart, periodEnd, checkDate, checkNum, g
 
   return (
     <div style={{ fontFamily: ES.font, display: 'flex', flexDirection: 'column', gap: '5pt' }}>
-
-      {/* Company / statement header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: '11pt', color: ES.accent, fontFamily: ES.font }}>JCCS Services LLC</p>
-          <p style={{ margin: '1pt 0 0', fontSize: '7.5pt', color: '#888', fontFamily: ES.font }}>Miami, FL</p>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: '10.5pt', color: '#222', fontFamily: ES.font }}>Earnings Statement</p>
-          <p style={{ margin: '2pt 0 0', fontSize: '8pt', color: '#555', fontFamily: ES.font }}>
-            Check Number:&nbsp;<strong>{checkNum || '___________'}</strong>
-          </p>
-          <p style={{ margin: '3pt 0 0', fontSize: '6.5pt', color: '#aaa', fontFamily: ES.font, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{copyLabel}</p>
-        </div>
-      </div>
 
       {/* Employee / Contractor info table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
@@ -219,7 +204,7 @@ function EarningsStatement({ emp, periodStart, periodEnd, checkDate, checkNum, g
 }
 
 // ── Flat rate earnings statement ──────────────────────────────────────────
-function FlatRateEarningsStatement({ fr, checkDate, checkNum, periodStart, periodEnd, copyLabel }) {
+function FlatRateEarningsStatement({ fr, checkDate, periodStart, periodEnd }) {
   const amount = parseFloat(fr.amount)
   const fmtPeriod = (() => {
     try {
@@ -228,20 +213,6 @@ function FlatRateEarningsStatement({ fr, checkDate, checkNum, periodStart, perio
   })()
   return (
     <div style={{ fontFamily: ES.font, display: 'flex', flexDirection: 'column', gap: '5pt' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: '11pt', color: ES.accent, fontFamily: ES.font }}>JCCS Services LLC</p>
-          <p style={{ margin: '1pt 0 0', fontSize: '7.5pt', color: '#888', fontFamily: ES.font }}>Miami, FL</p>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: '10.5pt', color: '#222', fontFamily: ES.font }}>Earnings Statement</p>
-          <p style={{ margin: '2pt 0 0', fontSize: '8pt', color: '#555', fontFamily: ES.font }}>
-            Check Number:&nbsp;<strong>{checkNum || '___________'}</strong>
-          </p>
-          <p style={{ margin: '3pt 0 0', fontSize: '6.5pt', color: '#aaa', fontFamily: ES.font, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{copyLabel}</p>
-        </div>
-      </div>
-
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
         <thead>
           <tr>
@@ -342,14 +313,14 @@ function FlatRateCheckPage({ fr, today, periodStart, periodEnd, checkNum }) {
 
       {/* Employee copy (middle) */}
       <div style={{ position: 'absolute', top: `${SEC.check + 0.35}in`, bottom: `${11 - SEC.stub + 0.3}in`, left: '0.75in', right: '0.75in' }}>
-        <FlatRateEarningsStatement fr={fr} checkDate={today} checkNum={checkNum}
-          periodStart={periodStart} periodEnd={periodEnd} copyLabel="Employee Copy" />
+        <FlatRateEarningsStatement fr={fr} checkDate={today}
+          periodStart={periodStart} periodEnd={periodEnd} />
       </div>
 
       {/* Employer copy (bottom) */}
       <div style={{ position: 'absolute', top: `${SEC.stub + 0.35}in`, bottom: '0.5in', left: '0.75in', right: '0.75in' }}>
-        <FlatRateEarningsStatement fr={fr} checkDate={today} checkNum={checkNum}
-          periodStart={periodStart} periodEnd={periodEnd} copyLabel="Employer Copy" />
+        <FlatRateEarningsStatement fr={fr} checkDate={today}
+          periodStart={periodStart} periodEnd={periodEnd} />
       </div>
     </div>
   )
@@ -698,9 +669,8 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
               }}>
                 <EarningsStatement
                   emp={emp} periodStart={period.start} periodEnd={period.end}
-                  checkDate={today} checkNum={checkNums[`u-${emp.user_id}`] ?? ''}
+                  checkDate={today}
                   gas={gas} bonus={bonus} loanDed={loanDed} netPay={netPay}
-                  copyLabel="Employee Copy"
                 />
               </div>
 
@@ -713,9 +683,8 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
               }}>
                 <EarningsStatement
                   emp={emp} periodStart={period.start} periodEnd={period.end}
-                  checkDate={today} checkNum={checkNums[`u-${emp.user_id}`] ?? ''}
+                  checkDate={today}
                   gas={gas} bonus={bonus} loanDed={loanDed} netPay={netPay}
-                  copyLabel="Employer Copy"
                 />
               </div>
 
