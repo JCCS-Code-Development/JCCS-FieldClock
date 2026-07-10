@@ -45,6 +45,9 @@ export default function MyPay() {
   const [corrReason, setCorrReason] = useState('')
   const [corrSaving, setCorrSaving] = useState(false)
   const [corrError, setCorrError]   = useState('')
+  const [detailSheet, setDetailSheet] = useState(null)
+  const [corrStep, setCorrStep]       = useState(1)
+  const [corrType, setCorrType]       = useState('')
 
   const [myLoans, setMyLoans]           = useState([])
   const [loadingLoans, setLoadingLoans] = useState(false)
@@ -114,6 +117,8 @@ export default function MyPay() {
 
   const openCorrection = (entry) => {
     setCorrModal(entry)
+    setCorrStep(1)
+    setCorrType('')
     setCorrStart(entry.start_time ? entry.start_time.slice(0, 16) : '')
     setCorrEnd(entry.end_time   ? entry.end_time.slice(0, 16)   : '')
     setCorrReason('')
@@ -121,8 +126,9 @@ export default function MyPay() {
   }
 
   const handleSubmitCorrection = async () => {
-    if (!corrReason.trim()) { setCorrError(t('pay.correction.reasonRequired')); return }
-    if (!corrStart && !corrEnd) { setCorrError(t('pay.correction.timeRequired')); return }
+    if (!corrReason.trim()) { setCorrError('Please provide an explanation.'); return }
+    if ((corrType === 'start' || corrType === 'both') && !corrStart) { setCorrError('Please enter the corrected clock-in time.'); return }
+    if ((corrType === 'end'   || corrType === 'both') && !corrEnd)   { setCorrError('Please enter the corrected clock-out time.'); return }
     setCorrSaving(true)
     setCorrError('')
     try {
@@ -364,24 +370,22 @@ export default function MyPay() {
               : <div className="flex flex-col gap-2">
                   {entries.map((entry) => {
                     const hasRequest = myRequests.some((r) => String(r.entry_id) === String(entry.id) && r.status === 'pending')
+                    const dot = ENTRY_DOT[entry.status_label] ?? 'bg-gray-400'
                     return (
-                      <div key={entry.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center justify-between gap-3">
+                      <button key={entry.id} onClick={() => setDetailSheet(entry)}
+                        className="w-full text-left bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3 active:bg-gray-50 transition-colors">
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-gray-400">{formatDate(entry.start_time)}</p>
-                          <p className="text-sm font-medium text-gray-900 capitalize">{entry.status_label?.replace('_',' ')}</p>
+                          <p className="text-sm font-semibold text-gray-900 capitalize">{entry.status_label?.replace('_',' ')}</p>
                           <p className="text-xs text-gray-500">
                             {formatTime(entry.start_time)} → {entry.end_time ? formatTime(entry.end_time) : <span className="text-orange-500">{t('pay.inProgress')}</span>}
                             {entry.job_name && ` · ${entry.job_name}`}
                           </p>
                         </div>
-                        {entry.end_time && (
-                          hasRequest
-                            ? <span className="text-xs text-amber-600 font-medium shrink-0">{t('pay.pendingReview')}</span>
-                            : <Button size="sm" variant="secondary" onClick={() => openCorrection(entry)}>
-                                {t('pay.requestCorrection')}
-                              </Button>
-                        )}
-                      </div>
+                        {hasRequest && <span className="text-xs text-amber-600 font-medium shrink-0">{t('pay.pendingReview')}</span>}
+                        <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                      </button>
                     )
                   })}
                 </div>
@@ -530,43 +534,183 @@ export default function MyPay() {
         </div>
       </Modal>
 
-      <Modal isOpen={!!corrModal} onClose={() => setCorrModal(null)} title={t('pay.correction.title')}>
+      {/* ── Shift detail bottom sheet ───────────────────────────── */}
+      {detailSheet && (() => {
+        const e = detailSheet
+        const hasReq = myRequests.some(r => String(r.entry_id) === String(e.id) && r.status === 'pending')
+        const cfg = ENTRY_CFG[e.status_label] ?? ENTRY_CFG.done
+        const durMs = e.end_time ? new Date(e.end_time) - new Date(e.start_time) : 0
+        const dh = Math.floor(durMs / 3600000)
+        const dm = Math.floor((durMs % 3600000) / 60000)
+        return (
+          <div className="fixed inset-0 z-[1100] flex flex-col justify-end" onClick={() => setDetailSheet(null)}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="relative bg-white rounded-t-3xl overflow-hidden" onClick={ev => ev.stopPropagation()}>
+              <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-gray-300" /></div>
+              <div className="px-5 pt-3 pb-6 flex flex-col gap-4">
+                {/* Status + date */}
+                <div className="flex items-center justify-between">
+                  <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold ${cfg.bg} ${cfg.text}`}>
+                    <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+                    <span className="capitalize">{e.status_label?.replace('_', ' ')}</span>
+                  </span>
+                  <p className="text-sm text-gray-400 font-medium">{formatDate(e.start_time)}</p>
+                </div>
+                {/* Time block */}
+                <div className="bg-gray-50 rounded-2xl px-5 py-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">Clock In</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatTime(e.start_time)}</p>
+                    </div>
+                    <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                    <div className="text-right">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">Clock Out</p>
+                      <p className={`text-2xl font-bold ${e.end_time ? 'text-gray-900' : 'text-orange-400'}`}>
+                        {e.end_time ? formatTime(e.end_time) : 'In Progress'}
+                      </p>
+                    </div>
+                  </div>
+                  {durMs > 0 && (
+                    <div className="border-t border-gray-200 pt-3 mt-3 text-center">
+                      <p className="text-sm font-semibold text-gray-600">
+                        {dh > 0 ? `${dh}h ${dm}m` : `${dm}m`} total
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {/* Job */}
+                {e.job_name && (
+                  <div className="flex items-center gap-2 px-1">
+                    <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                    <p className="text-sm font-medium text-gray-700">{e.job_name}</p>
+                  </div>
+                )}
+                {/* CTA */}
+                {e.end_time && (
+                  hasReq
+                    ? <div className="bg-amber-50 rounded-2xl px-4 py-3.5 text-center">
+                        <p className="text-sm font-semibold text-amber-700">Modification Pending Review</p>
+                        <p className="text-xs text-amber-500 mt-0.5">Your administrator is reviewing this request.</p>
+                      </div>
+                    : <button onClick={() => { setDetailSheet(null); openCorrection(e) }}
+                        className="w-full bg-brand-500 text-white font-semibold py-3.5 rounded-2xl text-sm active:bg-brand-600 transition-colors">
+                        Request Modification
+                      </button>
+                )}
+              </div>
+              <div style={{ height: 'max(12px, env(safe-area-inset-bottom))' }} />
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Modification request questionnaire ─────────────────── */}
+      <Modal isOpen={!!corrModal} onClose={() => setCorrModal(null)} title="Request Modification">
         {corrModal && (
           <div className="flex flex-col gap-4">
-            <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-600">
-              <p className="font-medium mb-1">{t('pay.correction.originalEntry')}</p>
-              <p>{t('pay.correction.start')}: {formatDate(corrModal.start_time)} {formatTime(corrModal.start_time)}</p>
-              {corrModal.end_time && <p>{t('pay.correction.end')}: {formatDate(corrModal.end_time)} {formatTime(corrModal.end_time)}</p>}
+            {/* Entry summary strip */}
+            <div className={`rounded-xl px-4 py-3 ${(ENTRY_CFG[corrModal.status_label] ?? ENTRY_CFG.done).bg}`}>
+              <p className={`text-sm font-semibold capitalize ${(ENTRY_CFG[corrModal.status_label] ?? ENTRY_CFG.done).text}`}>
+                {corrModal.status_label?.replace('_', ' ')} · {formatDate(corrModal.start_time)}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {formatTime(corrModal.start_time)} → {corrModal.end_time ? formatTime(corrModal.end_time) : 'In Progress'}
+                {corrModal.job_name && ` · ${corrModal.job_name}`}
+              </p>
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">{t('pay.correction.correctedStart')}</label>
-              <input type="datetime-local" value={corrStart} onChange={(e) => setCorrStart(e.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
+
+            {/* Step indicator */}
+            <div className="flex items-center gap-2">
+              {[1, 2].map(s => (
+                <div key={s} className={`h-1 flex-1 rounded-full transition-colors ${s <= corrStep ? 'bg-brand-500' : 'bg-gray-200'}`} />
+              ))}
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">{t('pay.correction.correctedEnd')}</label>
-              <input type="datetime-local" value={corrEnd} onChange={(e) => setCorrEnd(e.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">{t('pay.correction.reason')} *</label>
-              <textarea
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500 resize-none"
-                rows={3} placeholder={t('pay.correction.reasonPlaceholder')}
-                value={corrReason} onChange={(e) => setCorrReason(e.target.value)}
-              />
-            </div>
-            {corrError && <p className="text-sm text-red-600">{corrError}</p>}
-            <div className="flex gap-3">
-              <Button variant="secondary" fullWidth onClick={() => setCorrModal(null)}>{t('common.cancel')}</Button>
-              <Button fullWidth loading={corrSaving} onClick={handleSubmitCorrection}>{t('pay.correction.submit')}</Button>
-            </div>
+
+            {corrStep === 1 && (
+              <>
+                <p className="text-sm font-semibold text-gray-800">What needs to be corrected?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {CORR_TYPES.map(opt => (
+                    <button key={opt.value} onClick={() => setCorrType(opt.value)}
+                      className={`flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 text-sm font-semibold transition-colors text-left
+                        ${corrType === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 active:border-gray-300 bg-white'}`}>
+                      <span className="text-base">{opt.icon}</span>
+                      <span className="leading-tight">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-3 pt-1">
+                  <Button variant="secondary" fullWidth onClick={() => setCorrModal(null)}>Cancel</Button>
+                  <Button fullWidth disabled={!corrType} onClick={() => setCorrStep(2)}>Next →</Button>
+                </div>
+              </>
+            )}
+
+            {corrStep === 2 && (
+              <>
+                {(corrType === 'start' || corrType === 'both') && (
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Correct Clock-In Time</label>
+                    <input type="datetime-local" value={corrStart} onChange={e => setCorrStart(e.target.value)}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
+                  </div>
+                )}
+                {(corrType === 'end' || corrType === 'both') && (
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Correct Clock-Out Time</label>
+                    <input type="datetime-local" value={corrEnd} onChange={e => setCorrEnd(e.target.value)}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
+                  </div>
+                )}
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+                    {corrType === 'job'   ? 'What is the correct job site?' :
+                     corrType === 'other' ? 'Describe what needs to change' :
+                     'Why is this change needed?'}
+                    {' *'}
+                  </label>
+                  <textarea rows={3} value={corrReason} onChange={e => setCorrReason(e.target.value)}
+                    placeholder={
+                      corrType === 'job'   ? 'e.g. Should be Smith Residence, not Johnson Ave' :
+                      corrType === 'other' ? 'Describe the issue...' :
+                      'e.g. I forgot to clock back in after lunch'
+                    }
+                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500 resize-none" />
+                </div>
+                {corrError && <p className="text-sm text-red-600">{corrError}</p>}
+                <div className="flex gap-3 pt-1">
+                  <Button variant="secondary" fullWidth onClick={() => setCorrStep(1)}>← Back</Button>
+                  <Button fullWidth loading={corrSaving} onClick={handleSubmitCorrection}>Submit</Button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </Modal>
     </div>
   )
 }
+
+const ENTRY_DOT = {
+  traveling: 'bg-sky-500', working: 'bg-green-500', lunch: 'bg-amber-500',
+  material_run: 'bg-violet-500', waiting: 'bg-orange-500', done: 'bg-gray-400',
+}
+const ENTRY_CFG = {
+  traveling:    { dot: 'bg-sky-500',    bg: 'bg-sky-50',    text: 'text-sky-700'    },
+  working:      { dot: 'bg-green-500',  bg: 'bg-green-50',  text: 'text-green-700'  },
+  lunch:        { dot: 'bg-amber-500',  bg: 'bg-amber-50',  text: 'text-amber-700'  },
+  material_run: { dot: 'bg-violet-500', bg: 'bg-violet-50', text: 'text-violet-700' },
+  waiting:      { dot: 'bg-orange-500', bg: 'bg-orange-50', text: 'text-orange-700' },
+  done:         { dot: 'bg-gray-400',   bg: 'bg-gray-50',   text: 'text-gray-500'   },
+}
+const CORR_TYPES = [
+  { value: 'start', icon: '🕐', label: 'Clock-In Time' },
+  { value: 'end',   icon: '🕑', label: 'Clock-Out Time' },
+  { value: 'both',  icon: '⏱', label: 'Both Times' },
+  { value: 'job',   icon: '📍', label: 'Job Site' },
+  { value: 'other', icon: '💬', label: 'Something Else' },
+]
 
 const MileageIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 13l4.553 2.276A1 1 0 0021 21.382V10.618a1 1 0 00-.553-.894L15 7m0 13V7m0 0L9 4"/></svg>
 const ClockIcon  = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 7v5l3.5 3.5"/></svg>
