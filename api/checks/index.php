@@ -68,34 +68,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Bulk: { checks: [...] }
     $items = isset($body['checks']) ? $body['checks'] : [$body];
 
-    $stmt = $pdo->prepare(
-        'INSERT INTO check_registry
-           (check_number, payee_name, user_id, amount, pay_period_start, pay_period_end, issued_date, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           payee_name = VALUES(payee_name),
-           amount     = VALUES(amount),
-           pay_period_start = VALUES(pay_period_start),
-           pay_period_end   = VALUES(pay_period_end)'
-    );
+    try {
+        $stmt = $pdo->prepare(
+            'INSERT INTO check_registry
+               (check_number, payee_name, user_id, amount, pay_period_start, pay_period_end, issued_date, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+               payee_name       = VALUES(payee_name),
+               amount           = VALUES(amount),
+               pay_period_start = VALUES(pay_period_start),
+               pay_period_end   = VALUES(pay_period_end),
+               issued_date      = VALUES(issued_date)'
+        );
 
-    $ids = [];
-    foreach ($items as $item) {
-        if (empty($item['check_number']) || empty($item['payee_name'])) continue;
+        $saved = 0;
+        foreach ($items as $item) {
+            if (empty($item['check_number']) || empty($item['payee_name'])) continue;
 
-        $checkNum   = sanitizeString($item['check_number']);
-        $payeeName  = sanitizeString($item['payee_name']);
-        $userId     = !empty($item['user_id']) ? (int)$item['user_id'] : null;
-        $amount     = (float)($item['amount'] ?? 0);
-        $pStart     = sanitizeString($item['pay_period_start'] ?? date('Y-m-d'));
-        $pEnd       = sanitizeString($item['pay_period_end']   ?? date('Y-m-d'));
-        $issuedDate = sanitizeString($item['issued_date']      ?? date('Y-m-d'));
+            $checkNum   = sanitizeString($item['check_number']);
+            $payeeName  = sanitizeString($item['payee_name']);
+            $userId     = !empty($item['user_id']) ? (int)$item['user_id'] : null;
+            $amount     = (float)($item['amount'] ?? 0);
+            $pStart     = sanitizeString($item['pay_period_start'] ?? date('Y-m-d'));
+            $pEnd       = sanitizeString($item['pay_period_end']   ?? date('Y-m-d'));
+            $issuedDate = sanitizeString($item['issued_date']      ?? date('Y-m-d'));
 
-        $stmt->execute([$checkNum, $payeeName, $userId, $amount, $pStart, $pEnd, $issuedDate, $auth['user_id']]);
-        $ids[] = $pdo->lastInsertId();
+            $stmt->execute([$checkNum, $payeeName, $userId, $amount, $pStart, $pEnd, $issuedDate, $auth['user_id']]);
+            $saved++;
+        }
+
+        echo json_encode(['success' => true, 'registered' => $saved]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
-
-    echo json_encode(['success' => true, 'registered' => count($ids)]);
     exit;
 }
 

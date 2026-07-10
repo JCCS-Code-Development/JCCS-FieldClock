@@ -313,7 +313,8 @@ function FlatRateCheckPage({ fr, today, periodStart, periodEnd, checkNum }) {
 
       {/* Check fields — positions from Contractor_Check_Template.key */}
       <div style={{ position: 'absolute', top: CHECK_CON.date.top, left: CHECK_CON.date.left, width: CHECK_CON.date.w, textAlign: 'right', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{today}</div>
-      {checkNum && <div style={{ position: 'absolute', top: CHECK_CON.checkNum.top, left: CHECK_CON.checkNum.left, width: CHECK_CON.checkNum.w, textAlign: 'right', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000' }}>{checkNum}</div>}
+      {/* Dollar amount (numeric) — $ box to the right of the pay-to line */}
+      <div style={{ position: 'absolute', top: CHECK_CON.checkNum.top, left: CHECK_CON.checkNum.left, width: CHECK_CON.checkNum.w, textAlign: 'right', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000' }}>{formatCurrency(amount).replace('$', '')}</div>
       <div style={{ position: 'absolute', top: CHECK_CON.payTo.top, left: CHECK_CON.payTo.left, width: CHECK_CON.payTo.w, overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 600, color: '#000' }}>{fr.user_name}</div>
       <div style={{ position: 'absolute', top: CHECK_CON.words.top, left: CHECK_CON.words.left, width: CHECK_CON.words.w, overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{amountToWords(amount)}</div>
       <div style={{ position: 'absolute', top: CHECK_CON.memo.top, left: CHECK_CON.memo.left, width: CHECK_CON.memo.w, fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{fr.user_name}</div>
@@ -356,12 +357,14 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
   const [checkNums, setCheckNums] = useState({})
   const [regSaving, setRegSaving] = useState(false)
   const [regStatus, setRegStatus] = useState(null) // null | 'saved' | 'error'
+  const [regError,  setRegError]  = useState('')
 
-  // Default check date to the Friday of the pay period week (period.end is Sunday → subtract 2 days)
+  // Default check date to the Friday of the FOLLOWING week
+  // (period.end = Sunday of pay week; +5 days = Friday of next week)
   const defaultFriday = (() => {
     try {
       const sun = new Date(period.end + 'T12:00')
-      return new Date(sun.getTime() - 2 * 86400000)
+      return new Date(sun.getTime() + 5 * 86400000)
     } catch { return new Date() }
   })()
   const [checkDateISO, setCheckDateISO] = useState(format(defaultFriday, 'yyyy-MM-dd'))
@@ -391,6 +394,7 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
   const handleRegister = async () => {
     setRegSaving(true)
     setRegStatus(null)
+    setRegError('')
     try {
       const toSave = selectedPayees
         .filter(p => checkNums[p.key]?.trim())
@@ -406,7 +410,9 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
       if (!toSave.length) { setRegSaving(false); return }
       await registerChecks(toSave)
       setRegStatus('saved')
-    } catch {
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Unknown error'
+      setRegError(msg)
       setRegStatus('error')
     } finally {
       setRegSaving(false)
@@ -561,7 +567,7 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
             Saves check numbers for selected payees who have a check # entered
           </span>
           {regStatus === 'error' && (
-            <span style={{ fontSize: 12, color: '#f87171' }}>Failed — check for duplicate check numbers</span>
+            <span style={{ fontSize: 12, color: '#f87171' }}>{regError || 'Failed — please try again'}</span>
           )}
           {regStatus === 'saved' && (
             <span style={{ fontSize: 12, color: '#4ade80' }}>Saved. View in Check Registry.</span>
@@ -632,13 +638,11 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                 textAlign: 'right', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
               }}>{today}</div>
 
-              {/* Check number */}
-              {checkNums[`u-${emp.user_id}`] && (
-                <div style={{
-                  position: 'absolute', top: CHECK_EMP.checkNum.top, left: CHECK_EMP.checkNum.left, width: CHECK_EMP.checkNum.w,
-                  textAlign: 'right', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000',
-                }}>{checkNums[`u-${emp.user_id}`]}</div>
-              )}
+              {/* Dollar amount (numeric) — goes in the $ box to the right of the pay-to line */}
+              <div style={{
+                position: 'absolute', top: CHECK_EMP.checkNum.top, left: CHECK_EMP.checkNum.left, width: CHECK_EMP.checkNum.w,
+                textAlign: 'right', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000',
+              }}>{formatCurrency(netPay).replace('$', '')}</div>
 
               {/* Pay To name */}
               <div style={{
