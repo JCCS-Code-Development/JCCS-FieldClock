@@ -51,20 +51,25 @@ const CHECK_CON = {
 const SEC = { check: 3.4676, stub: 7.0149, barcode: 10.5622 }
 
 // ── Cut / tear line ───────────────────────────────────────────────────────
+// height:0 + borderTop anchors the dashed line to EXACTLY topIn in both
+// screen and print — no flex children, no content, nothing that can shift it.
 function CutLine({ topIn, label }) {
   return (
     <div style={{
-      position: 'absolute', top: `${topIn}in`, left: 0, right: 0, zIndex: 2,
-      display: 'flex', alignItems: 'center', gap: '8px',
+      position: 'absolute', top: `${topIn}in`, left: 0, right: 0,
+      height: 0, overflow: 'visible',
+      borderTop: '0.75pt dashed #94a3b8',
+      zIndex: 10, pointerEvents: 'none',
     }}>
-      <div style={{ flex: 1, borderTop: '1pt dashed #94a3b8' }} />
       <span className="no-print" style={{
+        position: 'absolute', left: '50%', top: '-9pt',
+        transform: 'translateX(-50%)',
         fontSize: '7pt', color: '#94a3b8', fontFamily: 'Arial, sans-serif',
-        letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap', flexShrink: 0,
+        letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+        background: 'white', padding: '0 8pt', display: 'inline-block',
       }}>
         ✂ {label}
       </span>
-      <div style={{ flex: 1, borderTop: '1pt dashed #94a3b8' }} />
     </div>
   )
 }
@@ -330,13 +335,13 @@ function FlatRateCheckPage({ fr, today, periodStart, periodEnd, checkNum }) {
       <div style={{ position: 'absolute', top: CHECK_CON.address.top, left: CHECK_CON.address.left, width: CHECK_CON.address.w, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{fr.user_name}</div>
 
       {/* Employee copy (middle) */}
-      <div style={{ position: 'absolute', top: `${SEC.check + 0.35}in`, bottom: `${11 - SEC.stub + 0.3}in`, left: '0.75in', right: '0.75in' }}>
+      <div style={{ position: 'absolute', top: `${SEC.check + 0.35}in`, bottom: `${11 - SEC.stub + 0.3}in`, left: '0.75in', right: '0.75in', overflow: 'hidden' }}>
         <FlatRateEarningsStatement fr={fr} checkDate={today}
           periodStart={periodStart} periodEnd={periodEnd} />
       </div>
 
       {/* Employer copy (bottom) */}
-      <div style={{ position: 'absolute', top: `${SEC.stub + 0.35}in`, bottom: `${(11 - SEC.barcode + 0.15).toFixed(4)}in`, left: '0.75in', right: '0.75in' }}>
+      <div style={{ position: 'absolute', top: `${SEC.stub + 0.35}in`, bottom: `${(11 - SEC.barcode + 0.15).toFixed(4)}in`, left: '0.75in', right: '0.75in', overflow: 'hidden' }}>
         <FlatRateEarningsStatement fr={fr} checkDate={today}
           periodStart={periodStart} periodEnd={periodEnd} />
       </div>
@@ -712,6 +717,7 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                 top: `${SEC.check + 0.35}in`,
                 bottom: `${11 - SEC.stub + 0.3}in`,
                 left: '0.75in', right: '0.75in',
+                overflow: 'hidden',
               }}>
                 <EarningsStatement
                   emp={emp} periodStart={period.start} periodEnd={period.end}
@@ -726,6 +732,7 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                 top: `${SEC.stub + 0.35}in`,
                 bottom: `${(11 - SEC.barcode + 0.15).toFixed(4)}in`,
                 left: '0.75in', right: '0.75in',
+                overflow: 'hidden',
               }}>
                 <EarningsStatement
                   emp={emp} periodStart={period.start} periodEnd={period.end}
