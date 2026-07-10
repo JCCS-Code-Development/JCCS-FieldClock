@@ -119,7 +119,7 @@ function EarningsStatement({ emp, periodStart, periodEnd, checkDate, gas, bonus,
   const bodyRows = Math.max(earningsRows.length, adjRows.length, 2)
 
   return (
-    <div style={{ fontFamily: ES.font, display: 'flex', flexDirection: 'column', gap: '5pt' }}>
+    <div style={{ fontFamily: ES.font, display: 'flex', flexDirection: 'column', gap: '5pt', height: '100%', justifyContent: 'center' }}>
 
       {/* Employee / Contractor info table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
@@ -212,7 +212,7 @@ function FlatRateEarningsStatement({ fr, checkDate, periodStart, periodEnd }) {
     } catch { return `${periodStart} – ${periodEnd}` }
   })()
   return (
-    <div style={{ fontFamily: ES.font, display: 'flex', flexDirection: 'column', gap: '5pt' }}>
+    <div style={{ fontFamily: ES.font, display: 'flex', flexDirection: 'column', gap: '5pt', height: '100%', justifyContent: 'center' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
         <thead>
           <tr>
