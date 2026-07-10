@@ -343,7 +343,12 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
     style.textContent = `
       @media print {
         @page { size: 8.5in 11in; margin: 0; }
-        html, body { margin: 0 !important; padding: 0 !important; }
+        html, body {
+          margin: 0 !important;
+          padding: 0 !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
         body > *:not(#print-checks-root) { display: none !important; }
         #print-checks-root {
           display: block !important;
