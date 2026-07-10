@@ -14,10 +14,10 @@ import { formatCurrency, formatHours, formatDate } from '../../utils/format'
 import { format, startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 
 const periods = Array.from({ length: 8 }, (_, i) => {
-  const start = startOfWeek(subWeeks(new Date(), i), { weekStartsOn: 1 })
-  const end   = endOfWeek(subWeeks(new Date(), i), { weekStartsOn: 1 })
+  const start = startOfWeek(subWeeks(new Date(), i + 1), { weekStartsOn: 1 })
+  const end   = endOfWeek(subWeeks(new Date(), i + 1), { weekStartsOn: 1 })
   return {
-    label: i === 0 ? 'This Week' : i === 1 ? 'Last Week' : `${format(start, 'MMM d')} – ${format(end, 'MMM d')}`,
+    label: i === 0 ? 'Last Week' : `${format(start, 'MMM d')} – ${format(end, 'MMM d')}`,
     start: format(start, 'yyyy-MM-dd'),
     end:   format(end,   'yyyy-MM-dd'),
   }
