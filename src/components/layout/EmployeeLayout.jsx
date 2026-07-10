@@ -73,7 +73,7 @@ export default function EmployeeLayout() {
           <p className="text-brand-400 text-xs font-bold mt-2 tracking-widest uppercase">{t('nav.fieldclock')}</p>
         </div>
         <div className="px-5 py-2.5 border-b border-brand-700/40">
-          <p className="text-brand-100/90 text-sm font-semibold">{user?.name}</p>
+          <p className="text-brand-100 text-sm font-semibold">{t('home.welcome', { name: user?.name?.split(' ')[0] })}</p>
           <div className="flex items-center gap-1.5 mt-0.5">
             {dotColor && statusKey && <span className={`w-2 h-2 rounded-full ${dotColor}`} />}
             <p className="text-brand-400/70 text-xs">

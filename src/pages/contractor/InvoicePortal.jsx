@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { format, startOfWeek, endOfWeek, addWeeks, isAfter } from 'date-fns'
 import { es, enUS } from 'date-fns/locale'
 import { useTranslation } from 'react-i18next'
+import { useAuthStore } from '../../store/authStore'
 import { listInvoices, uploadInvoice, deleteInvoice, getDownloadUrl } from '../../api/contractor'
 import { subscribeToPush, unsubscribeFromPush, getCurrentSubscription } from '../../api/push'
 
@@ -57,6 +58,7 @@ const ExternalIcon = () => (
 // ── Component ────────────────────────────────────────────────────────
 export default function InvoicePortal() {
   const { t, i18n } = useTranslation()
+  const { user } = useAuthStore()
   const dfnsLocale   = i18n.language.startsWith('es') ? es : enUS
 
   const [offset, setOffset]         = useState(0)
@@ -185,6 +187,7 @@ export default function InvoicePortal() {
       {/* Header + push toggle */}
       <div className="flex items-center justify-between">
         <div>
+          <p className="text-base font-semibold text-brand-500 mb-0.5">{t('home.welcome', { name: user?.name?.split(' ')[0] })}</p>
           <h1 className="text-2xl font-bold text-gray-900">{t('contractor.invoice.title')}</h1>
           <p className="text-sm text-gray-500 mt-0.5">{t('contractor.invoice.subtitle')}</p>
         </div>

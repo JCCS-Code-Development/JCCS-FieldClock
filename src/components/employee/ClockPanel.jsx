@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { es, enUS } from 'date-fns/locale'
 import { useTranslation } from 'react-i18next'
 import { useTimeclockStore } from '../../store/timeclockStore'
+import { useAuthStore } from '../../store/authStore'
 import { useGPS } from '../../hooks/useGPS'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { getStatus, dayStart, dayEnd, setWorking, setLunch, setMaterialRun, setWaiting, getEntries } from '../../api/timeclock'
@@ -132,6 +133,8 @@ function useLiveElapsed(isClockedIn, currentEntry) {
 
 export default function ClockPanel() {
   const { t, i18n } = useTranslation()
+  const { user } = useAuthStore()
+  const firstName = user?.name?.split(' ')[0] ?? ''
   const { statusLabel, currentEntry, activeJob, dayStarted, setTimeclockData } = useTimeclockStore()
 
   // Always sync with server on mount so the UI reflects actual DB state
@@ -142,6 +145,7 @@ export default function ClockPanel() {
   const { position, loading: gpsLoading, getPosition } = useGPS()
 
   const [loading, setLoading]               = useState(false)
+  const [activityOpen, setActivityOpen]     = useState(false)
   const [jobs, setJobs]                     = useState([])
   const [selectedJobId, setSelectedJobId]   = useState('')
   const [locationLabel, setLocationLabel]   = useState(null)
@@ -239,21 +243,26 @@ export default function ClockPanel() {
     <div className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:gap-6 w-full">
 
       {/* ── CLOCK SECTION — full width on mobile, left col on desktop ── */}
-      <div className="flex flex-col items-center gap-5 lg:gap-8 lg:py-2">
+      <div className="flex flex-col items-center gap-4 lg:gap-8 lg:py-2">
+
+        {/* Welcome */}
+        <p className="text-base font-semibold text-gray-700 lg:text-lg self-start lg:self-center">
+          {t('home.welcome', { name: firstName })}
+        </p>
 
         {/* Date */}
         <div className="text-center select-none">
           <p className="text-xs font-semibold tracking-widest text-gray-400 uppercase">{dayName}</p>
-          <p className="text-4xl lg:text-5xl font-extralight text-gray-900 mt-1 leading-none tracking-tight">{monthDay}</p>
+          <p className="text-3xl lg:text-5xl font-extralight text-gray-900 mt-0.5 leading-none tracking-tight">{monthDay}</p>
         </div>
 
         {/* Clock button */}
         <div className="relative flex items-center justify-center">
-          {isClockedIn && <span className="absolute w-56 h-56 lg:w-64 lg:h-64 rounded-full animate-ping bg-red-400/20" />}
+          {isClockedIn && <span className="absolute w-44 h-44 lg:w-60 lg:h-60 rounded-full animate-ping bg-red-400/20" />}
           <button
             onClick={handleToggle}
             disabled={loading || !isOnline}
-            className={`relative w-48 h-48 lg:w-56 lg:h-56 rounded-full flex flex-col items-center justify-center gap-2 text-white font-semibold shadow-2xl transition-all duration-300 active:scale-95 disabled:opacity-50 ring-[12px]
+            className={`relative w-36 h-36 lg:w-52 lg:h-52 rounded-full flex flex-col items-center justify-center gap-2 text-white font-semibold shadow-2xl transition-all duration-300 active:scale-95 disabled:opacity-50 ring-[10px]
               ${isClockedIn
                 ? 'bg-red-500 ring-red-100 shadow-red-300/50'
                 : 'bg-brand-500 ring-brand-100 shadow-brand-300/50'
@@ -406,55 +415,74 @@ export default function ClockPanel() {
             )}
           </div>
 
-          <div className="px-4 py-3">
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-3">{t('home.todaysActivity')}</p>
-            {todayEntries.filter((e) => e.cost_category !== 'day_end').length === 0 ? (
-              <p className="text-sm text-gray-300 text-center py-6">{t('home.noActivity')}</p>
-            ) : (
-              <div className="flex flex-col divide-y divide-gray-50 max-h-32 lg:max-h-64 overflow-y-auto">
-                {todayEntries
-                  .filter((e) => e.cost_category !== 'day_end')
-                  .map((entry, i) => {
-                    const cfg = STATUS_CONFIG[entry.status_label]
-                    const loc = entry.job_name ?? (entry.notes ? entry.notes.replace('Location: ', '') : null)
-                    return (
-                      <div key={i} className="flex items-start justify-between gap-3 py-2.5 first:pt-0">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            {cfg && (
-                              <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${
-                                entry.status_label === 'working'      ? 'bg-green-500'  :
-                                entry.status_label === 'lunch'        ? 'bg-amber-500'  :
-                                entry.status_label === 'material_run' ? 'bg-violet-500' :
-                                entry.status_label === 'waiting'      ? 'bg-orange-500' :
-                                entry.status_label === 'traveling'    ? 'bg-sky-500'    : 'bg-gray-400'
-                              }`} />
-                            )}
-                            <p className="text-xs font-semibold text-gray-800 capitalize">
-                              {entry.status_label?.replace('_', ' ')}
-                            </p>
-                          </div>
-                          {loc && <p className="text-xs text-gray-400 truncate pl-3.5">{loc}</p>}
+          {/* Today's activity — collapsible */}
+          {(() => {
+            const visible = todayEntries.filter((e) => e.cost_category !== 'day_end')
+            return (
+              <div>
+                <button onClick={() => setActivityOpen(v => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">{t('home.todaysActivity')}</p>
+                    {visible.length > 0 && (
+                      <span className="text-[10px] font-bold bg-brand-100 text-brand-600 px-1.5 py-0.5 rounded-full">{visible.length}</span>
+                    )}
+                  </div>
+                  <svg className={`w-4 h-4 text-gray-300 transition-transform ${activityOpen ? 'rotate-180' : ''}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+                {activityOpen && (
+                  <div className="px-4 pb-3">
+                    {visible.length === 0
+                      ? <p className="text-sm text-gray-300 text-center py-4">{t('home.noActivity')}</p>
+                      : <div className="flex flex-col divide-y divide-gray-50 max-h-40 lg:max-h-64 overflow-y-auto">
+                          {visible.map((entry, i) => {
+                            const cfg = STATUS_CONFIG[entry.status_label]
+                            const loc = entry.job_name ?? (entry.notes ? entry.notes.replace('Location: ', '') : null)
+                            return (
+                              <div key={i} className="flex items-start justify-between gap-3 py-2.5 first:pt-0">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 mb-0.5">
+                                    {cfg && (
+                                      <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${
+                                        entry.status_label === 'working'      ? 'bg-green-500'  :
+                                        entry.status_label === 'lunch'        ? 'bg-amber-500'  :
+                                        entry.status_label === 'material_run' ? 'bg-violet-500' :
+                                        entry.status_label === 'waiting'      ? 'bg-orange-500' :
+                                        entry.status_label === 'traveling'    ? 'bg-sky-500'    : 'bg-gray-400'
+                                      }`} />
+                                    )}
+                                    <p className="text-xs font-semibold text-gray-800 capitalize">
+                                      {entry.status_label?.replace('_', ' ')}
+                                    </p>
+                                  </div>
+                                  {loc && <p className="text-xs text-gray-400 truncate pl-3.5">{loc}</p>}
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="text-xs text-gray-500">
+                                    {format(new Date(entry.start_time), 'h:mm a')}
+                                    {' → '}
+                                    {entry.end_time
+                                      ? format(new Date(entry.end_time), 'h:mm a')
+                                      : <span className="text-brand-500 font-medium">{t('home.now')}</span>
+                                    }
+                                  </p>
+                                  <p className="text-xs font-bold text-gray-700 mt-0.5">
+                                    {formatDur(entry.start_time, entry.end_time)}
+                                  </p>
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-xs text-gray-500">
-                            {format(new Date(entry.start_time), 'h:mm a')}
-                            {' → '}
-                            {entry.end_time
-                              ? format(new Date(entry.end_time), 'h:mm a')
-                              : <span className="text-brand-500 font-medium">{t('home.now')}</span>
-                            }
-                          </p>
-                          <p className="text-xs font-bold text-gray-700 mt-0.5">
-                            {formatDur(entry.start_time, entry.end_time)}
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  })}
+                    }
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            )
+          })()}
         </div>
       </div>
 

@@ -80,7 +80,7 @@ export default function AdminLayout() {
           <p className="text-brand-400 text-xs font-bold mt-2 tracking-widest uppercase">{t('nav.fieldclock')}</p>
         </div>
         <div className="px-5 py-2.5 border-b border-brand-700/40">
-          <p className="text-brand-100/90 text-sm font-semibold">{user?.name}</p>
+          <p className="text-brand-100 text-sm font-semibold">{t('home.welcome', { name: user?.name?.split(' ')[0] })}</p>
           <p className="text-brand-400/60 text-xs">{t('role.admin')}</p>
         </div>
         <nav className="flex-1 py-3 overflow-y-auto">

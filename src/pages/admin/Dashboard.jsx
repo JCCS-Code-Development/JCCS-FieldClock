@@ -107,6 +107,7 @@ export default function AdminDashboard() {
   return (
     <div className="flex flex-col gap-4 w-full">
       <div>
+        <p className="text-base font-semibold text-brand-500 mb-0.5">{t('home.welcome', { name: user?.name?.split(' ')[0] })}</p>
         <h1 className="text-xl lg:text-2xl font-bold text-gray-900">{t('nav.dashboard')}</h1>
         <p className="text-sm text-gray-500 mt-0.5">{t('dashboard.overview')}</p>
       </div>
