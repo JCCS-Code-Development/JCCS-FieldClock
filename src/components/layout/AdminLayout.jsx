@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import OfflineBanner from '../OfflineBanner'
+import PullToRefresh from '../ui/PullToRefresh'
 import LangSwitcher from '../ui/LangSwitcher'
 import { useAuthStore } from '../../store/authStore'
 import { logout as logoutAPI } from '../../api/auth'
@@ -101,8 +102,8 @@ export default function AdminLayout() {
       <div className="flex-1 flex flex-col min-w-0 lg:ml-60 overflow-hidden">
         <OfflineBanner />
 
-        {/* Mobile top bar */}
-        <header className="lg:hidden bg-brand-900 text-white flex items-center justify-between px-4 py-3 sticky top-0 z-30">
+        {/* Mobile top bar — fixed so it never moves on iOS overscroll */}
+        <header className="lg:hidden bg-brand-900 text-white flex items-center justify-between px-4 py-3 fixed top-0 inset-x-0 z-30">
           <img src="/jccs-logo.jpg" alt="JCCS" className="h-7 w-auto"
             style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
           <div className="flex items-center gap-3">
@@ -114,12 +115,15 @@ export default function AdminLayout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-4 pt-4 pb-24 lg:p-6 w-full"
+        {/* Spacer below fixed header (mobile only) */}
+        <div className="lg:hidden h-[52px] shrink-0" />
+
+        <PullToRefresh className="flex-1 px-4 pt-4 lg:p-6 w-full"
           style={{ paddingBottom: 'max(96px, calc(64px + env(safe-area-inset-bottom)))' }}>
           <div className="max-w-7xl mx-auto w-full">
             <Outlet />
           </div>
-        </main>
+        </PullToRefresh>
 
         {/* ── Mobile bottom nav ────────────────────────────── */}
         <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-100 flex z-40"

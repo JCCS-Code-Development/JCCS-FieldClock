@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../store/authStore'
 import { logout as logoutAPI } from '../../api/auth'
 import OfflineBanner from '../OfflineBanner'
+import PullToRefresh from '../ui/PullToRefresh'
 import PendingContractorDocsBanner from '../PendingContractorDocsBanner'
 import LangSwitcher from '../ui/LangSwitcher'
 
@@ -76,8 +77,8 @@ export default function ContractorLayout() {
       <div className="flex-1 flex flex-col min-w-0 lg:ml-60 overflow-hidden">
         <OfflineBanner />
 
-        {/* Mobile top bar */}
-        <header className="lg:hidden bg-brand-900 text-white flex items-center justify-between px-4 py-3 sticky top-0 z-30">
+        {/* Mobile top bar — fixed so it never moves on iOS overscroll */}
+        <header className="lg:hidden bg-brand-900 text-white flex items-center justify-between px-4 py-3 fixed top-0 inset-x-0 z-30">
           <img src="/jccs-logo.jpg" alt="JCCS" className="h-7 w-auto"
             style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
           <div className="flex items-center gap-3">
@@ -90,12 +91,15 @@ export default function ContractorLayout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 w-full"
+        {/* Spacer below fixed header (mobile only) */}
+        <div className="lg:hidden h-[52px] shrink-0" />
+
+        <PullToRefresh className="flex-1 p-4 lg:p-6 w-full"
           style={{ paddingBottom: 'max(96px, calc(64px + env(safe-area-inset-bottom)))' }}>
           <div className="max-w-4xl mx-auto w-full">
             <Outlet />
           </div>
-        </main>
+        </PullToRefresh>
 
         {/* Document reminder — sits just above the bottom nav */}
         <PendingContractorDocsBanner />
