@@ -133,7 +133,7 @@ function EarningsStatement({ emp, periodStart, periodEnd, checkDate, gas, bonus,
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
         <thead>
           <tr>
-            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>{isW2 ? 'Employee' : 'Contractor'}</th>
+            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>{isW2 ? 'Employee' : '1099 Employee'}</th>
             <th style={{ ...esH({ width: '16%' }) }}>Pay Date</th>
             <th style={{ ...esH({ width: '30%' }) }}>Pay Period</th>
             <th style={{ ...esH({ width: '16%' }) }}>Pay Schedule</th>
@@ -143,7 +143,7 @@ function EarningsStatement({ emp, periodStart, periodEnd, checkDate, gas, bonus,
           <tr>
             <td style={{ ...esC({ textAlign: 'left', verticalAlign: 'top', padding: '5pt 6pt' }) }}>
               <p style={{ margin: 0, fontWeight: 700, fontSize: '9pt', color: ES.accent }}>{emp.name}</p>
-              <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>{isW2 ? 'W-2 Employee' : '1099 Contractor'}</p>
+              <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>{isW2 ? 'W-2 Employee' : '1099 Employee'}</p>
             </td>
             <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{checkDate}</td>
             <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{fmtPeriod}</td>
@@ -224,7 +224,7 @@ function FlatRateEarningsStatement({ fr, checkDate, periodStart, periodEnd }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
         <thead>
           <tr>
-            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>Contractor</th>
+            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>1099 Employee</th>
             <th style={{ ...esH({ width: '16%' }) }}>Pay Date</th>
             <th style={{ ...esH({ width: '30%' }) }}>Pay Period</th>
             <th style={{ ...esH({ width: '16%' }) }}>Pay Schedule</th>
@@ -234,7 +234,7 @@ function FlatRateEarningsStatement({ fr, checkDate, periodStart, periodEnd }) {
           <tr>
             <td style={{ ...esC({ textAlign: 'left', verticalAlign: 'top', padding: '5pt 6pt' }) }}>
               <p style={{ margin: 0, fontWeight: 700, fontSize: '9pt', color: ES.accent }}>{fr.user_name}</p>
-              <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>1099 Contractor</p>
+              <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>1099 Employee</p>
             </td>
             <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{checkDate}</td>
             <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{fmtPeriod}</td>
@@ -296,7 +296,7 @@ function FlatRateCheckPage({ fr, today, periodStart, periodEnd, checkNum }) {
         height: `${SEC.stub - SEC.check}in`, background: 'rgba(16,185,129,0.04)', pointerEvents: 'none',
       }}>
         <span style={{ position: 'absolute', top: 18, left: 10, fontSize: 8, color: '#6ee7b7', fontFamily: 'sans-serif', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-          Employee Copy — Flat Rate
+          Employee Copy — 1099 Employee
         </span>
       </div>
       <div className="no-print" style={{
