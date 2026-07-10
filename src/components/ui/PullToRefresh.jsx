@@ -29,8 +29,12 @@ export default function PullToRefresh({ children, className = '', style, onRefre
       setRefreshing(true)
       setPullY(0)
       setTimeout(() => {
-        if (onRefresh) { onRefresh(); setRefreshing(false) }
-        else window.location.reload()
+        if (onRefresh) {
+          onRefresh()
+          setTimeout(() => setRefreshing(false), 400)
+        } else {
+          window.location.reload()
+        }
       }, 900)
     } else {
       setPullY(0)

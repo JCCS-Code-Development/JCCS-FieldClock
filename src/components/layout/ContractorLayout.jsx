@@ -100,6 +100,7 @@ export default function ContractorLayout() {
           onRefresh={() => setRefreshKey(k => k + 1)}>
           <div key={refreshKey} className="max-w-4xl mx-auto w-full">
             <Outlet />
+            <div className="lg:hidden h-24 shrink-0" />
           </div>
         </PullToRefresh>
 

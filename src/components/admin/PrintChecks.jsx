@@ -28,13 +28,13 @@ function amountToWords(amount) {
 }
 
 // ── Check field positions ─────────────────────────────────────────────────
-// Calibrated from Cheque_Luz_Hernandez_Y2026_W27.pptx
-// Slide = 7.5"×10" (letter, 0.5" margins). @page margin:0 → add 0.5" to all slide coords.
+// Calibrated to Contractor_Check_Template.key / Employee_1099_Check_Template.key
 // Positions are from the physical paper edge (top-left corner).
 const CHECK = {
-  date:     { top: '1.104in', right: '0.771in' },  // date field — right edge at 7.729" from left
+  date:     { top: '1.104in', right: '0.771in' },  // date field
+  checkNum: { top: '1.38in',  right: '0.771in' },  // check number, below date
   payTo:    { top: '1.615in', left:  '1.312in' },  // "Pay to the order of" name line
-  dollarAmt:{ top: '1.594in', right: '0.771in' },  // $ amount box — same right alignment as date
+  dollarAmt:{ top: '1.594in', right: '0.771in' },  // $ amount box
   words:    { top: '1.885in', left:  '1.312in' },  // written-out amount line
   memo:     { top: '2.500in', left:  '1.417in' },  // memo / for line
 }
@@ -61,13 +61,13 @@ function CutLine({ topIn, label }) {
   )
 }
 
-// ── Earnings Statement styles ─────────────────────────────────────────────
+// ── Earnings Statement styles — matches Check_Templates color scheme ──────
 const ES = {
-  headerBg:  '#b5a642',
+  headerBg:  '#6b7fa5',   // steel blue from Keynote template
   headerTxt: '#ffffff',
-  accent:    '#7a6920',
-  border:    '#c8b870',
-  footerBg:  '#f0e9d0',
+  accent:    '#4a5f82',   // darker blue for text accents
+  border:    '#a8bad0',   // light blue-gray border
+  footerBg:  '#eef1f6',   // very light blue-gray footer background
   font:      'Arial, "Helvetica Neue", sans-serif',
 }
 const esH = (extra = {}) => ({
@@ -136,11 +136,11 @@ function EarningsStatement({ emp, periodStart, periodEnd, checkDate, checkNum, g
         </div>
       </div>
 
-      {/* Employee info table */}
+      {/* Employee / Contractor info table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
         <thead>
           <tr>
-            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>Employee Information</th>
+            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>{isW2 ? 'Employee' : 'Contractor'}</th>
             <th style={{ ...esH({ width: '16%' }) }}>Pay Date</th>
             <th style={{ ...esH({ width: '30%' }) }}>Pay Period</th>
             <th style={{ ...esH({ width: '16%' }) }}>Pay Schedule</th>
@@ -245,10 +245,10 @@ function FlatRateEarningsStatement({ fr, checkDate, checkNum, periodStart, perio
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
         <thead>
           <tr>
-            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>Payee Information</th>
+            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>Contractor</th>
             <th style={{ ...esH({ width: '16%' }) }}>Pay Date</th>
             <th style={{ ...esH({ width: '30%' }) }}>Pay Period</th>
-            <th style={{ ...esH({ width: '16%' }) }}>Type</th>
+            <th style={{ ...esH({ width: '16%' }) }}>Pay Schedule</th>
           </tr>
         </thead>
         <tbody>
@@ -259,7 +259,7 @@ function FlatRateEarningsStatement({ fr, checkDate, checkNum, periodStart, perio
             </td>
             <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{checkDate}</td>
             <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{fmtPeriod}</td>
-            <td style={{ ...esC({ textAlign: 'center', fontWeight: 700 }) }}>Flat Rate</td>
+            <td style={{ ...esC({ textAlign: 'center', fontWeight: 700 }) }}>Weekly</td>
           </tr>
         </tbody>
       </table>
@@ -334,6 +334,7 @@ function FlatRateCheckPage({ fr, today, periodStart, periodEnd, checkNum }) {
 
       {/* Check fields */}
       <div style={{ position: 'absolute', top: CHECK.date.top, right: CHECK.date.right, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{today}</div>
+      {checkNum && <div style={{ position: 'absolute', top: CHECK.checkNum.top, right: CHECK.checkNum.right, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000' }}>{checkNum}</div>}
       <div style={{ position: 'absolute', top: CHECK.payTo.top, left: CHECK.payTo.left, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 600, color: '#000', maxWidth: '4.7in', overflow: 'hidden', whiteSpace: 'nowrap' }}>{fr.user_name}</div>
       <div style={{ position: 'absolute', top: CHECK.dollarAmt.top, right: CHECK.dollarAmt.right, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000', letterSpacing: '0.04em' }}>{formatCurrency(amount).replace('$', '')}</div>
       <div style={{ position: 'absolute', top: CHECK.words.top, left: CHECK.words.left, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000', maxWidth: '6.1in', overflow: 'hidden', whiteSpace: 'nowrap' }}>{amountToWords(amount)}</div>
@@ -373,10 +374,9 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
     return () => document.getElementById('print-checks-css')?.remove()
   }, [])
 
-  const [checkNums, setCheckNums]       = useState({})
-  const [regOpen, setRegOpen]           = useState(false)
-  const [regSaving, setRegSaving]       = useState(false)
-  const [regStatus, setRegStatus]       = useState(null) // null | 'saved' | 'error'
+  const [checkNums, setCheckNums] = useState({})
+  const [regSaving, setRegSaving] = useState(false)
+  const [regStatus, setRegStatus] = useState(null) // null | 'saved' | 'error'
 
   // Default check date to the Friday of the pay period week (period.end is Sunday → subtract 2 days)
   const defaultFriday = (() => {
@@ -389,24 +389,31 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
 
   const today      = (() => { try { return format(new Date(checkDateISO + 'T12:00'), 'MM/dd/yyyy') } catch { return checkDateISO } })()
   const issuedDate = checkDateISO
-  const periodLabel = (() => {
-    try {
-      return `${format(new Date(period.start + 'T12:00'), 'MM/dd/yyyy')} – ${format(new Date(period.end + 'T12:00'), 'MM/dd/yyyy')}`
-    } catch { return period.label }
-  })()
-  const totalChecks = employees.length + flatRatePayments.length
 
-  // Flat list of all checks for the registration panel
+  // Flat list of all payees
   const allPayees = [
     ...employees.map(e => ({ key: `u-${e.user_id}`, name: e.name, amount: e.estimated_total ?? 0, user_id: e.user_id })),
     ...flatRatePayments.map(fr => ({ key: `fr-${fr.id}`, name: fr.user_name, amount: parseFloat(fr.amount), user_id: null })),
   ]
 
+  // Selection — all checked by default
+  const [selected, setSelected] = useState(() => new Set(allPayees.map(p => p.key)))
+  const toggleSelect = (key) => setSelected(prev => {
+    const next = new Set(prev)
+    next.has(key) ? next.delete(key) : next.add(key)
+    return next
+  })
+  const allSelected  = selected.size === allPayees.length
+  const noneSelected = selected.size === 0
+
+  const selectedPayees = allPayees.filter(p => selected.has(p.key))
+  const selectedCount  = selectedPayees.length
+
   const handleRegister = async () => {
     setRegSaving(true)
     setRegStatus(null)
     try {
-      const toSave = allPayees
+      const toSave = selectedPayees
         .filter(p => checkNums[p.key]?.trim())
         .map(p => ({
           check_number:     checkNums[p.key].trim(),
@@ -436,15 +443,14 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
         position: 'sticky', top: 0, zIndex: 20,
         background: '#0f172a', color: '#f8fafc',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 24px', gap: 16,
+        padding: '12px 24px', gap: 16, flexWrap: 'wrap',
       }}>
         <div>
           <p style={{ fontWeight: 600, fontSize: '14px', margin: 0 }}>
             Print Checks — {period.label}
           </p>
           <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0' }}>
-            {totalChecks} check{totalChecks !== 1 ? 's' : ''}&ensp;·&ensp;Load check stock before printing
-            {flatRatePayments.length > 0 && employees.length > 0 && ` (${employees.length} hourly + ${flatRatePayments.length} flat rate)`}
+            {selectedCount} of {allPayees.length} selected&ensp;·&ensp;Load check stock before printing
           </p>
         </div>
 
@@ -472,11 +478,14 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
           }}>
             ← Back
           </button>
-          <button onClick={() => window.print()} style={{
-            padding: '8px 20px', borderRadius: 8, background: '#6366f1',
-            color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13,
+          <button onClick={() => window.print()} disabled={noneSelected} style={{
+            padding: '8px 20px', borderRadius: 8,
+            background: noneSelected ? '#374151' : '#6366f1',
+            color: noneSelected ? '#6b7280' : '#fff',
+            border: 'none', cursor: noneSelected ? 'not-allowed' : 'pointer',
+            fontWeight: 600, fontSize: 13,
           }}>
-            Print All ({totalChecks})
+            Print Selected ({selectedCount})
           </button>
         </div>
       </div>
@@ -485,99 +494,112 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
       <div className="no-print" style={{
         background: '#fef3c7', borderBottom: '1px solid #fde68a',
         padding: '7px 24px', fontSize: '11.5px', color: '#92400e',
-        display: 'flex', gap: 20, flexWrap: 'wrap',
       }}>
-        <span><strong>Sections:</strong> Check stock (top) · Employee copy (middle) · Employer copy (bottom)</span>
-        <span>To fine-tune field placement, edit the <code style={{ background: '#fde68a', padding: '0 3px', borderRadius: 3 }}>CHECK</code> constants in <code style={{ background: '#fde68a', padding: '0 3px', borderRadius: 3 }}>PrintChecks.jsx</code></span>
+        <strong>Sections:</strong> Check stock (top) · Employee/Contractor copy (middle) · Employer copy (bottom)
       </div>
 
-      {/* ── Check number registration panel ─────────────────────── */}
-      <div className="no-print" style={{ background: '#1e293b', borderBottom: '1px solid #334155', padding: '0 24px' }}>
-        <button
-          onClick={() => { setRegOpen(o => !o); setRegStatus(null) }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '10px 0', width: '100%', background: 'none', border: 'none',
-            color: '#cbd5e1', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-          }}>
-          <span style={{ fontSize: 16 }}>{regOpen ? '▾' : '▸'}</span>
-          Register Check Numbers
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#64748b', fontWeight: 400 }}>
-            Enter physical check numbers to track in the registry
+      {/* ── Selection + check number panel (always open) ────────── */}
+      <div className="no-print" style={{ background: '#1e293b', borderBottom: '1px solid #334155', padding: '12px 24px 16px' }}>
+
+        {/* Panel header + select all/none */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Select Checks to Print
           </span>
-        </button>
-
-        {regOpen && (
-          <div style={{ paddingBottom: 16 }}>
-            {/* Column headers */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: '1fr auto 140px',
-              gap: 8, marginBottom: 6, padding: '0 2px',
-            }}>
-              <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Payee</span>
-              <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Amount</span>
-              <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 4 }}>Check #</span>
-            </div>
-
-            {allPayees.map(p => (
-              <div key={p.key} style={{
-                display: 'grid', gridTemplateColumns: '1fr auto 140px',
-                gap: 8, alignItems: 'center', marginBottom: 6,
-              }}>
-                <span style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {p.name}
-                </span>
-                <span style={{ fontSize: 12, color: '#94a3b8', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  {formatCurrency(p.amount)}
-                </span>
-                <input
-                  type="text"
-                  value={checkNums[p.key] ?? ''}
-                  onChange={e => setCheckNums(prev => ({ ...prev, [p.key]: e.target.value }))}
-                  placeholder="e.g. 1042"
-                  style={{
-                    background: '#0f172a', border: '1px solid #334155', borderRadius: 6,
-                    padding: '5px 10px', fontSize: 13, color: '#f1f5f9',
-                    outline: 'none', width: '100%', boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-            ))}
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-              <button
-                onClick={handleRegister}
-                disabled={regSaving || !allPayees.some(p => checkNums[p.key]?.trim())}
-                style={{
-                  padding: '8px 20px', borderRadius: 8,
-                  background: regStatus === 'saved' ? '#16a34a' : '#6366f1',
-                  color: '#fff', border: 'none', cursor: 'pointer',
-                  fontWeight: 600, fontSize: 13, opacity: regSaving ? 0.7 : 1,
-                  transition: 'background 0.2s',
-                }}>
-                {regSaving ? 'Saving…' : regStatus === 'saved' ? '✓ Saved to Registry' : 'Save to Registry'}
-              </button>
-              {regStatus === 'error' && (
-                <span style={{ fontSize: 12, color: '#f87171' }}>Failed — check for duplicate check numbers</span>
-              )}
-              {regStatus === 'saved' && (
-                <span style={{ fontSize: 12, color: '#4ade80' }}>Check numbers saved. View in Check Registry.</span>
-              )}
-            </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button onClick={() => setSelected(new Set(allPayees.map(p => p.key)))}
+              disabled={allSelected}
+              style={{ fontSize: 12, color: allSelected ? '#475569' : '#818cf8', background: 'none', border: 'none', cursor: allSelected ? 'default' : 'pointer', padding: 0, fontWeight: 600 }}>
+              Select All
+            </button>
+            <button onClick={() => setSelected(new Set())}
+              disabled={noneSelected}
+              style={{ fontSize: 12, color: noneSelected ? '#475569' : '#f87171', background: 'none', border: 'none', cursor: noneSelected ? 'default' : 'pointer', padding: 0, fontWeight: 600 }}>
+              Deselect All
+            </button>
           </div>
-        )}
+        </div>
+
+        {/* Column headers */}
+        <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr auto 150px', gap: 10, marginBottom: 6, padding: '0 2px' }}>
+          <span />
+          <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Payee</span>
+          <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Amount</span>
+          <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 6 }}>Check #</span>
+        </div>
+
+        {/* Payee rows */}
+        {allPayees.map(p => {
+          const isSelected = selected.has(p.key)
+          return (
+            <div key={p.key} style={{
+              display: 'grid', gridTemplateColumns: '20px 1fr auto 150px',
+              gap: 10, alignItems: 'center', marginBottom: 7,
+              opacity: isSelected ? 1 : 0.4, transition: 'opacity 0.15s',
+            }}>
+              {/* Checkbox */}
+              <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(p.key)}
+                style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#6366f1' }} />
+              <span style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {p.name}
+              </span>
+              <span style={{ fontSize: 12, color: '#94a3b8', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                {formatCurrency(p.amount)}
+              </span>
+              <input
+                type="text"
+                value={checkNums[p.key] ?? ''}
+                onChange={e => { setCheckNums(prev => ({ ...prev, [p.key]: e.target.value })); setRegStatus(null) }}
+                placeholder="Check #"
+                disabled={!isSelected}
+                style={{
+                  background: isSelected ? '#0f172a' : '#1e293b',
+                  border: `1px solid ${isSelected ? '#4f46e5' : '#1e293b'}`,
+                  borderRadius: 6, padding: '5px 10px', fontSize: 13, color: '#f1f5f9',
+                  outline: 'none', width: '100%', boxSizing: 'border-box',
+                  cursor: isSelected ? 'text' : 'not-allowed',
+                }}
+              />
+            </div>
+          )
+        })}
+
+        {/* Save to registry footer */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 10, borderTop: '1px solid #334155' }}>
+          <button
+            onClick={handleRegister}
+            disabled={regSaving || !selectedPayees.some(p => checkNums[p.key]?.trim())}
+            style={{
+              padding: '8px 20px', borderRadius: 8,
+              background: regStatus === 'saved' ? '#16a34a' : '#6366f1',
+              color: '#fff', border: 'none', cursor: 'pointer',
+              fontWeight: 600, fontSize: 13, opacity: regSaving ? 0.7 : 1,
+              transition: 'background 0.2s',
+            }}>
+            {regSaving ? 'Saving…' : regStatus === 'saved' ? '✓ Saved to Registry' : 'Save to Registry'}
+          </button>
+          <span style={{ fontSize: 11, color: '#64748b' }}>
+            Saves check numbers for selected payees who have a check # entered
+          </span>
+          {regStatus === 'error' && (
+            <span style={{ fontSize: 12, color: '#f87171' }}>Failed — check for duplicate check numbers</span>
+          )}
+          {regStatus === 'saved' && (
+            <span style={{ fontSize: 12, color: '#4ade80' }}>Saved. View in Check Registry.</span>
+          )}
+        </div>
       </div>
 
       {/* ── Check pages ──────────────────────────────────────────── */}
       <div style={{ padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 44, alignItems: 'center' }}>
 
-        {totalChecks === 0 && (
+        {noneSelected && (
           <p style={{ color: '#6b7280', padding: '80px 0', fontSize: 14 }}>
-            No checks to print for this period.
+            No checks selected — check at least one payee above to preview.
           </p>
         )}
 
-        {employees.map((emp) => {
+        {employees.filter(emp => selected.has(`u-${emp.user_id}`)).map((emp) => {
           const gas     = gasByUser[emp.user_id]      ?? 0
           const bonus   = bonusByUser[emp.user_id]    ?? 0
           const loanDed = loanDeductions[emp.user_id] ?? 0
@@ -630,6 +652,14 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
                 position: 'absolute', top: CHECK.date.top, right: CHECK.date.right,
                 fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
               }}>{today}</div>
+
+              {/* Check number (below date) */}
+              {checkNums[`u-${emp.user_id}`] && (
+                <div style={{
+                  position: 'absolute', top: CHECK.checkNum.top, right: CHECK.checkNum.right,
+                  fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 700, color: '#000',
+                }}>{checkNums[`u-${emp.user_id}`]}</div>
+              )}
 
               {/* Pay To name */}
               <div style={{
@@ -694,7 +724,7 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
         })}
 
         {/* Flat rate check pages */}
-        {flatRatePayments.map((fr) => (
+        {flatRatePayments.filter(fr => selected.has(`fr-${fr.id}`)).map((fr) => (
           <FlatRateCheckPage key={`fr-${fr.id}`} fr={fr} today={today}
             periodStart={period.start} periodEnd={period.end}
             checkNum={checkNums[`fr-${fr.id}`] ?? ''} />

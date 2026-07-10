@@ -124,6 +124,7 @@ export default function AdminLayout() {
           onRefresh={() => setRefreshKey(k => k + 1)}>
           <div key={refreshKey} className="max-w-7xl mx-auto w-full">
             <Outlet />
+            <div className="lg:hidden h-24 shrink-0" />
           </div>
         </PullToRefresh>
 

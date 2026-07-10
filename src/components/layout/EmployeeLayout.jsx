@@ -132,6 +132,7 @@ export default function EmployeeLayout() {
           onRefresh={() => setRefreshKey(k => k + 1)}>
           <div key={refreshKey} className="max-w-4xl mx-auto w-full flex-1 flex flex-col p-4 lg:p-6">
             <Outlet />
+            <div className="lg:hidden h-24 shrink-0" />
           </div>
         </PullToRefresh>
 
