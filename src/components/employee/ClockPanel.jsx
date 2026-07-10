@@ -541,7 +541,7 @@ export default function ClockPanel() {
             <div className="absolute inset-0 bg-black/50" />
             <div className="relative bg-white rounded-t-3xl overflow-hidden" onClick={ev => ev.stopPropagation()}>
               <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-gray-300" /></div>
-              <div className="px-5 pt-3 pb-6 flex flex-col gap-4">
+              <div className="px-5 pt-3 pb-3 flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold ${cfg.bg} ${cfg.text}`}>
                     <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
