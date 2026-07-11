@@ -337,6 +337,14 @@ export default function AdminPayroll() {
   // ── Derived ──────────────────────────────────────────────────────
   const filtered  = summary.filter((e) => e.pay_type === tab)
   const adjTotal  = adjustments.reduce((s, a) => s + parseFloat(a.amount ?? 0), 0)
+
+  // W-2 employees with gas/bonus appear in the 1099 tab as additional check entries
+  const w2ExtraRows = tab === '1099'
+    ? summary
+        .filter(e => e.pay_type === 'w2')
+        .map(e => ({ ...e, _gas: gasByUser[e.user_id] ?? 0, _bonus: bonusByUser[e.user_id] ?? 0 }))
+        .filter(e => e._gas + e._bonus > 0)
+    : []
   const pendingInvCount = contractorInvs.filter((i) => i.status === 'submitted').length
 
   // Per-employee breakdown from adjustments list
@@ -453,6 +461,30 @@ export default function AdminPayroll() {
                     </button>
                   )
                 })}
+                {/* W-2 additional entries (gas/bonus) — shown in 1099 tab only */}
+                {w2ExtraRows.length > 0 && (
+                  <div className="border-t border-amber-100 bg-amber-50/30">
+                    <p className="px-4 pt-2 pb-1 text-xs font-semibold text-amber-700 uppercase tracking-wide">W-2 Additional (Gas / Bonus)</p>
+                    {w2ExtraRows.map(e => (
+                      <div key={`w2x-${e.user_id}`} className="flex items-center gap-3 px-4 py-3 border-t border-amber-100/50">
+                        <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 font-bold text-sm flex items-center justify-center shrink-0">
+                          {e.name?.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{e.name}</p>
+                            <span className="text-xs bg-indigo-50 text-indigo-500 font-semibold px-1.5 py-0.5 rounded shrink-0">W-2</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {e._gas   > 0 && <span className="text-xs text-amber-600 font-medium">+{formatCurrency(e._gas)} gas</span>}
+                            {e._bonus > 0 && <span className="text-xs text-green-600 font-medium">+{formatCurrency(e._bonus)} bonus</span>}
+                          </div>
+                        </div>
+                        <p className="font-bold text-gray-900 shrink-0">{formatCurrency(e._gas + e._bonus)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {filtered.length > 0 && (
                   <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
                     <span className="text-sm font-semibold text-gray-700">Totals</span>
@@ -513,6 +545,36 @@ export default function AdminPayroll() {
                         </tr>
                       )
                     })}
+                    {/* W-2 additional entries (gas/bonus) — shown in 1099 tab only */}
+                    {w2ExtraRows.length > 0 && (
+                      <>
+                        <tr>
+                          <td colSpan={7} className="px-5 py-2 bg-amber-50 text-xs font-semibold text-amber-700 uppercase tracking-wide border-t-2 border-amber-100">
+                            W-2 Additional (Gas / Bonus)
+                          </td>
+                        </tr>
+                        {w2ExtraRows.map(e => (
+                          <tr key={`w2x-${e.user_id}`} className="border-b border-amber-100/60 bg-amber-50/20">
+                            <td className="px-5 py-3 font-medium text-gray-900">
+                              <div className="flex items-center gap-2">
+                                {e.name}
+                                <span className="text-xs bg-indigo-50 text-indigo-500 font-semibold px-1.5 py-0.5 rounded">W-2</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-300">—</td>
+                            <td className="px-4 py-3 text-right text-gray-300">—</td>
+                            <td className="px-4 py-3 text-right text-amber-600 font-medium">
+                              {e._gas > 0 ? formatCurrency(e._gas) : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-300">—</td>
+                            <td className="px-4 py-3 text-right text-green-600 font-medium">
+                              {e._bonus > 0 ? formatCurrency(e._bonus) : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-5 py-3 text-right font-bold text-gray-900">{formatCurrency(e._gas + e._bonus)}</td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
                     {filtered.length > 0 && (
                       <tr className="bg-gray-50 font-semibold text-sm">
                         <td className="px-5 py-3 text-gray-700">Totals</td>
@@ -583,87 +645,6 @@ export default function AdminPayroll() {
             )}
           </div>
 
-          {/* ── W-2 Additional Checks (gas/bonus) — visible on 1099 tab only ── */}
-          {tab === '1099' && (() => {
-            const w2Extras = summary
-              .filter(e => e.pay_type === 'w2')
-              .map(e => ({ ...e, gas: gasByUser[e.user_id] ?? 0, bonus: bonusByUser[e.user_id] ?? 0 }))
-              .filter(e => e.gas + e.bonus > 0)
-            if (w2Extras.length === 0) return null
-            const extrasTotal = w2Extras.reduce((s, e) => s + e.gas + e.bonus, 0)
-            return (
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mt-4">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">W-2 Additional Checks</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">Gas &amp; bonus for W-2 employees — printed as 1099 checks</p>
-                  </div>
-                  <span className="text-sm font-semibold text-amber-600">{formatCurrency(extrasTotal)} total</span>
-                </div>
-
-                {/* Mobile */}
-                <div className="md:hidden divide-y divide-gray-50">
-                  {w2Extras.map(e => (
-                    <div key={e.user_id} className="flex items-center gap-3 px-4 py-3.5">
-                      <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 font-bold text-sm flex items-center justify-center shrink-0">
-                        {e.name?.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className="font-semibold text-gray-900 text-sm truncate">{e.name}</p>
-                          <span className="text-xs bg-indigo-50 text-indigo-500 font-semibold px-1.5 py-0.5 rounded shrink-0">W-2</span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          {e.gas   > 0 && <span className="text-xs text-amber-600 font-medium">Gas {formatCurrency(e.gas)}</span>}
-                          {e.bonus > 0 && <span className="text-xs text-green-600 font-medium">Bonus {formatCurrency(e.bonus)}</span>}
-                        </div>
-                      </div>
-                      <p className="font-bold text-gray-900 shrink-0">{formatCurrency(e.gas + e.bonus)}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Desktop */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        <th className="text-left px-5 py-3">Employee</th>
-                        <th className="text-right px-4 py-3 text-amber-600">Gas</th>
-                        <th className="text-right px-4 py-3 text-green-600">Bonus</th>
-                        <th className="text-right px-5 py-3">Check Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {w2Extras.map(e => (
-                        <tr key={e.user_id} className="border-b border-gray-50">
-                          <td className="px-5 py-3 font-medium text-gray-900">
-                            <div className="flex items-center gap-2">
-                              {e.name}
-                              <span className="text-xs bg-indigo-50 text-indigo-500 font-semibold px-1.5 py-0.5 rounded">W-2</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-right text-amber-600 font-medium">
-                            {e.gas > 0 ? formatCurrency(e.gas) : <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-right text-green-600 font-medium">
-                            {e.bonus > 0 ? formatCurrency(e.bonus) : <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-5 py-3 text-right font-bold text-gray-900">{formatCurrency(e.gas + e.bonus)}</td>
-                        </tr>
-                      ))}
-                      <tr className="bg-gray-50 font-semibold text-sm">
-                        <td className="px-5 py-3 text-gray-700">Totals</td>
-                        <td className="px-4 py-3 text-right text-amber-600">{formatCurrency(w2Extras.reduce((s, e) => s + e.gas, 0))}</td>
-                        <td className="px-4 py-3 text-right text-green-600">{formatCurrency(w2Extras.reduce((s, e) => s + e.bonus, 0))}</td>
-                        <td className="px-5 py-3 text-right text-brand-500">{formatCurrency(extrasTotal)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )
-          })()}
         </>
       )}
 
