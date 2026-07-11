@@ -337,14 +337,6 @@ export default function AdminPayroll() {
   // ── Derived ──────────────────────────────────────────────────────
   const filtered  = summary.filter((e) => e.pay_type === tab)
   const adjTotal  = adjustments.reduce((s, a) => s + parseFloat(a.amount ?? 0), 0)
-
-  // W-2 employees with gas/bonus appear in the 1099 tab as additional check entries
-  const w2ExtraRows = tab === '1099'
-    ? summary
-        .filter(e => e.pay_type === 'w2')
-        .map(e => ({ ...e, _gas: gasByUser[e.user_id] ?? 0, _bonus: bonusByUser[e.user_id] ?? 0 }))
-        .filter(e => e._gas + e._bonus > 0)
-    : []
   const pendingInvCount = contractorInvs.filter((i) => i.status === 'submitted').length
 
   // Per-employee breakdown from adjustments list
@@ -355,6 +347,14 @@ export default function AdminPayroll() {
     if (a.type === 'gas_allowance') gasByUser[uid] = (gasByUser[uid] ?? 0) + parseFloat(a.amount ?? 0)
     else bonusByUser[uid] = (bonusByUser[uid] ?? 0) + parseFloat(a.amount ?? 0)
   })
+
+  // W-2 employees with gas/bonus appear in the 1099 tab as additional check entries
+  const w2ExtraRows = tab === '1099'
+    ? summary
+        .filter(e => e.pay_type === 'w2')
+        .map(e => ({ ...e, _gas: gasByUser[e.user_id] ?? 0, _bonus: bonusByUser[e.user_id] ?? 0 }))
+        .filter(e => e._gas + e._bonus > 0)
+    : []
 
   const pendingPcCount = paychecks.filter((p) => p.status === 'processing').length
   const pendingFRCount = flatRatePayments.filter((fr) => fr.status === 'pending').length
