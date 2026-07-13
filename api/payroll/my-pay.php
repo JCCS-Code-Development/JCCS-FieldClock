@@ -43,8 +43,19 @@ $weeksWorked = count($weeks);
 $totalApproved = $approvedMinutes / 60;
 $totalPending  = $pendingMinutes / 60;
 
+// Number of weeks in the requested period (used for salaried employees who don't clock in)
+$weeksInPeriod = max(1, (int) round((strtotime($end) - strtotime($start) + 86400) / (7 * 86400)));
+
+$rate     = (float)($u['pay_rate'] ?? 0);
 $regHours = 0; $otHours = 0;
-if ($u['pay_type'] === 'w2') {
+$isSalary = ($u['pay_structure'] ?? 'hourly') === 'salary';
+
+if ($isSalary) {
+    // Fixed weekly salary — pay_rate is the weekly amount regardless of hours
+    $weeksForPay = $weeksWorked > 0 ? $weeksWorked : $weeksInPeriod;
+    $baseGross   = $rate * $weeksForPay;
+    $weeksWorked = $weeksForPay;
+} elseif ($u['pay_type'] === 'w2') {
     // Recalculate by week for OT
     $weekMins = [];
     foreach ($rows as $r) {
@@ -55,11 +66,9 @@ if ($u['pay_type'] === 'w2') {
     foreach ($weekMins as $m) {
         $h = $m / 60; $regHours += min($h, 40); $otHours += max(0, $h - 40);
     }
-    $rate      = (float)($u['pay_rate'] ?? 0);
     $otRate    = (float)($u['overtime_rate'] ?? $rate * 1.5);
     $baseGross = ($regHours * $rate) + ($otHours * $otRate);
 } else {
-    $rate      = (float)($u['pay_rate'] ?? 0);
     $regHours  = $totalApproved;
     $baseGross = $totalApproved * $rate;
 }

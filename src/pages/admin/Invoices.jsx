@@ -8,10 +8,9 @@ import Input from '../../components/ui/Input'
 import Spinner from '../../components/ui/Spinner'
 import { listInvoices, createInvoice, updateInvoice, deleteInvoice } from '../../api/invoices'
 import { listJobs } from '../../api/jobs'
-import { listWorkOrders } from '../../api/workOrders'
 import { formatCurrency, formatDate } from '../../utils/format'
 
-const EMPTY = { job_id: '', work_order_id: '', amount: '', due_date: '', notes: '' }
+const EMPTY = { job_id: '', amount: '', due_date: '', notes: '' }
 
 const STATUS_FLOW = { draft: 'sent', sent: 'paid', paid: 'paid' }
 const STATUS_LABELS = { draft: 'Mark Sent', sent: 'Mark Paid', paid: 'Paid ✓' }
@@ -19,7 +18,6 @@ const STATUS_LABELS = { draft: 'Mark Sent', sent: 'Mark Paid', paid: 'Paid ✓' 
 export default function AdminInvoices() {
   const [invoices, setInvoices] = useState([])
   const [jobs, setJobs] = useState([])
-  const [workOrders, setWorkOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState(EMPTY)
@@ -33,13 +31,7 @@ export default function AdminInvoices() {
   }
   useEffect(() => { load() }, [])
 
-  const loadWOs = async (jobId) => {
-    if (!jobId) { setWorkOrders([]); return }
-    const d = await listWorkOrders({ job_id: jobId }).catch(() => ({ work_orders: [] }))
-    setWorkOrders(d.work_orders ?? [])
-  }
-
-  const openCreate = () => { setForm(EMPTY); setWorkOrders([]); setModal('create') }
+  const openCreate = () => { setForm(EMPTY); setModal('create') }
 
   const handleSave = async () => {
     setSaving(true)
@@ -56,13 +48,11 @@ export default function AdminInvoices() {
   const set = (k) => (e) => {
     const val = e.target.value
     setForm((f) => ({ ...f, [k]: val }))
-    if (k === 'job_id') loadWOs(val)
   }
 
   const columns = [
     { key: 'invoice_number', label: 'Invoice #', render: (v) => <span className="font-mono text-xs font-semibold">{v}</span> },
     { key: 'job_name', label: 'Job' },
-    { key: 'work_order_title', label: 'Work Order' },
     { key: 'amount', label: 'Amount', render: (v) => formatCurrency(v) },
     { key: 'due_date', label: 'Due', render: (v) => v ? formatDate(v + 'T00:00:00') : '—' },
     { key: 'status', label: 'Status', render: (v) => <Badge variant={v === 'paid' ? 'approved' : v === 'sent' ? 'active' : 'pending'}>{v}</Badge> },
@@ -101,16 +91,6 @@ export default function AdminInvoices() {
               {jobs.map((j) => <option key={j.id} value={j.id}>{j.name} — {j.client_name}</option>)}
             </select>
           </div>
-          {workOrders.length > 0 && (
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">Work Order (optional)</label>
-              <select className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500"
-                value={form.work_order_id} onChange={set('work_order_id')}>
-                <option value="">Entire job</option>
-                {workOrders.map((w) => <option key={w.id} value={w.id}>{w.title}</option>)}
-              </select>
-            </div>
-          )}
           <Input label="Amount ($) *" type="number" inputMode="decimal" value={form.amount} onChange={set('amount')} placeholder="0.00" />
           <Input label="Due Date" type="date" value={form.due_date} onChange={set('due_date')} />
           <div className="flex flex-col gap-1">

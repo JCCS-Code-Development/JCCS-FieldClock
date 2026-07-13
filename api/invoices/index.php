@@ -14,7 +14,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
     $params = [];
-    $sql = 'SELECT i.*, j.name as job_name, wo.title as wo_title FROM invoices i JOIN jobs j ON j.id = i.job_id LEFT JOIN work_orders wo ON wo.id = i.work_order_id WHERE 1=1';
+    $sql = 'SELECT i.*, j.name as job_name FROM invoices i JOIN jobs j ON j.id = i.job_id WHERE 1=1';
     if (isset($_GET['status'])) { $sql .= ' AND i.status = :st'; $params[':st'] = $_GET['status']; }
     if (isset($_GET['job_id'])) { $sql .= ' AND i.job_id = :jid'; $params[':jid'] = (int)$_GET['job_id']; }
     $sql .= ' ORDER BY i.created_at DESC';
@@ -34,10 +34,9 @@ if ($method === 'GET') {
     $num  = "INV-$year-$seq";
 
     $pdo->prepare(
-        'INSERT INTO invoices (job_id, work_order_id, invoice_number, amount, due_date, status, notes) VALUES (?,?,?,?,?,?,?)'
+        'INSERT INTO invoices (job_id, invoice_number, amount, due_date, status, notes) VALUES (?,?,?,?,?,?)'
     )->execute([
         (int)$body['job_id'],
-        $body['work_order_id'] ? (int)$body['work_order_id'] : null,
         $num,
         (float)$body['amount'],
         $body['due_date'],

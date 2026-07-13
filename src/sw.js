@@ -14,7 +14,7 @@ precacheAndRoute(self.__WB_MANIFEST)
 
 // Runtime cache: API reads
 registerRoute(
-  ({ url }) => /\/api\/(?:jobs|employees|work-orders|invoices|reports)\//.test(url.pathname),
+  ({ url }) => /\/api\/(?:jobs|employees|invoices|reports)\//.test(url.pathname),
   new NetworkFirst({
     cacheName: 'api-reads-v1',
     networkTimeoutSeconds: 5,

@@ -48,7 +48,7 @@ if ($auth['role'] === 'admin') {
          FROM time_entries te
          JOIN users u ON u.id = te.user_id
          LEFT JOIN jobs j ON j.id = te.job_id
-         WHERE te.end_time IS NULL AND te.status_label NOT IN ('done', 'day_end')
+         WHERE te.end_time IS NULL AND te.status_label NOT IN (\'done\', \'day_end\')
          ORDER BY u.name'
     )->fetchAll();
     $activeEmployees = $all;

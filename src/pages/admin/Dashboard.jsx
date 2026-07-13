@@ -11,7 +11,6 @@ import { useAuthStore } from '../../store/authStore'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { getPending } from '../../api/approvals'
 import { listJobs } from '../../api/jobs'
-import { getWorkOrderReview } from '../../api/reports'
 
 const STATUS_DOT = {
   working: 'bg-green-500', traveling: 'bg-sky-500', lunch: 'bg-amber-500',
@@ -69,7 +68,7 @@ export default function AdminDashboard() {
   const { t } = useTranslation()
   const { user } = useAuthStore()
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ clockedIn: [], pendingApprovals: 0, activeJobs: 0, pendingReview: 0 })
+  const [stats, setStats] = useState({ clockedIn: [], pendingApprovals: 0, activeJobs: 0 })
   const { setTimeclockData } = useTimeclockStore()
 
   useEffect(() => {
@@ -77,8 +76,7 @@ export default function AdminDashboard() {
       getStatus().catch(() => ({ active_employees: [] })),
       getPending().catch(() => ({ entries: [] })),
       listJobs({ status: 'active' }).catch(() => ({ jobs: [] })),
-      getWorkOrderReview({ review_status: 'pending_review' }).catch(() => ({ work_orders: [] })),
-    ]).then(([status, approvals, jobs, woReview]) => {
+    ]).then(([status, approvals, jobs]) => {
       setTimeclockData({
         statusLabel:  status.statusLabel  ?? null,
         currentEntry: status.currentEntry ?? null,
@@ -89,7 +87,6 @@ export default function AdminDashboard() {
         clockedIn:        status.active_employees ?? [],
         pendingApprovals: approvals.entries?.length ?? 0,
         activeJobs:       jobs.jobs?.length ?? 0,
-        pendingReview:    woReview.work_orders?.length ?? 0,
       })
     }).finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -130,9 +127,6 @@ export default function AdminDashboard() {
         <StatsCard label={t('dashboard.activeJobs')} value={stats.activeJobs} color="blue"
           onClick={() => navigate('/admin/jobs')}
           icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>} />
-        <StatsCard label={t('dashboard.pendingPayroll')} value={stats.pendingReview} color="violet"
-          onClick={() => navigate('/admin/payroll')}
-          icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="2" y="5" width="20" height="14" rx="2"/><path strokeLinecap="round" d="M2 10h20M6 15h4M14 15h4"/></svg>} />
       </div>
 
       {/* Clocked-in employees */}

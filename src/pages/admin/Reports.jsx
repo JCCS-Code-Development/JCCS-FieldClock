@@ -39,7 +39,7 @@ export default function AdminReports() {
         <div>
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Group By</label>
           <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-            {[['job', 'By Job'], ['employee', 'By Employee'], ['work_order', 'By Work Order']].map(([val, label]) => (
+            {[['job', 'By Job'], ['employee', 'By Employee']].map(([val, label]) => (
               <button key={val} onClick={() => setGroupBy(val)}
                 className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${groupBy === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                 {label}

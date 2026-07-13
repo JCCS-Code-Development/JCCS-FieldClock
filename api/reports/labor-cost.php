@@ -14,10 +14,8 @@ $pdo     = getPDO();
 
 $selectCol = match($groupBy) {
     'employee'   => 'u.name as group_label, te.user_id as group_id',
-    'work_order' => 'COALESCE(wo.title, "No WO") as group_label, te.work_order_id as group_id',
     default      => 'COALESCE(j.name, "No Job") as group_label, te.job_id as group_id',
 };
-$joinWO = $groupBy === 'work_order' ? 'LEFT JOIN work_orders wo ON wo.id = te.work_order_id' : '';
 
 $sql = "SELECT $selectCol, te.cost_category,
                SUM(TIMESTAMPDIFF(MINUTE, te.start_time, te.end_time)) / 60.0 as hours,
@@ -25,7 +23,6 @@ $sql = "SELECT $selectCol, te.cost_category,
         FROM time_entries te
         JOIN users u ON u.id = te.user_id
         LEFT JOIN jobs j ON j.id = te.job_id
-        $joinWO
         WHERE DATE(te.start_time) BETWEEN :start AND :end
           AND te.approval_status = 'approved'
           AND te.end_time IS NOT NULL
