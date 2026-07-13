@@ -14,6 +14,7 @@ require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
 require_once __DIR__ . '/../middleware/auth.php';
 require_once __DIR__ . '/../middleware/validate.php';
+require_once __DIR__ . '/_helper.php';
 
 $auth = requireAuth();
 requireAdmin($auth);
@@ -30,10 +31,11 @@ $COST_MAP = [
 
 function fetchEntry(PDO $pdo, int $id): array|false {
     $s = $pdo->prepare(
-        'SELECT te.*, u.name AS user_name, j.name AS job_name
+        'SELECT te.*, u.name AS user_name, j.name AS job_name, je.estimate_number
          FROM time_entries te
          JOIN users u ON u.id = te.user_id
          LEFT JOIN jobs j ON j.id = te.job_id
+         LEFT JOIN job_estimates je ON je.id = te.estimate_id
          WHERE te.id = ?'
     );
     $s->execute([$id]);
@@ -62,6 +64,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $endTime     = !empty($body['end_time']) ? $body['end_time'] : null;
     $jobId       = !empty($body['job_id'])   ? (int)$body['job_id'] : null;
     $notes       = !empty($body['notes'])    ? sanitizeString($body['notes']) : null;
+    $visitType   = !empty($body['visit_type'])  ? trim((string)$body['visit_type']) : null;
+    $estimateId  = !empty($body['estimate_id']) ? (int)$body['estimate_id']         : null;
+
+    validateVisitType($pdo, $visitType, $estimateId, $jobId);
 
     // Check for overlapping entries for this user
     if ($endTime) {
@@ -95,10 +101,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $pdo->prepare(
         'INSERT INTO time_entries
-            (user_id, job_id, status_label, cost_category, start_time, end_time,
+            (user_id, job_id, visit_type, estimate_id, status_label, cost_category, start_time, end_time,
              start_lat, start_lng, end_lat, end_lng, approval_status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'approved\', ?)'
-    )->execute([$userId, $jobId, $statusLabel, $costCat, $startTime, $endTime,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'approved\', ?)'
+    )->execute([$userId, $jobId, $visitType, $estimateId, $statusLabel, $costCat, $startTime, $endTime,
                 $startLat, $startLng, $endLat, $endLng, $notes]);
 
     echo json_encode(['entry' => fetchEntry($pdo, (int)$pdo->lastInsertId())]);
@@ -148,6 +154,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     }
     if (array_key_exists('notes', $body)) {
         $fields[] = 'notes = ?'; $params[] = !empty($body['notes']) ? sanitizeString($body['notes']) : null;
+    }
+    if (array_key_exists('visit_type', $body)) {
+        $newVisitType  = !empty($body['visit_type'])  ? trim((string)$body['visit_type']) : null;
+        $newEstimateId = !empty($body['estimate_id']) ? (int)$body['estimate_id']         : null;
+
+        if (array_key_exists('job_id', $body) && !empty($body['job_id'])) {
+            $jobForValidation = (int)$body['job_id'];
+        } else {
+            $curJob = $pdo->prepare('SELECT job_id FROM time_entries WHERE id = ?');
+            $curJob->execute([$id]);
+            $jobForValidation = (int)($curJob->fetch()['job_id'] ?? 0);
+        }
+        validateVisitType($pdo, $newVisitType, $newEstimateId, $jobForValidation);
+
+        $fields[] = 'visit_type = ?';  $params[] = $newVisitType;
+        $fields[] = 'estimate_id = ?'; $params[] = $newEstimateId;
     }
 
     if (empty($fields)) { http_response_code(422); exit(json_encode(['error' => 'No fields to update'])); }

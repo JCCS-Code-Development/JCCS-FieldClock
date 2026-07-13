@@ -21,10 +21,11 @@ $userId = $auth['role'] === 'admin' && isset($_GET['user_id']) ? (int)$_GET['use
 $start  = $_GET['start'] ?? date('Y-m-d', strtotime('-7 days'));
 $end    = $_GET['end']   ?? date('Y-m-d');
 
-$sql = 'SELECT te.*, u.name as user_name, j.name as job_name
+$sql = 'SELECT te.*, u.name as user_name, j.name as job_name, je.estimate_number
         FROM time_entries te
         JOIN users u ON u.id = te.user_id
         LEFT JOIN jobs j ON j.id = te.job_id
+        LEFT JOIN job_estimates je ON je.id = te.estimate_id
         WHERE te.user_id = :uid
           AND DATE(te.start_time) BETWEEN :start AND :end
         ORDER BY te.start_time DESC';

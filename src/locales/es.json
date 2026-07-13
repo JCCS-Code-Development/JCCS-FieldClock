@@ -73,6 +73,18 @@
     "noJobs": "Sin trabajos activos asignados.",
     "loadError": "No se pudieron cargar los trabajos."
   },
+  "visitType": {
+    "title": "¿Para qué está registrando su entrada?",
+    "subtitle": "Seleccione el motivo de esta visita",
+    "estimate": "Presupuesto existente",
+    "emergency": "Emergencia",
+    "newWorkOrder": "Nueva Orden de Trabajo",
+    "warranty": "Garantía",
+    "other": "Otro",
+    "selectEstimate": "Seleccione un presupuesto",
+    "noEstimates": "Aún no hay presupuestos registrados para este trabajo.",
+    "back": "← Atrás"
+  },
   "pay": {
     "title": "Mi Pago",
     "thisWeek": "Esta Semana",

@@ -21,8 +21,10 @@ $body = json_decode(file_get_contents('php://input'), true) ?? [];
 $lat   = isset($body['lat'])      ? (float)$body['lat']      : null;
 $lng   = isset($body['lng'])      ? (float)$body['lng']      : null;
 $acc   = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
-$jobId = isset($body['job_id'])   ? (int)$body['job_id']     : null;
-$notes = isset($body['notes'])    ? trim($body['notes'])      : null;
+$jobId      = isset($body['job_id'])      ? (int)$body['job_id']              : null;
+$notes      = isset($body['notes'])       ? trim($body['notes'])              : null;
+$visitType  = !empty($body['visit_type']) ? trim((string)$body['visit_type']) : null;
+$estimateId = !empty($body['estimate_id']) ? (int)$body['estimate_id']        : null;
 
 $pdo = getPDO();
 requireHourly($auth, $pdo);
@@ -34,6 +36,8 @@ if ($jobId) {
     if (!$j->fetch()) $jobId = null;
 }
 
+validateVisitType($pdo, $visitType, $estimateId, $jobId);
+
 // Block only if there is an active (non-day_end) open entry today
 $open = $pdo->prepare('SELECT id FROM time_entries WHERE user_id = ? AND end_time IS NULL AND cost_category != ? AND DATE(start_time) = CURDATE()');
 $open->execute([$auth['user_id'], 'day_end']);
@@ -42,5 +46,5 @@ if ($open->fetch()) {
     exit(json_encode(['error' => 'Day already started']));
 }
 
-$result = openEntry($pdo, $auth['user_id'], $jobId, 'working', 'direct_labor', $lat, $lng, $acc, null, $notes);
+$result = openEntry($pdo, $auth['user_id'], $jobId, 'working', 'direct_labor', $lat, $lng, $acc, null, $notes, $visitType, $estimateId);
 echo json_encode($result);

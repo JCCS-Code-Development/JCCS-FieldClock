@@ -12,6 +12,11 @@ const COST_LABELS = {
   admin_photos: 'Admin/Photos', rework: 'Rework',
 }
 
+const VISIT_TYPE_LABELS = {
+  estimate: 'Estimate', emergency: 'Emergency', new_work_order: 'New Work Order',
+  warranty: 'Warranty', other: 'Other', unspecified: 'Unspecified',
+}
+
 export default function AdminReports() {
   const [groupBy, setGroupBy] = useState('job')
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'))
@@ -39,7 +44,7 @@ export default function AdminReports() {
         <div>
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Group By</label>
           <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-            {[['job', 'By Job'], ['employee', 'By Employee']].map(([val, label]) => (
+            {[['job', 'By Job'], ['employee', 'By Employee'], ['visit_type', 'By Visit Type']].map(([val, label]) => (
               <button key={val} onClick={() => setGroupBy(val)}
                 className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${groupBy === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                 {label}
@@ -81,7 +86,9 @@ export default function AdminReports() {
               )}
               {rows.map((row, i) => (
                 <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="px-5 py-3 font-medium text-gray-900">{row.label}</td>
+                  <td className="px-5 py-3 font-medium text-gray-900">
+                    {groupBy === 'visit_type' ? (VISIT_TYPE_LABELS[row.label] ?? row.label) : row.label}
+                  </td>
                   {Object.keys(COST_LABELS).map((cat) => (
                     <td key={cat} className="px-3 py-3 text-right text-gray-500 text-xs">
                       {row.categories?.[cat] ? formatHours(row.categories[cat]) : '—'}

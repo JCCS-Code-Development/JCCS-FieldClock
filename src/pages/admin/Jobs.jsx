@@ -8,6 +8,7 @@ import Input from '../../components/ui/Input'
 import Spinner from '../../components/ui/Spinner'
 import { listJobs, createJob, updateJob, deleteJob, assignEmployees } from '../../api/jobs'
 import { listEmployees } from '../../api/employees'
+import { listEstimates, createEstimate, updateEstimate } from '../../api/estimates'
 import JobsMap from '../../components/admin/JobsMap'
 
 const EMPTY = { name: '', client_name: '', address: '', latitude: '', longitude: '', clock_in_radius_meters: 300, status: 'active', notes: '' }
@@ -31,6 +32,14 @@ export default function AdminJobs() {
   const [showSug, setShowSug]         = useState(false)
   const addrRef = useRef(null)
 
+  // Estimates (per job, shown only when editing an existing job)
+  const [estimates, setEstimates]     = useState([])
+  const [loadingEst, setLoadingEst]   = useState(false)
+  const [newEstNumber, setNewEstNumber] = useState('')
+  const [newEstDesc, setNewEstDesc]   = useState('')
+  const [savingEst, setSavingEst]     = useState(false)
+  const [estError, setEstError]       = useState('')
+
   const load = () => {
     setLoading(true)
     Promise.all([listJobs(), listEmployees()])
@@ -39,11 +48,44 @@ export default function AdminJobs() {
   }
   useEffect(() => { load() }, [])
 
-  const openCreate = () => { setForm(EMPTY); setAssignedIds([]); setModal('create') }
+  const loadEstimates = (jobId) => {
+    setLoadingEst(true)
+    listEstimates({ job_id: jobId })
+      .then((d) => setEstimates(d.estimates ?? []))
+      .finally(() => setLoadingEst(false))
+  }
+
+  const openCreate = () => { setForm(EMPTY); setAssignedIds([]); setEstimates([]); setModal('create') }
   const openEdit = (job) => {
     setForm({ ...job })
     setAssignedIds(job.assigned_user_ids ?? [])
+    setNewEstNumber(''); setNewEstDesc(''); setEstError('')
+    loadEstimates(job.id)
     setModal(job)
+  }
+
+  const handleAddEstimate = async () => {
+    if (!newEstNumber.trim()) { setEstError('Enter an estimate number.'); return }
+    setSavingEst(true); setEstError('')
+    try {
+      await createEstimate({ job_id: modal.id, estimate_number: newEstNumber.trim(), description: newEstDesc.trim() })
+      setNewEstNumber(''); setNewEstDesc('')
+      loadEstimates(modal.id)
+    } catch (err) {
+      setEstError(err?.response?.data?.error ?? 'Could not add estimate.')
+    } finally {
+      setSavingEst(false)
+    }
+  }
+
+  const handleRemoveEstimate = async (est) => {
+    if (!confirm(`Remove estimate #${est.estimate_number}?`)) return
+    try {
+      await updateEstimate(est.id, { is_active: false })
+      loadEstimates(modal.id)
+    } catch (err) {
+      alert(err?.response?.data?.error ?? 'Could not remove estimate.')
+    }
   }
 
   // Debounced address autocomplete
@@ -107,7 +149,7 @@ export default function AdminJobs() {
     setAssignedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
 
   const columns = [
-    { key: 'name', label: 'Job Name' },
+    { key: 'name', label: 'Job Title' },
     { key: 'client_name', label: 'Client' },
     { key: 'address', label: 'Address' },
     { key: 'status', label: 'Status', render: (v) => <Badge variant={v}>{v}</Badge> },
@@ -137,7 +179,7 @@ export default function AdminJobs() {
       <Modal isOpen={!!modal} onClose={() => setModal(null)} title={modal === 'create' ? 'New Job' : 'Edit Job'} size="lg">
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Job Name *" value={form.name} onChange={set('name')} className="col-span-2" />
+            <Input label="Job Title *" value={form.name} onChange={set('name')} className="col-span-2" />
             <Input label="Client Name *" value={form.client_name} onChange={set('client_name')} className="col-span-2" />
             <div className="col-span-2 flex flex-col gap-1" ref={addrRef}>
               <label className="text-sm font-medium text-gray-700">Address *</label>
@@ -239,6 +281,52 @@ export default function AdminJobs() {
               ))}
             </div>
           </div>
+
+          {/* Estimates — only manageable once the job exists */}
+          {modal && modal !== 'create' && (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Estimates</p>
+              {loadingEst ? (
+                <div className="flex justify-center py-4"><Spinner size="sm" /></div>
+              ) : (
+                <div className="flex flex-col gap-2 max-h-40 overflow-y-auto mb-3">
+                  {estimates.length === 0 && (
+                    <p className="text-xs text-gray-400">No estimates on file for this job yet.</p>
+                  )}
+                  {estimates.map((est) => (
+                    <div key={est.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-semibold text-gray-800">#{est.estimate_number}</span>
+                        {est.description && <span className="text-xs text-gray-400 ml-2">{est.description}</span>}
+                      </div>
+                      <button
+                        onClick={() => handleRemoveEstimate(est)}
+                        className="text-xs text-red-400 hover:text-red-600 transition-colors shrink-0"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  className="w-32 rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                  placeholder="Estimate #"
+                  value={newEstNumber}
+                  onChange={(e) => setNewEstNumber(e.target.value)}
+                />
+                <input
+                  className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                  placeholder="Description (optional)"
+                  value={newEstDesc}
+                  onChange={(e) => setNewEstDesc(e.target.value)}
+                />
+                <Button size="sm" loading={savingEst} onClick={handleAddEstimate}>+ Add</Button>
+              </div>
+              {estError && <p className="text-xs text-red-600 mt-1.5">{estError}</p>}
+            </div>
+          )}
 
           <div className="flex gap-3 pt-2">
             <Button variant="secondary" fullWidth onClick={() => setModal(null)}>Cancel</Button>

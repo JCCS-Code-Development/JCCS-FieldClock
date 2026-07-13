@@ -11,6 +11,7 @@ import { useGPS } from '../../hooks/useGPS'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { getStatus, dayStart, dayEnd, setWorking, setLunch, setMaterialRun, setWaiting, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
 import { getNearbyJobs, listJobs } from '../../api/jobs'
+import { listEstimates } from '../../api/estimates'
 import Spinner from '../ui/Spinner'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
@@ -168,6 +169,11 @@ export default function ClockPanel() {
   const [corrSaving, setCorrSaving]   = useState(false)
   const [corrError, setCorrError]     = useState('')
 
+  const [visitModal, setVisitModal]               = useState(false)
+  const [visitStep, setVisitStep]                 = useState(1)
+  const [visitEstimates, setVisitEstimates]       = useState([])
+  const [loadingVisitEstimates, setLoadingVisitEstimates] = useState(false)
+
   const isClockedIn = dayStarted && statusLabel !== 'done' && statusLabel !== null
   const liveElapsed = useLiveElapsed(isClockedIn, currentEntry)
   const { entries: todayEntries, completedSeconds } = useTodayData(statusLabel)
@@ -237,21 +243,8 @@ export default function ClockPanel() {
         setError(t('home.noLocation'))
         return
       }
-      setLoading(true)
-      try {
-        const data = await dayStart({
-          job_id:   selectedJobId ? parseInt(selectedJobId) : null,
-          notes:    !selectedJobId && manualLocation.trim() ? `Location: ${manualLocation.trim()}` : null,
-          lat:      position?.lat      ?? null,
-          lng:      position?.lng      ?? null,
-          accuracy: position?.accuracy ?? null,
-        })
-        setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
-        setShowManual(false)
-        setManualLocation('')
-      } catch (err) {
-        setError(err?.response?.data?.error ?? t('home.clockInError'))
-      } finally { setLoading(false) }
+      setVisitStep(1)
+      setVisitModal(true)
     } else {
       setLoading(true)
       try {
@@ -259,6 +252,36 @@ export default function ClockPanel() {
         setTimeclockData({ statusLabel: 'done', currentEntry: null, activeJob: null, dayStarted: true })
       } finally { setLoading(false) }
     }
+  }
+
+  const openEstimatePicker = () => {
+    setVisitStep(2)
+    setLoadingVisitEstimates(true)
+    listEstimates({ job_id: selectedJobId, active: 1 })
+      .then((d) => setVisitEstimates(d.estimates ?? []))
+      .catch(() => setVisitEstimates([]))
+      .finally(() => setLoadingVisitEstimates(false))
+  }
+
+  const performClockIn = async (visitType, estimateId = null) => {
+    setVisitModal(false)
+    setLoading(true)
+    try {
+      const data = await dayStart({
+        job_id:      selectedJobId ? parseInt(selectedJobId) : null,
+        notes:       !selectedJobId && manualLocation.trim() ? `Location: ${manualLocation.trim()}` : null,
+        lat:         position?.lat      ?? null,
+        lng:         position?.lng      ?? null,
+        accuracy:    position?.accuracy ?? null,
+        visit_type:  visitType,
+        estimate_id: estimateId,
+      })
+      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
+      setShowManual(false)
+      setManualLocation('')
+    } catch (err) {
+      setError(err?.response?.data?.error ?? t('home.clockInError'))
+    } finally { setLoading(false) }
   }
 
   const handleStatus = async (key) => {
@@ -670,6 +693,51 @@ export default function ClockPanel() {
           </div>
         )}
       </Modal>
+
+      {/* ── Visit type picker — shown right before clocking in ──── */}
+      <Modal isOpen={visitModal} onClose={() => setVisitModal(false)} title={t('visitType.title')}>
+        {visitStep === 1 && (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm font-semibold text-gray-800">{t('visitType.subtitle')}</p>
+            <div className="grid grid-cols-2 gap-2">
+              {VISIT_TYPES.map((opt) => {
+                const disabled = opt.value === 'estimate' && !selectedJobId
+                return (
+                  <button key={opt.value}
+                    disabled={disabled}
+                    onClick={() => opt.value === 'estimate' ? openEstimatePicker() : performClockIn(opt.value)}
+                    className={`flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 text-sm font-semibold transition-colors text-left
+                      ${disabled ? 'border-gray-100 text-gray-300 bg-gray-50 cursor-not-allowed' : 'border-gray-200 text-gray-600 active:border-brand-300 bg-white'}`}>
+                    <span className="text-base">{opt.icon}</span>
+                    <span className="leading-tight">{t(opt.labelKey)}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        {visitStep === 2 && (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm font-semibold text-gray-800">{t('visitType.selectEstimate')}</p>
+            {loadingVisitEstimates ? (
+              <div className="flex justify-center py-6"><Spinner size="md" /></div>
+            ) : visitEstimates.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">{t('visitType.noEstimates')}</p>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+                {visitEstimates.map((est) => (
+                  <button key={est.id} onClick={() => performClockIn('estimate', est.id)}
+                    className="w-full text-left px-4 py-3 rounded-2xl border-2 border-gray-200 active:border-brand-300 bg-white transition-colors">
+                    <p className="text-sm font-semibold text-gray-800">#{est.estimate_number}</p>
+                    {est.description && <p className="text-xs text-gray-400 mt-0.5">{est.description}</p>}
+                  </button>
+                ))}
+              </div>
+            )}
+            <Button variant="secondary" fullWidth onClick={() => setVisitStep(1)}>{t('visitType.back')}</Button>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
@@ -692,4 +760,11 @@ const CORR_TYPES = [
   { value: 'both',  icon: '⏱',  label: 'Both Times' },
   { value: 'job',   icon: '📍', label: 'Job Site' },
   { value: 'other', icon: '💬', label: 'Something Else' },
+]
+const VISIT_TYPES = [
+  { value: 'estimate',       icon: '📋', labelKey: 'visitType.estimate' },
+  { value: 'emergency',      icon: '🚨', labelKey: 'visitType.emergency' },
+  { value: 'new_work_order', icon: '🆕', labelKey: 'visitType.newWorkOrder' },
+  { value: 'warranty',       icon: '🛡️', labelKey: 'visitType.warranty' },
+  { value: 'other',          icon: '💬', labelKey: 'visitType.other' },
 ]

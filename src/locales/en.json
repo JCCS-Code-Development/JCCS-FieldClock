@@ -73,6 +73,18 @@
     "noJobs": "No active jobs assigned.",
     "loadError": "Could not load jobs."
   },
+  "visitType": {
+    "title": "What are you clocking in for?",
+    "subtitle": "Select the reason for this visit",
+    "estimate": "Existing Estimate#",
+    "emergency": "Emergency",
+    "newWorkOrder": "New Work Order",
+    "warranty": "Warranty",
+    "other": "Other",
+    "selectEstimate": "Select an estimate",
+    "noEstimates": "No estimates on file for this job yet.",
+    "back": "← Back"
+  },
   "pay": {
     "title": "My Pay",
     "thisWeek": "This Week",

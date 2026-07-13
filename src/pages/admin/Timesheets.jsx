@@ -10,8 +10,32 @@ import {
 import { getTimeOffRequests, reviewTimeOffRequest } from '../../api/timeoff'
 import { listEmployees } from '../../api/employees'
 import { listJobs } from '../../api/jobs'
+import { listEstimates } from '../../api/estimates'
 import { getDailyMileage } from '../../api/gps'
 import { formatTime } from '../../utils/format'
+
+const VISIT_TYPE_OPTIONS = [
+  { value: 'estimate',       label: 'Estimate#' },
+  { value: 'emergency',      label: 'Emergency' },
+  { value: 'new_work_order', label: 'New Work Order' },
+  { value: 'warranty',       label: 'Warranty' },
+  { value: 'other',          label: 'Other' },
+]
+
+const VISIT_TYPE_LABELS = {
+  estimate: 'Estimate', emergency: 'Emergency', new_work_order: 'New WO', warranty: 'Warranty', other: 'Other',
+}
+
+const VISIT_TYPE_COLORS = {
+  estimate: 'bg-indigo-100 text-indigo-700', emergency: 'bg-red-100 text-red-700',
+  new_work_order: 'bg-blue-100 text-blue-700', warranty: 'bg-teal-100 text-teal-700', other: 'bg-gray-100 text-gray-500',
+}
+
+function visitTypeLabel(entry) {
+  if (!entry.visit_type) return null
+  if (entry.visit_type === 'estimate' && entry.estimate_number) return `Est. #${entry.estimate_number}`
+  return VISIT_TYPE_LABELS[entry.visit_type] ?? entry.visit_type
+}
 
 const STATUS_OPTIONS = [
   { value: 'working',      label: 'Working' },
@@ -94,6 +118,21 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
   const [error,       setError]       = useState('')
   const [saving,      setSaving]      = useState(false)
 
+  const [visitType,   setVisitType]   = useState(entry?.visit_type ?? '')
+  const [estimateId,  setEstimateId]  = useState(entry?.estimate_id ? String(entry.estimate_id) : '')
+  const [estimates,   setEstimates]   = useState([])
+  const [loadingEstimates, setLoadingEstimates] = useState(false)
+
+  // Fetch the selected job's estimates whenever the job changes
+  useEffect(() => {
+    if (!jobId) { setEstimates([]); return }
+    setLoadingEstimates(true)
+    listEstimates({ job_id: jobId, active: 1 })
+      .then((d) => setEstimates(d.estimates ?? []))
+      .catch(() => setEstimates([]))
+      .finally(() => setLoadingEstimates(false))
+  }, [jobId])
+
   const duration = useMemo(() => {
     if (!startTime || !endTime) return null
     const [sh, sm] = startTime.split(':').map(Number)
@@ -115,6 +154,8 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
         end_time:     endTime ? `${entryDate} ${endTime}:00` : null,
         job_id:       jobId ? parseInt(jobId) : null,
         notes:        notes.trim() || null,
+        visit_type:   visitType || null,
+        estimate_id:  visitType === 'estimate' && estimateId ? parseInt(estimateId) : null,
       }
       await onSave(isNew ? { ...payload, user_id: userId } : { ...payload, id: entry.id })
       onClose()
@@ -205,6 +246,35 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
         </div>
       </div>
 
+      {/* Visit type */}
+      <div>
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Visit Type (optional)</label>
+        <div className="grid grid-cols-3 gap-2">
+          {VISIT_TYPE_OPTIONS.map(opt => (
+            <button key={opt.value}
+              onClick={() => setVisitType(visitType === opt.value ? '' : opt.value)}
+              className={`py-2 rounded-xl text-xs font-semibold border-2 transition-colors ${
+                visitType === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {visitType === 'estimate' && (
+          <div className="relative mt-2">
+            <select value={estimateId} onChange={e => setEstimateId(e.target.value)}
+              disabled={loadingEstimates}
+              className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 pr-8 text-sm outline-none focus:border-brand-500 appearance-none bg-white transition-colors disabled:opacity-60">
+              <option value="">{loadingEstimates ? 'Loading estimates…' : '— Select an estimate —'}</option>
+              {estimates.map(est => (
+                <option key={est.id} value={est.id}>#{est.estimate_number}{est.description ? ` · ${est.description}` : ''}</option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
+          </div>
+        )}
+      </div>
+
       {/* Notes */}
       <div>
         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Adjustment Note</label>
@@ -277,6 +347,9 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                     {(loc || comment) && (
                       <p className="text-xs text-gray-400 truncate mt-0.5">{loc || comment}</p>
                     )}
+                    {visitTypeLabel(entry) && (
+                      <p className="text-[10px] font-semibold text-gray-400 mt-0.5">{visitTypeLabel(entry)}</p>
+                    )}
                   </div>
                   <span className="text-xs font-semibold text-gray-700 shrink-0 w-10 text-right">{isDayEnd ? '' : fmtDur(mins)}</span>
                   <div className="flex items-center gap-0.5 shrink-0">
@@ -299,6 +372,7 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                 <tr className="text-left border-b border-gray-100">
                   <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-32">Type</th>
                   <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Location</th>
+                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-28">Visit</th>
                   <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-24">Start</th>
                   <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-24">End</th>
                   <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-16">Hrs</th>
@@ -322,6 +396,13 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-gray-600 text-xs max-w-[140px] truncate">{loc || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-2.5">
+                        {visitTypeLabel(entry) ? (
+                          <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap ${VISIT_TYPE_COLORS[entry.visit_type] ?? 'bg-gray-100 text-gray-500'}`}>
+                            {visitTypeLabel(entry)}
+                          </span>
+                        ) : <span className="text-gray-300">—</span>}
+                      </td>
                       <td className="px-4 py-2.5 text-gray-700 font-mono text-xs">{formatTime(entry.start_time)}</td>
                       <td className="px-4 py-2.5 text-xs">
                         {entry.end_time
