@@ -11,7 +11,7 @@ export default function SetupPassword() {
   const location  = useLocation()
   const userId    = location.state?.userId
   const { login } = useAuthStore()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const [password, setPass]   = useState('')
   const [confirm, setConfirm] = useState('')
@@ -31,6 +31,7 @@ export default function SetupPassword() {
     try {
       const data = await setPassword(userId, password)
       login(data.user, data.token, data.refreshToken)
+      if (data.user.preferred_language) i18n.changeLanguage(data.user.preferred_language)
       navigate(data.user.role === 'admin' ? '/admin' : '/', { replace: true })
     } catch (err) {
       setError(err?.response?.data?.error ?? t('auth.setup.failed'))

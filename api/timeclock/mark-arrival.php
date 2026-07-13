@@ -20,10 +20,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit; }
 $auth = requireAuth();
 $body = jsonBody();
 requireFields($body, ['job_id']);
-$jobId = (int)$body['job_id'];
-$lat   = isset($body['lat'])      ? (float)$body['lat']      : null;
-$lng   = isset($body['lng'])      ? (float)$body['lng']      : null;
-$acc   = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
+$jobId      = (int)$body['job_id'];
+$lat        = isset($body['lat'])      ? (float)$body['lat']      : null;
+$lng        = isset($body['lng'])      ? (float)$body['lng']      : null;
+$acc        = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
+$visitType  = !empty($body['visit_type'])  ? trim((string)$body['visit_type']) : null;
+$estimateId = !empty($body['estimate_id']) ? (int)$body['estimate_id']         : null;
 
 $pdo = getPDO();
 requireHourly($auth, $pdo);
@@ -32,6 +34,8 @@ $job = $pdo->prepare('SELECT * FROM jobs WHERE id = ?');
 $job->execute([$jobId]);
 $job = $job->fetch();
 if (!$job) { http_response_code(404); exit(json_encode(['error' => 'Job not found'])); }
+
+validateVisitType($pdo, $visitType, $estimateId, $jobId);
 
 // GPS radius check
 $withinRadius = null;
@@ -42,7 +46,7 @@ if ($lat !== null && $lng !== null && $job['latitude'] && $job['longitude']) {
 }
 
 closeOpenEntry($pdo, $auth['user_id'], $lat, $lng);
-$result = openEntry($pdo, $auth['user_id'], $jobId, 'working', 'direct_labor', $lat, $lng, $acc, $withinRadius);
+$result = openEntry($pdo, $auth['user_id'], $jobId, 'working', 'direct_labor', $lat, $lng, $acc, $withinRadius, null, $visitType, $estimateId);
 
 echo json_encode([
     'timeclock'       => $result,

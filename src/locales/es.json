@@ -57,7 +57,12 @@
     "mustBeOnline": "Debes estar en línea para marcar entrada o salida.",
     "clockOutFailed": "Error al registrar salida. Sigues marcado como activo.",
     "clockInFailed": "Error al registrar entrada. Intenta de nuevo.",
-    "switchJob": "Cambiar a Este Trabajo"
+    "switchJob": "Cambiar a Este Trabajo",
+    "headingTo": "En camino a",
+    "iveArrived": "He Llegado",
+    "travelStartError": "No se pudo iniciar el viaje. Intenta de nuevo.",
+    "arrivalError": "No se pudo confirmar la llegada. Intenta de nuevo.",
+    "arrivalOutOfRadius": "Pareces estar a {{distance}}m del sitio de trabajo. Llegada registrada — tu administrador puede revisarla."
   },
   "status": {
     "working": "Trabajando",

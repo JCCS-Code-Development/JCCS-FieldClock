@@ -56,11 +56,11 @@ function push_vapid_jwt(string $endpoint): string {
  * $type is sent as a JSON payload for browsers that support it;
  * push services that reject non-encrypted payloads will fall back gracefully.
  */
-function send_push(array $sub, string $type = 'check_ready'): bool {
+function send_push(array $sub, string $type = 'check_ready', string $lang = 'en'): bool {
     if (!defined('VAPID_PUBLIC_KEY') || !defined('VAPID_PRIVATE_KEY_PEM')) return false;
 
     $jwt     = push_vapid_jwt($sub['endpoint']);
-    $payload = json_encode(['type' => $type]);
+    $payload = json_encode(['type' => $type, 'lang' => $lang]);
 
     $ch = curl_init($sub['endpoint']);
     curl_setopt_array($ch, [
@@ -110,9 +110,13 @@ function send_push(array $sub, string $type = 'check_ready'): bool {
  * $type: 'check_ready' (contractor invoice) | 'paycheck' (employee paycheck)
  */
 function push_to_user(PDO $pdo, int $user_id, string $type = 'check_ready'): void {
+    $langStmt = $pdo->prepare('SELECT preferred_language FROM users WHERE id = ?');
+    $langStmt->execute([$user_id]);
+    $lang = $langStmt->fetch()['preferred_language'] ?? 'en';
+
     $stmt = $pdo->prepare('SELECT endpoint, p256dh, auth_key FROM push_subscriptions WHERE user_id = ?');
     $stmt->execute([$user_id]);
-    foreach ($stmt->fetchAll() as $sub) send_push($sub, $type);
+    foreach ($stmt->fetchAll() as $sub) send_push($sub, $type, $lang);
 }
 
 /**

@@ -8,3 +8,6 @@ export const setPassword = (userId, password) =>
 
 export const logout = (refreshToken) =>
   client.post('/auth/logout.php', { refreshToken }).then((r) => r.data)
+
+export const setLanguage = (language) =>
+  client.post('/auth/set-language.php', { language }).then((r) => r.data)

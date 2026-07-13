@@ -9,7 +9,7 @@ import { useTimeclockStore } from '../../store/timeclockStore'
 import { useAuthStore } from '../../store/authStore'
 import { useGPS } from '../../hooks/useGPS'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
-import { getStatus, dayStart, dayEnd, setWorking, setLunch, setMaterialRun, setWaiting, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
+import { getStatus, dayStart, dayEnd, setTraveling, markArrival, setWorking, setLunch, setMaterialRun, setWaiting, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
 import { getNearbyJobs, listJobs } from '../../api/jobs'
 import { listEstimates } from '../../api/estimates'
 import Spinner from '../ui/Spinner'
@@ -243,8 +243,18 @@ export default function ClockPanel() {
         setError(t('home.noLocation'))
         return
       }
-      setVisitStep(1)
-      setVisitModal(true)
+      const selectedJob = jobs.find((j) => String(j.id) === String(selectedJobId))
+      const isFarFromJob = selectedJob
+        && selectedJob.distance_meters != null
+        && selectedJob.clock_in_radius_meters != null
+        && selectedJob.distance_meters > selectedJob.clock_in_radius_meters
+
+      if (selectedJobId && isFarFromJob) {
+        handleStartTraveling()
+      } else {
+        setVisitStep(1)
+        setVisitModal(true)
+      }
     } else {
       setLoading(true)
       try {
@@ -254,6 +264,27 @@ export default function ClockPanel() {
     }
   }
 
+  const handleStartTraveling = async () => {
+    setLoading(true)
+    try {
+      const data = await setTraveling({
+        job_id:   parseInt(selectedJobId),
+        lat:      position?.lat      ?? null,
+        lng:      position?.lng      ?? null,
+        accuracy: position?.accuracy ?? null,
+      })
+      setTimeclockData(data.timeclock)
+    } catch (err) {
+      setError(err?.response?.data?.error ?? t('home.travelStartError'))
+    } finally { setLoading(false) }
+  }
+
+  const openArrival = () => {
+    setError('')
+    setVisitStep(1)
+    setVisitModal(true)
+  }
+
   const openEstimatePicker = () => {
     setVisitStep(2)
     setLoadingVisitEstimates(true)
@@ -261,6 +292,11 @@ export default function ClockPanel() {
       .then((d) => setVisitEstimates(d.estimates ?? []))
       .catch(() => setVisitEstimates([]))
       .finally(() => setLoadingVisitEstimates(false))
+  }
+
+  const finalizeVisit = (visitType, estimateId = null) => {
+    if (statusLabel === 'traveling') return performArrival(visitType, estimateId)
+    return performClockIn(visitType, estimateId)
   }
 
   const performClockIn = async (visitType, estimateId = null) => {
@@ -281,6 +317,27 @@ export default function ClockPanel() {
       setManualLocation('')
     } catch (err) {
       setError(err?.response?.data?.error ?? t('home.clockInError'))
+    } finally { setLoading(false) }
+  }
+
+  const performArrival = async (visitType, estimateId = null) => {
+    setVisitModal(false)
+    setLoading(true)
+    try {
+      const data = await markArrival({
+        job_id:      parseInt(selectedJobId),
+        lat:         position?.lat      ?? null,
+        lng:         position?.lng      ?? null,
+        accuracy:    position?.accuracy ?? null,
+        visit_type:  visitType,
+        estimate_id: estimateId,
+      })
+      setTimeclockData(data.timeclock)
+      if (data.within_radius === false) {
+        setError(t('home.arrivalOutOfRadius', { distance: data.distance_meters }))
+      }
+    } catch (err) {
+      setError(err?.response?.data?.error ?? t('home.arrivalError'))
     } finally { setLoading(false) }
   }
 
@@ -366,8 +423,19 @@ export default function ClockPanel() {
           </p>
         </div>
 
-        {/* Status change buttons — shown when clocked in */}
-        {isClockedIn && (
+        {/* Traveling — show "I've Arrived" instead of status buttons */}
+        {isClockedIn && statusLabel === 'traveling' && (
+          <div className="w-full">
+            <button onClick={openArrival} disabled={loading}
+              className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-2xl bg-sky-500 text-white font-bold text-base shadow-lg active:bg-sky-600 transition-colors disabled:opacity-50">
+              <span className="text-xl leading-none">📍</span>
+              {t('home.iveArrived')}
+            </button>
+          </div>
+        )}
+
+        {/* Status change buttons — shown once clocked in and arrived */}
+        {isClockedIn && statusLabel !== 'traveling' && (
           <div className="w-full">
             <p className="text-[10px] text-gray-400 text-center mb-3 uppercase tracking-widest font-semibold">{t('home.changeStatus')}</p>
             <div className="grid grid-cols-2 gap-2.5">
@@ -422,7 +490,9 @@ export default function ClockPanel() {
 
           <div className="px-4 py-3 border-b border-gray-50">
             <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-2">
-              {isClockedIn ? t('home.clockedInAt') : t('home.selectLocation')}
+              {isClockedIn
+                ? (statusLabel === 'traveling' ? t('home.headingTo') : t('home.clockedInAt'))
+                : t('home.selectLocation')}
             </p>
             {isClockedIn ? (
               <div>
@@ -705,7 +775,7 @@ export default function ClockPanel() {
                 return (
                   <button key={opt.value}
                     disabled={disabled}
-                    onClick={() => opt.value === 'estimate' ? openEstimatePicker() : performClockIn(opt.value)}
+                    onClick={() => opt.value === 'estimate' ? openEstimatePicker() : finalizeVisit(opt.value)}
                     className={`flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 text-sm font-semibold transition-colors text-left
                       ${disabled ? 'border-gray-100 text-gray-300 bg-gray-50 cursor-not-allowed' : 'border-gray-200 text-gray-600 active:border-brand-300 bg-white'}`}>
                     <span className="text-base">{opt.icon}</span>
@@ -726,7 +796,7 @@ export default function ClockPanel() {
             ) : (
               <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
                 {visitEstimates.map((est) => (
-                  <button key={est.id} onClick={() => performClockIn('estimate', est.id)}
+                  <button key={est.id} onClick={() => finalizeVisit('estimate', est.id)}
                     className="w-full text-left px-4 py-3 rounded-2xl border-2 border-gray-200 active:border-brand-300 bg-white transition-colors">
                     <p className="text-sm font-semibold text-gray-800">#{est.estimate_number}</p>
                     {est.description && <p className="text-xs text-gray-400 mt-0.5">{est.description}</p>}

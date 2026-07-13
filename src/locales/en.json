@@ -57,7 +57,12 @@
     "mustBeOnline": "You must be online to clock in or out.",
     "clockOutFailed": "Clock-out failed. You are still clocked in.",
     "clockInFailed": "Clock-in failed. Try again.",
-    "switchJob": "Switch to This Job"
+    "switchJob": "Switch to This Job",
+    "headingTo": "Heading to",
+    "iveArrived": "I've Arrived",
+    "travelStartError": "Could not start traveling. Try again.",
+    "arrivalError": "Could not confirm arrival. Try again.",
+    "arrivalOutOfRadius": "You appear to be {{distance}}m from the jobsite. Arrival recorded — your admin can review."
   },
   "status": {
     "working": "Working",

@@ -10,7 +10,7 @@ import { useAuthStore } from '../../store/authStore'
 export default function Login() {
   const navigate    = useNavigate()
   const { login: storeLogin } = useAuthStore()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword]     = useState('')
@@ -29,6 +29,7 @@ export default function Login() {
         return
       }
       storeLogin(data.user, data.token, data.refreshToken)
+      if (data.user.preferred_language) i18n.changeLanguage(data.user.preferred_language)
       navigate(data.user.role === 'admin' ? '/admin' : '/', { replace: true })
     } catch (err) {
       setError(err?.response?.data?.error ?? t('auth.loginFailed'))

@@ -1,8 +1,16 @@
 import { useTranslation } from 'react-i18next'
+import { useAuthStore } from '../../store/authStore'
+import { setLanguage } from '../../api/auth'
 
 export default function LangSwitcher({ className = '' }) {
   const { i18n, t } = useTranslation()
-  const toggle = () => i18n.changeLanguage(i18n.language.startsWith('es') ? 'en' : 'es')
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+
+  const toggle = () => {
+    const next = i18n.language.startsWith('es') ? 'en' : 'es'
+    i18n.changeLanguage(next)
+    if (isAuthenticated) setLanguage(next).catch(() => {})
+  }
 
   return (
     <button
