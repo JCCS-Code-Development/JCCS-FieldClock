@@ -8,7 +8,7 @@ import { getSummary, getBreakdown, listAdjustments, createAdjustment, updateAdju
 import { listEmployees } from '../../api/employees'
 import { listInvoices, updateInvoiceStatus, getDownloadUrl } from '../../api/contractor'
 import { getPeriodLoanTotals } from '../../api/loans'
-import { listPaychecks, createPaycheck, updatePaycheck, deletePaycheck } from '../../api/paychecks'
+import { listPaychecks, createPaycheck, updatePaycheck, deletePaycheck, markAllAvailable } from '../../api/paychecks'
 import PayPieChart from '../../components/ui/PayPieChart'
 import { formatCurrency, formatHours, formatDate } from '../../utils/format'
 import { format, startOfWeek, endOfWeek, subWeeks, startOfYear, differenceInWeeks } from 'date-fns'
@@ -116,6 +116,10 @@ export default function AdminPayroll() {
   const [pcError,        setPcError]        = useState('')
   const [pcStatusTarget, setPcStatusTarget] = useState(null)    // { paycheck, nextStatus }
   const [pcStatusSaving, setPcStatusSaving] = useState(false)
+  const [pcVoidTarget,   setPcVoidTarget]   = useState(null)    // paycheck being voided
+  const [pcVoidReason,   setPcVoidReason]   = useState('')
+  const [pcVoiding,      setPcVoiding]      = useState(false)
+  const [pcMarkingAll,   setPcMarkingAll]   = useState(false)
   const [employees,      setEmployees]      = useState([])
 
   const p = periods[period]
@@ -204,6 +208,26 @@ export default function AdminPayroll() {
     if (!window.confirm('Delete this paycheck record?')) return
     await deletePaycheck(id)
     loadPaychecks()
+  }
+
+  const handleVoidPaycheck = async () => {
+    if (!pcVoidTarget) return
+    setPcVoiding(true)
+    try {
+      await updatePaycheck({ id: pcVoidTarget.id, status: 'voided', void_reason: pcVoidReason.trim() || null })
+      setPcVoidTarget(null)
+      setPcVoidReason('')
+      loadPaychecks()
+    } finally { setPcVoiding(false) }
+  }
+
+  const handleMarkAllAvailable = async () => {
+    if (!window.confirm(`Mark all pending paychecks for ${p.label} as available? This will notify every employee.`)) return
+    setPcMarkingAll(true)
+    try {
+      await markAllAvailable(p.start, p.end)
+      loadPaychecks()
+    } finally { setPcMarkingAll(false) }
   }
 
   // ── Drill-down ───────────────────────────────────────────────────
@@ -356,7 +380,10 @@ export default function AdminPayroll() {
         .filter(e => e._gas + e._bonus > 0)
     : []
 
-  const pendingPcCount = paychecks.filter((p) => p.status === 'processing').length
+  const pendingPcCount = paychecks.filter((pc) => pc.status === 'processing').length
+  const pendingPcForPeriodCount = paychecks.filter((pc) =>
+    pc.status === 'processing' && pc.period_start === p.start && pc.period_end === p.end
+  ).length
   const pendingFRCount = flatRatePayments.filter((fr) => fr.status === 'pending').length
 
   const TABS = [
@@ -382,7 +409,12 @@ export default function AdminPayroll() {
                   <Button onClick={() => { setFrForm({ user_id: '', amount: '', description: '' }); setFrError(''); setFrModal(true) }}>+ Add Payment</Button>
                 </div>
             : tab === 'paychecks'
-              ? <Button onClick={() => { setPcForm({ user_id: '', amount: '', notes: '' }); setPcError(''); setPcModal(true) }}>+ Add Paycheck</Button>
+              ? <div className="flex gap-2">
+                  <Button variant="secondary" loading={pcMarkingAll} disabled={pendingPcForPeriodCount === 0} onClick={handleMarkAllAvailable}>
+                    Mark All Available ({pendingPcForPeriodCount})
+                  </Button>
+                  <Button onClick={() => { setPcForm({ user_id: '', amount: '', notes: '' }); setPcError(''); setPcModal(true) }}>+ Add Paycheck</Button>
+                </div>
               : null
         }
       />
@@ -1047,17 +1079,24 @@ export default function AdminPayroll() {
                       processing: { label: 'Processing', color: 'bg-amber-100 text-amber-700', next: 'available',  nextLabel: 'Mark Available' },
                       available:  { label: 'Available',  color: 'bg-green-100 text-green-700',  next: 'picked_up', nextLabel: 'Mark Picked Up' },
                       picked_up:  { label: 'Picked Up',  color: 'bg-gray-100 text-gray-600',    next: null,        nextLabel: null },
+                      voided:     { label: 'Voided',     color: 'bg-red-100 text-red-700',      next: null,        nextLabel: null },
                     }[pc.status] ?? { label: pc.status, color: 'bg-gray-100 text-gray-600', next: null }
 
                     return (
-                      <div key={pc.id} className="flex items-center gap-3 px-4 py-3.5">
+                      <div key={pc.id} className={`flex items-center gap-3 px-4 py-3.5 ${pc.status === 'voided' ? 'opacity-60' : ''}`}>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-semibold text-gray-900">{pc.employee_name}</span>
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusCfg.color}`}>{statusCfg.label}</span>
                             {pc.status === 'available' && <span className="text-xs text-gray-400">🔔</span>}
                           </div>
-                          <p className="text-xs text-gray-400 mt-0.5">{formatDate(pc.period_start)} – {formatDate(pc.period_end)}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {formatDate(pc.period_start)} – {formatDate(pc.period_end)}
+                            {pc.check_number && ` · Check #${pc.check_number}`}
+                          </p>
+                          {pc.status === 'voided' && pc.void_reason && (
+                            <p className="text-xs text-red-500 mt-0.5 italic">{pc.void_reason}</p>
+                          )}
                         </div>
                         <div className="text-right shrink-0">
                           <p className="font-semibold text-gray-900 text-sm">{pc.amount ? formatCurrency(pc.amount) : <span className="text-gray-400">—</span>}</p>
@@ -1066,6 +1105,12 @@ export default function AdminPayroll() {
                               <button onClick={() => setPcStatusTarget({ paycheck: pc, nextStatus: statusCfg.next })}
                                 className="text-xs font-semibold text-brand-500 hover:text-brand-700 transition-colors">
                                 {statusCfg.nextLabel}
+                              </button>
+                            )}
+                            {pc.status !== 'voided' && pc.status !== 'picked_up' && (
+                              <button onClick={() => { setPcVoidTarget(pc); setPcVoidReason('') }}
+                                className="text-xs text-red-400 hover:text-red-600 transition-colors">
+                                Void
                               </button>
                             )}
                             <button onClick={() => handleDeletePaycheck(pc.id)}
@@ -1130,6 +1175,26 @@ export default function AdminPayroll() {
           <div className="flex gap-3">
             <Button variant="secondary" fullWidth onClick={() => setPcStatusTarget(null)}>Cancel</Button>
             <Button fullWidth loading={pcStatusSaving} onClick={handlePcStatus}>Confirm</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Void paycheck */}
+      <Modal isOpen={!!pcVoidTarget} onClose={() => setPcVoidTarget(null)} title={`Void Paycheck — ${pcVoidTarget?.employee_name ?? ''}`}>
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-gray-600">
+            This marks the paycheck as voided (e.g. a spoiled or misprinted check) and removes it from anything
+            pending "Mark Available." This cannot be undone.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
+            <textarea rows={2} value={pcVoidReason} onChange={(e) => setPcVoidReason(e.target.value)}
+              placeholder="e.g. Printer jam, reissuing with a new check number"
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 resize-none" />
+          </div>
+          <div className="flex gap-3">
+            <Button variant="secondary" fullWidth onClick={() => setPcVoidTarget(null)}>Cancel</Button>
+            <Button variant="danger" fullWidth loading={pcVoiding} onClick={handleVoidPaycheck}>Void Paycheck</Button>
           </div>
         </div>
       </Modal>

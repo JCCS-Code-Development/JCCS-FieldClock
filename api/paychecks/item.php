@@ -17,18 +17,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     $id   = (int)($body['id'] ?? 0);
     if (!$id) { http_response_code(422); exit(json_encode(['error' => 'id required'])); }
 
-    $allowed = ['processing', 'available', 'picked_up'];
+    $allowed = ['processing', 'available', 'picked_up', 'voided'];
     $status  = sanitizeString($body['status'] ?? '');
     if (!in_array($status, $allowed)) {
         http_response_code(422);
         exit(json_encode(['error' => 'Invalid status']));
     }
 
-    $notes = !empty($body['notes']) ? sanitizeString($body['notes']) : null;
+    $notes      = !empty($body['notes'])       ? sanitizeString($body['notes'])       : null;
+    $voidReason = !empty($body['void_reason']) ? sanitizeString($body['void_reason']) : null;
 
     // Build update
-    $sets = ['status = ?', 'notes = ?'];
-    $params = [$status, $notes];
+    $sets = ['status = ?', 'notes = ?', 'void_reason = ?'];
+    $params = [$status, $notes, $status === 'voided' ? $voidReason : null];
     if ($status === 'available') { $sets[] = 'available_at = NOW()'; }
     if ($status === 'picked_up') { $sets[] = 'picked_up_at = NOW()'; }
     $params[] = $id;
@@ -38,7 +39,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
 
     // Fetch updated row
     $row = $pdo->prepare(
-        'SELECT p.*, u.name AS employee_name FROM paychecks p JOIN users u ON u.id=p.user_id WHERE p.id=?'
+        'SELECT p.*, u.name AS employee_name, cr.check_number
+         FROM paychecks p
+         JOIN users u ON u.id=p.user_id
+         LEFT JOIN check_registry cr ON cr.id = p.check_registry_id
+         WHERE p.id=?'
     );
     $row->execute([$id]);
     $paycheck = $row->fetch();

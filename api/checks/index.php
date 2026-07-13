@@ -74,11 +74,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                (check_number, payee_name, user_id, amount, pay_period_start, pay_period_end, issued_date, created_by)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
+               id               = LAST_INSERT_ID(id),
                payee_name       = VALUES(payee_name),
                amount           = VALUES(amount),
                pay_period_start = VALUES(pay_period_start),
                pay_period_end   = VALUES(pay_period_end),
                issued_date      = VALUES(issued_date)'
+        );
+
+        $findPaycheck = $pdo->prepare(
+            'SELECT id FROM paychecks WHERE user_id = ? AND period_start = ? AND period_end = ?'
+        );
+        $updatePaycheck = $pdo->prepare(
+            'UPDATE paychecks SET check_registry_id = ?, amount = ? WHERE id = ?'
+        );
+        $insertPaycheck = $pdo->prepare(
+            'INSERT INTO paychecks (user_id, period_start, period_end, amount, check_registry_id, status, created_by)
+             VALUES (?, ?, ?, ?, ?, \'processing\', ?)'
         );
 
         $saved = 0;
@@ -94,7 +106,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $issuedDate = sanitizeString($item['issued_date']      ?? date('Y-m-d'));
 
             $stmt->execute([$checkNum, $payeeName, $userId, $amount, $pStart, $pEnd, $issuedDate, $auth['user_id']]);
+            $checkRegistryId = (int)$pdo->lastInsertId();
             $saved++;
+
+            // Auto-create/update the linked Paycheck record (status untouched if it already exists,
+            // so re-registering a check never regresses an available/picked-up/voided paycheck)
+            if ($userId) {
+                $findPaycheck->execute([$userId, $pStart, $pEnd]);
+                $existing = $findPaycheck->fetch();
+                if ($existing) {
+                    $updatePaycheck->execute([$checkRegistryId, $amount, $existing['id']]);
+                } else {
+                    $insertPaycheck->execute([$userId, $pStart, $pEnd, $amount, $checkRegistryId, $auth['user_id']]);
+                }
+            }
         }
 
         echo json_encode(['success' => true, 'registered' => $saved]);

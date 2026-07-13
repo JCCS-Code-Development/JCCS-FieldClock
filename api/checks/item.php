@@ -49,6 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
          WHERE id = ?'
     )->execute([$status, $notes, $auth['user_id'], $id]);
 
+    if ($status === 'voided') {
+        $pdo->prepare('UPDATE paychecks SET status = "voided" WHERE check_registry_id = ?')->execute([$id]);
+    }
+
     $row = $pdo->prepare(
         'SELECT cr.*, u.name AS updater_name
          FROM check_registry cr
@@ -70,6 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
          SET status = "voided", status_updated_by = ?, status_updated_at = NOW()
          WHERE id = ?'
     )->execute([$auth['user_id'], $id]);
+
+    $pdo->prepare('UPDATE paychecks SET status = "voided" WHERE check_registry_id = ?')->execute([$id]);
 
     echo json_encode(['success' => true]);
     exit;

@@ -13,8 +13,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if ($auth['role'] === 'admin') {
         // Admin: all employees, optionally filtered
         $uid = isset($_GET['user_id']) ? (int)$_GET['user_id'] : null;
-        $sql = 'SELECT p.*, u.name AS employee_name, u.pay_type
-                FROM paychecks p JOIN users u ON u.id = p.user_id
+        $sql = 'SELECT p.*, u.name AS employee_name, u.pay_type, cr.check_number
+                FROM paychecks p
+                JOIN users u ON u.id = p.user_id
+                LEFT JOIN check_registry cr ON cr.id = p.check_registry_id
                 WHERE u.role = "employee"';
         $params = [];
         if ($uid) { $sql .= ' AND p.user_id = ?'; $params[] = $uid; }
@@ -24,8 +26,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     } else {
         // Employee: own paychecks only
         $stmt = $pdo->prepare(
-            'SELECT p.*, u.name AS employee_name, u.pay_type
-             FROM paychecks p JOIN users u ON u.id = p.user_id
+            'SELECT p.*, u.name AS employee_name, u.pay_type, cr.check_number
+             FROM paychecks p
+             JOIN users u ON u.id = p.user_id
+             LEFT JOIN check_registry cr ON cr.id = p.check_registry_id
              WHERE p.user_id = ? ORDER BY p.period_end DESC'
         );
         $stmt->execute([$auth['user_id']]);
@@ -53,7 +57,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $id = $pdo->lastInsertId();
     $row = $pdo->prepare(
-        'SELECT p.*, u.name AS employee_name, u.pay_type FROM paychecks p JOIN users u ON u.id=p.user_id WHERE p.id=?'
+        'SELECT p.*, u.name AS employee_name, u.pay_type, cr.check_number
+         FROM paychecks p
+         JOIN users u ON u.id=p.user_id
+         LEFT JOIN check_registry cr ON cr.id = p.check_registry_id
+         WHERE p.id=?'
     );
     $row->execute([$id]);
     echo json_encode(['paycheck' => $row->fetch()]);
