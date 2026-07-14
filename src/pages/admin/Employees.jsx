@@ -8,12 +8,14 @@ import Input from '../../components/ui/Input'
 import Spinner from '../../components/ui/Spinner'
 import { listEmployees, createEmployee, updateEmployee, deactivateEmployee, reactivateEmployee, resetEmployeePassword } from '../../api/employees'
 import { listDocuments, getDocumentUrl } from '../../api/documents'
+import { listJobs } from '../../api/jobs'
+import { groupJobsByCompany } from '../../utils/jobs'
 import { formatCurrency } from '../../utils/format'
 import { format, parseISO } from 'date-fns'
 
 const EMPTY = {
   name: '', email: '', phone: '', role: 'employee',
-  pay_type: 'w2', pay_structure: 'hourly', pay_rate: '',
+  pay_type: 'w2', pay_structure: 'hourly', pay_rate: '', default_job_id: '',
 }
 
 const DOC_LABELS = {
@@ -42,6 +44,7 @@ const XCircle = () => (
 export default function AdminEmployees() {
   const [employees, setEmployees]     = useState([])
   const [inactive, setInactive]       = useState([])
+  const [jobs, setJobs]               = useState([])
   const [loading, setLoading]         = useState(true)
   const [modal, setModal]             = useState(null)
   const [form, setForm]               = useState(EMPTY)
@@ -61,10 +64,11 @@ export default function AdminEmployees() {
 
   const load = () => {
     setLoading(true)
-    Promise.all([listEmployees({ active: 1 }), listEmployees({ active: 0 })])
-      .then(([active, inactiveRes]) => {
+    Promise.all([listEmployees({ active: 1 }), listEmployees({ active: 0 }), listJobs({ status: 'active' })])
+      .then(([active, inactiveRes, jobsRes]) => {
         setEmployees(active.employees ?? [])
         setInactive(inactiveRes.employees ?? [])
+        setJobs(jobsRes.jobs ?? [])
       })
       .finally(() => setLoading(false))
   }
@@ -80,6 +84,7 @@ export default function AdminEmployees() {
       pay_type:      emp.pay_type      ?? 'w2',
       pay_structure: emp.pay_structure ?? 'hourly',
       pay_rate:      emp.pay_rate      ?? '',
+      default_job_id: emp.default_job_id ?? '',
     })
     setError('')
     setModal(emp)
@@ -113,6 +118,9 @@ export default function AdminEmployees() {
         pay_type:      form.pay_type,
         pay_structure: form.pay_structure,
         pay_rate:      parseFloat(form.pay_rate) || 0,
+      }),
+      ...(modal !== 'create' && {
+        default_job_id: form.default_job_id || null,
       }),
     }
     try {
@@ -353,6 +361,26 @@ export default function AdminEmployees() {
                 helperText={form.pay_structure === 'salary' ? 'Paid each week regardless of hours clocked' : undefined}
               />
             </>
+          )}
+
+          {modal && modal !== 'create' && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">Default Job Site</label>
+              <select
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500"
+                value={form.default_job_id} onChange={set('default_job_id')}
+              >
+                <option value="">— None —</option>
+                {groupJobsByCompany(jobs).map(({ company, jobs: groupJobs }) => (
+                  <optgroup key={company} label={company}>
+                    {groupJobs.map((j) => (
+                      <option key={j.id} value={j.id}>{j.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Auto-selected when this person clocks in — they can still change it</p>
+            </div>
           )}
 
           {error && <p className="text-sm text-red-600 font-medium">{error}</p>}

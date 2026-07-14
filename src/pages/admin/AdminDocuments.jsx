@@ -11,9 +11,8 @@ import { formatCurrency } from '../../utils/format'
 // ─── Company constants ────────────────────────────────────────────────────────
 const COMPANY = {
   name:    'JCCS Services LLC',
-  address: '109 Miller Rd Suite E',
-  city:    'Mauldin, SC 29662',
-  phone:   '(864) 907-9052',
+  address: '1200 Woodruff Rd, Greenville, SC 29607, Suite B-3',
+  phone:   '864-907-9052',
 }
 
 // ─── Period helpers ───────────────────────────────────────────────────────────
@@ -103,18 +102,26 @@ const td = {
 }
 
 // ─── Shared document header ───────────────────────────────────────────────────
+const DOC_BLUE = '#1e3a8a'
+
 function DocHeader({ title, ein }) {
   return (
-    <div style={{ borderBottom: '2.5px solid #1e293b', paddingBottom: '14px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-      <div>
-        <p style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{COMPANY.name}</p>
-        <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '2px 0 0' }}>{COMPANY.address} · {COMPANY.city}</p>
-        <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '1px 0 0' }}>{COMPANY.phone}{ein ? ` · EIN: ${ein}` : ''}</p>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <img src="/jccs-logo.jpg" alt="JCCS Services" style={{ height: '54px', width: 'auto' }} />
+          <div>
+            <p style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.15 }}>{COMPANY.name}</p>
+            <p style={{ fontSize: '0.78rem', color: '#334155', margin: '3px 0 0' }}>{COMPANY.address}</p>
+            <p style={{ fontSize: '0.78rem', color: '#334155', margin: '1px 0 0' }}>{COMPANY.phone}{ein ? ` · EIN: ${ein}` : ''}</p>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ fontSize: '1.15rem', fontWeight: 800, color: DOC_BLUE, textTransform: 'uppercase', letterSpacing: '0.02em', margin: 0, lineHeight: 1.2, maxWidth: '220px' }}>{title}</p>
+          <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '4px 0 0' }}>Generated: {format(new Date(), 'MMMM d, yyyy')}</p>
+        </div>
       </div>
-      <div style={{ textAlign: 'right' }}>
-        <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>{title}</p>
-        <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '3px 0 0' }}>Generated: {format(new Date(), 'MMMM d, yyyy')}</p>
-      </div>
+      <div style={{ borderBottom: `2.5px solid ${DOC_BLUE}`, marginTop: '14px', marginBottom: '20px' }} />
     </div>
   )
 }
@@ -273,7 +280,7 @@ function EmploymentLetterDoc({ emp, jobTitle, purpose, ein, sigName, sigTitle })
 
       <p style={{ marginBottom: '1rem' }}>
         This letter is to confirm that <strong>{emp.name}</strong> is currently employed with <strong>{COMPANY.name}</strong>
-        {jobTitle ? ` in the position of <strong>${jobTitle}</strong>` : ''}. This letter is being issued upon request
+        {jobTitle && <> in the position of <strong>{jobTitle}</strong></>}. This letter is being issued upon request
         for {purposeLabels[purpose] ?? 'general purposes'}.
       </p>
 
@@ -286,7 +293,7 @@ function EmploymentLetterDoc({ emp, jobTitle, purpose, ein, sigName, sigTitle })
         to contact our office at {COMPANY.phone}.
       </p>
 
-      <p style={{ marginBottom: '3rem' }}>Sincerely,</p>
+      <p style={{ marginBottom: '5rem' }}>Sincerely,</p>
 
       <div style={{ borderTop: '1px solid #1e293b', width: '240px', paddingTop: '6px' }}>
         <p style={{ margin: 0, fontWeight: 700 }}>{sigName || '____________________________'}</p>

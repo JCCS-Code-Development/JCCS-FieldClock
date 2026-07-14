@@ -36,12 +36,18 @@ if (!$check->fetch()) {
 }
 
 if ($method === 'GET') {
-    $stmt = $pdo->prepare('SELECT id, name, email, phone, role, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance, is_active, deactivated_at FROM users WHERE id = ?');
+    $stmt = $pdo->prepare(
+        'SELECT u.id, u.name, u.email, u.phone, u.role, u.pay_type, u.pay_rate, u.pay_structure, u.overtime_rate,
+                u.gas_weekly_allowance, u.is_active, u.deactivated_at, u.default_job_id, j.name as default_job_name
+         FROM users u
+         LEFT JOIN jobs j ON j.id = u.default_job_id
+         WHERE u.id = ?'
+    );
     $stmt->execute([$id]);
     echo json_encode($stmt->fetch());
 
 } elseif ($method === 'PUT') {
-    $allowed = ['name', 'email', 'phone', 'role', 'pay_type', 'pay_rate', 'pay_structure', 'overtime_rate', 'gas_weekly_allowance', 'is_active'];
+    $allowed = ['name', 'email', 'phone', 'role', 'pay_type', 'pay_rate', 'pay_structure', 'overtime_rate', 'gas_weekly_allowance', 'is_active', 'default_job_id'];
     $sets = []; $params = [];
 
     foreach ($allowed as $f) {
@@ -49,6 +55,8 @@ if ($method === 'GET') {
 
         if (in_array($f, ['pay_rate', 'overtime_rate', 'gas_weekly_allowance'])) {
             $params[] = ($body[$f] === null || $body[$f] === '') ? null : (float)$body[$f];
+        } elseif ($f === 'default_job_id') {
+            $params[] = ($body[$f] === null || $body[$f] === '') ? null : (int)$body[$f];
         } elseif ($f === 'phone') {
             $params[] = ($body[$f] === null || $body[$f] === '') ? null : sanitizeString((string)$body[$f]);
         } elseif ($f === 'is_active') {

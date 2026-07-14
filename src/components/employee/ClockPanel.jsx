@@ -222,6 +222,15 @@ export default function ClockPanel({ showHeader = true }) {
     if (activeJob?.id) setSelectedJobId(String(activeJob.id))
   }, [activeJob])
 
+  // Auto-select this person's default job site (e.g. office staff who always
+  // clock in from the same place) — still fully overridable via the dropdown.
+  useEffect(() => {
+    if (isClockedIn || selectedJobId || !user?.default_job_id) return
+    if (jobs.some((j) => String(j.id) === String(user.default_job_id))) {
+      setSelectedJobId(String(user.default_job_id))
+    }
+  }, [jobs, user?.default_job_id, isClockedIn, selectedJobId])
+
   const openCorrection = (entry) => {
     setCorrModal(entry)
     setCorrStep(1)

@@ -22,7 +22,14 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
     $active = isset($_GET['active']) ? (int)$_GET['active'] : 1;
-    $stmt   = $pdo->prepare('SELECT id, name, email, phone, role, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance, is_active, deactivated_at FROM users WHERE is_active = ? ORDER BY FIELD(role,\'admin\',\'employee\',\'contractor\'), name');
+    $stmt   = $pdo->prepare(
+        'SELECT u.id, u.name, u.email, u.phone, u.role, u.pay_type, u.pay_rate, u.pay_structure, u.overtime_rate,
+                u.gas_weekly_allowance, u.is_active, u.deactivated_at, u.default_job_id, j.name as default_job_name
+         FROM users u
+         LEFT JOIN jobs j ON j.id = u.default_job_id
+         WHERE u.is_active = ?
+         ORDER BY FIELD(u.role,\'admin\',\'employee\',\'contractor\'), u.name'
+    );
     $stmt->execute([$active]);
     echo json_encode(['employees' => $stmt->fetchAll()]);
 
