@@ -6,7 +6,7 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import Spinner from '../../components/ui/Spinner'
-import { listEmployees, createEmployee, updateEmployee, deactivateEmployee, resetEmployeePassword } from '../../api/employees'
+import { listEmployees, createEmployee, updateEmployee, deactivateEmployee, reactivateEmployee, resetEmployeePassword } from '../../api/employees'
 import { listDocuments, getDocumentUrl } from '../../api/documents'
 import { formatCurrency } from '../../utils/format'
 import { format, parseISO } from 'date-fns'
@@ -40,12 +40,13 @@ const XCircle = () => (
 )
 
 export default function AdminEmployees() {
-  const [employees, setEmployees] = useState([])
-  const [loading, setLoading]     = useState(true)
-  const [modal, setModal]         = useState(null)
-  const [form, setForm]           = useState(EMPTY)
-  const [saving, setSaving]       = useState(false)
-  const [error, setError]         = useState('')
+  const [employees, setEmployees]     = useState([])
+  const [inactive, setInactive]       = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [modal, setModal]             = useState(null)
+  const [form, setForm]               = useState(EMPTY)
+  const [saving, setSaving]           = useState(false)
+  const [error, setError]             = useState('')
 
   // Password reset modal
   const [pwModal,    setPwModal]    = useState(null)  // employee row | null
@@ -60,7 +61,12 @@ export default function AdminEmployees() {
 
   const load = () => {
     setLoading(true)
-    listEmployees().then((d) => setEmployees(d.employees ?? [])).finally(() => setLoading(false))
+    Promise.all([listEmployees({ active: 1 }), listEmployees({ active: 0 })])
+      .then(([active, inactiveRes]) => {
+        setEmployees(active.employees ?? [])
+        setInactive(inactiveRes.employees ?? [])
+      })
+      .finally(() => setLoading(false))
   }
   useEffect(() => { load() }, [])
 
@@ -125,6 +131,16 @@ export default function AdminEmployees() {
       load()
     } catch (err) {
       alert(err?.response?.data?.error ?? 'Could not deactivate. Try again.')
+    }
+  }
+
+  const handleReactivate = async (emp) => {
+    if (!confirm(`Reactivate ${emp.name}? They will be able to log in again.`)) return
+    try {
+      await reactivateEmployee(emp.id)
+      load()
+    } catch (err) {
+      alert(err?.response?.data?.error ?? 'Could not reactivate. Try again.')
     }
   }
 
@@ -195,6 +211,32 @@ export default function AdminEmployees() {
     },
   ]
 
+  const inactiveColumns = [
+    { key: 'name',  label: 'Name' },
+    { key: 'email', label: 'Email' },
+    {
+      key: 'role', label: 'Role',
+      render: (v) => (
+        <Badge variant={v === 'admin' ? 'active' : v === 'contractor' ? 'pending' : 'approved'}>
+          {v}
+        </Badge>
+      ),
+    },
+    {
+      key: 'deactivated_at', label: 'Deactivated',
+      render: (v) => v ? format(parseISO(v), 'MMM d, yyyy') : '—',
+    },
+    {
+      key: 'id', label: '',
+      render: (_, row) => (
+        <div className="flex gap-2">
+          <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(row) }}>Edit</Button>
+          <Button size="sm" onClick={(e) => { e.stopPropagation(); handleReactivate(row) }}>Reactivate</Button>
+        </div>
+      ),
+    },
+  ]
+
   const ROLE_ORDER = ['admin', 'employee', 'contractor']
   const ROLE_LABELS = { admin: 'Admins', employee: 'Employees', contractor: 'Contractors' }
   const grouped = ROLE_ORDER.map(role => ({
@@ -223,6 +265,14 @@ export default function AdminEmployees() {
                 <DataTable columns={columns} data={rows} />
               </div>
             ))}
+            {inactive.length > 0 && (
+              <div>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">
+                  Deactivated Employees
+                </h3>
+                <DataTable columns={inactiveColumns} data={inactive} />
+              </div>
+            )}
           </div>
         )
       }

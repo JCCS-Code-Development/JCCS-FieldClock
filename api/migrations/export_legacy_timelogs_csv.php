@@ -49,7 +49,7 @@ foreach ($pdo->query('SELECT id, full_name, email FROM users') as $row) {
 }
 
 $stmt = $pdo->prepare(
-    'SELECT user_id, type, event_time FROM time_logs
+    'SELECT user_id, type, event_time, notes FROM time_logs
      WHERE event_time BETWEEN ? AND ?
      ORDER BY user_id, event_time'
 );
@@ -90,6 +90,7 @@ foreach ($logsByUser as $userId => $logs) {
                     $userId, $user['name'], $user['email'],
                     substr($pendingIn['event_time'], 0, 10),
                     $pendingIn['event_time'], '', '',
+                    $pendingIn['notes'] ?? '', '',
                     'NO MATCHING OUT',
                 ];
                 $bumpMonth($userId, substr($pendingIn['event_time'], 0, 7), 0, 1, 0.0);
@@ -104,6 +105,7 @@ foreach ($logsByUser as $userId => $logs) {
                 $userId, $user['name'], $user['email'],
                 substr($log['event_time'], 0, 10),
                 '', $log['event_time'], '',
+                '', $log['notes'] ?? '',
                 'OUT WITH NO MATCHING IN',
             ];
             continue;
@@ -113,15 +115,16 @@ foreach ($logsByUser as $userId => $logs) {
         $outTime = new DateTime($log['event_time']);
         $hours   = round(($outTime->getTimestamp() - $inTime->getTimestamp()) / 3600, 2);
 
-        $notes = [];
-        if ($hours < 0)  { $notes[] = 'OUT BEFORE IN'; }
-        if ($hours > 16) { $notes[] = '> 16 HOURS'; }
+        $flags = [];
+        if ($hours < 0)  { $flags[] = 'OUT BEFORE IN'; }
+        if ($hours > 16) { $flags[] = '> 16 HOURS'; }
 
         $detailRows[] = [
             $userId, $user['name'], $user['email'],
             $inTime->format('Y-m-d'),
             $pendingIn['event_time'], $log['event_time'], $hours,
-            implode('; ', $notes),
+            $pendingIn['notes'] ?? '', $log['notes'] ?? '',
+            implode('; ', $flags),
         ];
 
         if ($hours >= 0) {
@@ -138,6 +141,7 @@ foreach ($logsByUser as $userId => $logs) {
             $userId, $user['name'], $user['email'],
             substr($pendingIn['event_time'], 0, 10),
             $pendingIn['event_time'], '', '',
+            $pendingIn['notes'] ?? '', '',
             'NO MATCHING OUT',
         ];
         $bumpMonth($userId, substr($pendingIn['event_time'], 0, 7), 0, 1, 0.0);
@@ -170,7 +174,7 @@ if (!is_dir($OUTPUT_DIR)) {
 
 $detailPath = $OUTPUT_DIR . '/legacy_timelogs_review.csv';
 $fh = fopen($detailPath, 'w');
-fputcsv($fh, ['old_user_id', 'employee_name', 'email', 'date', 'clock_in', 'clock_out', 'hours_worked', 'notes'], ',', '"', '\\');
+fputcsv($fh, ['old_user_id', 'employee_name', 'email', 'date', 'clock_in', 'clock_out', 'hours_worked', 'in_notes', 'out_notes', 'flag'], ',', '"', '\\');
 foreach ($detailRows as $row) { fputcsv($fh, $row, ',', '"', '\\'); }
 fclose($fh);
 

@@ -36,12 +36,12 @@ if (!$check->fetch()) {
 }
 
 if ($method === 'GET') {
-    $stmt = $pdo->prepare('SELECT id, name, email, phone, role, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance, is_active FROM users WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, name, email, phone, role, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance, is_active, deactivated_at FROM users WHERE id = ?');
     $stmt->execute([$id]);
     echo json_encode($stmt->fetch());
 
 } elseif ($method === 'PUT') {
-    $allowed = ['name', 'email', 'phone', 'role', 'pay_type', 'pay_rate', 'pay_structure', 'overtime_rate', 'gas_weekly_allowance'];
+    $allowed = ['name', 'email', 'phone', 'role', 'pay_type', 'pay_rate', 'pay_structure', 'overtime_rate', 'gas_weekly_allowance', 'is_active'];
     $sets = []; $params = [];
 
     foreach ($allowed as $f) {
@@ -51,6 +51,13 @@ if ($method === 'GET') {
             $params[] = ($body[$f] === null || $body[$f] === '') ? null : (float)$body[$f];
         } elseif ($f === 'phone') {
             $params[] = ($body[$f] === null || $body[$f] === '') ? null : sanitizeString((string)$body[$f]);
+        } elseif ($f === 'is_active') {
+            $isActive = !empty($body[$f]) ? 1 : 0;
+            $params[] = $isActive;
+            if ($isActive) {
+                // Reactivating — clear the deactivation date
+                $sets[] = 'deactivated_at = NULL';
+            }
         } else {
             $params[] = sanitizeString((string)$body[$f]);
         }
@@ -87,7 +94,7 @@ if ($method === 'GET') {
     echo json_encode(['message' => 'Updated']);
 
 } elseif ($method === 'DELETE') {
-    $pdo->prepare('UPDATE users SET is_active = 0 WHERE id = ?')->execute([$id]);
+    $pdo->prepare('UPDATE users SET is_active = 0, deactivated_at = NOW() WHERE id = ?')->execute([$id]);
     echo json_encode(['message' => 'Deactivated']);
 
 } else {
