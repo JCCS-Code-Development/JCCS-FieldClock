@@ -28,6 +28,7 @@ export default function AdminJobs() {
   const [form, setForm] = useState(EMPTY)
   const [assignedIds, setAssignedIds] = useState([])
   const [saving, setSaving]         = useState(false)
+  const [formError, setFormError]   = useState('')
   const [suggestions, setSuggestions] = useState([])
   const [sugLoading, setSugLoading]   = useState(false)
   const [showSug, setShowSug]         = useState(false)
@@ -56,11 +57,11 @@ export default function AdminJobs() {
       .finally(() => setLoadingEst(false))
   }
 
-  const openCreate = () => { setForm(EMPTY); setAssignedIds([]); setEstimates([]); setModal('create') }
+  const openCreate = () => { setForm(EMPTY); setAssignedIds([]); setEstimates([]); setFormError(''); setModal('create') }
   const openEdit = (job) => {
     setForm({ ...job })
     setAssignedIds(job.assigned_user_ids ?? [])
-    setNewEstNumber(''); setNewEstDesc(''); setEstError('')
+    setNewEstNumber(''); setNewEstDesc(''); setEstError(''); setFormError('')
     loadEstimates(job.id)
     setModal(job)
   }
@@ -119,7 +120,7 @@ export default function AdminJobs() {
   }
 
   const handleSave = async () => {
-    setSaving(true)
+    setSaving(true); setFormError('')
     try {
       let jobId
       if (modal === 'create') {
@@ -134,6 +135,8 @@ export default function AdminJobs() {
       }
       setModal(null)
       load()
+    } catch (err) {
+      setFormError(err?.response?.data?.error ?? 'Could not save. Try again.')
     } finally {
       setSaving(false)
     }
@@ -141,17 +144,23 @@ export default function AdminJobs() {
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this job?')) return
-    await deleteJob(id)
-    load()
+    try {
+      await deleteJob(id)
+      load()
+    } catch (err) {
+      alert(err?.response?.data?.error ?? 'Could not delete. Try again.')
+    }
   }
 
   const handleApprove = async () => {
-    setSaving(true)
+    setSaving(true); setFormError('')
     try {
       await updateJob(modal.id, { ...form, status: 'active' })
       if (assignedIds.length > 0) await assignEmployees(modal.id, assignedIds)
       setModal(null)
       load()
+    } catch (err) {
+      setFormError(err?.response?.data?.error ?? 'Could not approve. Try again.')
     } finally {
       setSaving(false)
     }
@@ -159,11 +168,13 @@ export default function AdminJobs() {
 
   const handleReject = async () => {
     if (!confirm('Reject this location? It stays on file (marked cancelled) so any time already logged against it is preserved.')) return
-    setSaving(true)
+    setSaving(true); setFormError('')
     try {
       await updateJob(modal.id, { ...form, status: 'cancelled' })
       setModal(null)
       load()
+    } catch (err) {
+      setFormError(err?.response?.data?.error ?? 'Could not reject. Try again.')
     } finally {
       setSaving(false)
     }
@@ -400,6 +411,8 @@ export default function AdminJobs() {
               {estError && <p className="text-xs text-red-600 mt-1.5">{estError}</p>}
             </div>
           )}
+
+          {formError && <p className="text-sm text-red-600 font-medium">{formError}</p>}
 
           {modal && modal !== 'create' && modal.status === 'pending_review' ? (
             <div className="flex flex-col gap-2 pt-2">
