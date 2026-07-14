@@ -5,63 +5,11 @@ import StatsCard from '../../components/admin/StatsCard'
 import Badge from '../../components/ui/Badge'
 import Spinner from '../../components/ui/Spinner'
 import ClockPanel from '../../components/employee/ClockPanel'
-import { getStatus, dayStart, dayEnd } from '../../api/timeclock'
+import { getStatus } from '../../api/timeclock'
 import { useTimeclockStore } from '../../store/timeclockStore'
 import { useAuthStore } from '../../store/authStore'
-import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { getPending } from '../../api/approvals'
 import { listJobs } from '../../api/jobs'
-
-const STATUS_DOT = {
-  working: 'bg-green-500', traveling: 'bg-sky-500', lunch: 'bg-amber-500',
-  material_run: 'bg-violet-500', waiting: 'bg-orange-500',
-}
-
-function CompactClock({ t }) {
-  const { statusLabel, activeJob, dayStarted, setTimeclockData } = useTimeclockStore()
-  const isOnline = useOnlineStatus()
-  const [loading, setLoading] = useState(false)
-  const isClockedIn = dayStarted && statusLabel !== 'done' && statusLabel !== null
-
-  const toggle = async () => {
-    if (!isOnline || loading) return
-    setLoading(true)
-    try {
-      if (!isClockedIn) {
-        const data = await dayStart({ job_id: null, notes: 'Office', lat: null, lng: null, accuracy: null })
-        setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
-      } else {
-        await dayEnd({ lat: null, lng: null })
-        setTimeclockData({ statusLabel: 'done', currentEntry: null, activeJob: null, dayStarted: true })
-      }
-    } catch {} finally { setLoading(false) }
-  }
-
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3.5 flex items-center gap-3">
-      <button onClick={toggle} disabled={loading || !isOnline}
-        className={`w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 transition-colors disabled:opacity-50 ${isClockedIn ? 'bg-red-500' : 'bg-brand-500'}`}>
-        {loading
-          ? <Spinner size="sm" />
-          : isClockedIn
-            ? <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-            : <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-        }
-      </button>
-      <div className="flex-1 min-w-0">
-        {isClockedIn ? (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[statusLabel] ?? 'bg-gray-400'} animate-pulse`} />
-            <p className="text-sm font-semibold text-gray-900 capitalize">{statusLabel?.replace('_', ' ')}</p>
-            {activeJob?.name && <p className="text-xs text-gray-400 truncate">· {activeJob.name}</p>}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500">{t('dashboard.yourClock')}</p>
-        )}
-      </div>
-    </div>
-  )
-}
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
@@ -112,15 +60,10 @@ export default function AdminDashboard() {
 
       {/* Your clock — hourly admins only; salaried admins don't clock in/out at all */}
       {!isSalaried && (
-        <>
-          <div className="lg:hidden">
-            <CompactClock t={t} />
-          </div>
-          <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 p-6">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">{t('dashboard.yourClock')}</p>
-            <ClockPanel />
-          </div>
-        </>
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 lg:p-6">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 lg:mb-4">{t('dashboard.yourClock')}</p>
+          <ClockPanel />
+        </div>
       )}
 
       {/* Stats */}
