@@ -99,10 +99,10 @@ foreach ($userMap as $uid => $u) {
             $regHrs   = $hrs;
             $otHrs    = 0;
         } elseif ($u['pay_type'] === 'w2') {
+            // No overtime multiplier at this company — every hour is paid at the same rate.
             $regHrs   = min($hrs, 40);
             $otHrs    = max(0, $hrs - 40);
-            $otRate   = (float)($u['overtime_rate'] ?? 0) ?: (float)$u['pay_rate'] * 1.5;
-            $weekBase = ($regHrs * (float)$u['pay_rate']) + ($otHrs * $otRate);
+            $weekBase = $hrs * (float)$u['pay_rate'];
         } else {
             $regHrs   = $hrs;
             $otHrs    = 0;

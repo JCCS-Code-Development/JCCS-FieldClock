@@ -66,8 +66,8 @@ if ($isSalary) {
     foreach ($weekMins as $m) {
         $h = $m / 60; $regHours += min($h, 40); $otHours += max(0, $h - 40);
     }
-    $otRate    = (float)($u['overtime_rate'] ?? $rate * 1.5);
-    $baseGross = ($regHours * $rate) + ($otHours * $otRate);
+    // No overtime multiplier at this company — every hour is paid at the same rate.
+    $baseGross = ($regHours + $otHours) * $rate;
 } else {
     $regHours  = $totalApproved;
     $baseGross = $totalApproved * $rate;

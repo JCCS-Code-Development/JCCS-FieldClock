@@ -62,7 +62,7 @@ export default function AdminDashboard() {
       {!isSalaried && (
         <div className="bg-white rounded-2xl border border-gray-100 p-4 lg:p-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 lg:mb-4">{t('dashboard.yourClock')}</p>
-          <ClockPanel />
+          <ClockPanel showHeader={false} />
         </div>
       )}
 

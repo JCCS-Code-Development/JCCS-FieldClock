@@ -138,7 +138,7 @@ function useLiveElapsed(isClockedIn, currentEntry) {
   return elapsed
 }
 
-export default function ClockPanel() {
+export default function ClockPanel({ showHeader = true }) {
   const { t, i18n } = useTranslation()
   const { user } = useAuthStore()
   const firstName = user?.name?.split(' ')[0] ?? ''
@@ -403,15 +403,17 @@ export default function ClockPanel() {
       {/* ── CLOCK SECTION — full width on mobile, left col on desktop ── */}
       <div className="flex flex-col items-center gap-4 lg:gap-8 lg:py-2">
 
-        {/* Header: greeting + date, centered */}
-        <div className="w-full text-center select-none">
-          <p className="text-xl lg:text-2xl font-bold text-gray-900 leading-tight">
-            {t('home.welcome', { name: firstName })}
-          </p>
-          <p className="text-sm lg:text-base text-gray-400 mt-0.5">
-            {t('home.todayIs', { date: format(now, 'EEEE, MMMM d', { locale: dateFnsLocale }) })}
-          </p>
-        </div>
+        {/* Header: greeting + date, centered — omitted when embedded somewhere that already shows one */}
+        {showHeader && (
+          <div className="w-full text-center select-none">
+            <p className="text-xl lg:text-2xl font-bold text-gray-900 leading-tight">
+              {t('home.welcome', { name: firstName })}
+            </p>
+            <p className="text-sm lg:text-base text-gray-400 mt-0.5">
+              {t('home.todayIs', { date: format(now, 'EEEE, MMMM d', { locale: dateFnsLocale }) })}
+            </p>
+          </div>
+        )}
 
         {/* Today's total + Clock button — side by side on mobile, stacked on desktop */}
         <div className="flex items-center justify-between w-full px-1 lg:flex-col lg:gap-8">

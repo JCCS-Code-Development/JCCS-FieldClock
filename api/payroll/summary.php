@@ -96,9 +96,9 @@ foreach ($byUser as $uid => $data) {
             $regHours += min($weekHrs, 40);
             $otHours  += max(0, $weekHrs - 40);
         }
+        // No overtime multiplier at this company — every hour is paid at the same rate.
         $rate      = (float)($u['pay_rate'] ?? 0);
-        $otRate    = (float)($u['overtime_rate'] ?? $rate * 1.5);
-        $baseGross = ($regHours * $rate) + ($otHours * $otRate);
+        $baseGross = ($regHours + $otHours) * $rate;
     } else {
         $rate       = (float)($u['pay_rate'] ?? 0);
         $totalHours = $totalMinutes / 60;
