@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { format, startOfWeek, endOfWeek, subWeeks, parseISO } from 'date-fns'
+import { format, startOfWeek, endOfWeek, subWeeks, addWeeks, parseISO } from 'date-fns'
 import PageHeader from '../../components/admin/PageHeader'
 import Button from '../../components/ui/Button'
 import { listEmployees } from '../../api/employees'
@@ -28,6 +28,25 @@ const PERIODS = Array.from({ length: 16 }, (_, i) => {
 
 const CURRENT_YEAR = new Date().getFullYear()
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i)
+
+// Splits an arbitrary date range into its individual Mon–Sun pay weeks
+function weeksInRange(startStr, endStr) {
+  const weeks = []
+  let cur = startOfWeek(parseISO(startStr), { weekStartsOn: 1 })
+  const rangeEnd = parseISO(endStr)
+  let guard = 0
+  while (cur <= rangeEnd && guard < 260) { // safety cap: 5 years of weeks
+    const weekEnd = endOfWeek(cur, { weekStartsOn: 1 })
+    weeks.push({
+      label: `${format(cur, 'MMM d')} – ${format(weekEnd, 'MMM d, yyyy')}`,
+      start: format(cur, 'yyyy-MM-dd'),
+      end:   format(weekEnd, 'yyyy-MM-dd'),
+    })
+    cur = addWeeks(cur, 1)
+    guard++
+  }
+  return weeks
+}
 
 const PURPOSES = [
   { value: 'general',     label: 'General Purpose' },
@@ -246,6 +265,95 @@ function PayStubDoc({ emp, summary, adjustments, loanDed, period, ein }) {
             <tr style={{ background: '#0f172a' }}>
               <td style={{ padding: '10px', fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>NET PAY</td>
               <td style={{ padding: '10px', textAlign: 'right', fontWeight: 800, color: '#fff', fontSize: '1.05rem' }}>{formatCurrency(netPay)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <DocFooter />
+    </div>
+  )
+}
+
+// ─── Doc 1b: Monthly Earnings Statement (multiple weeks combined) ─────────────
+function MonthlyEarningsDoc({ emp, monthKey, weekStubs, ein }) {
+  const isSalary   = (weekStubs[0]?.summary?.pay_structure ?? 'hourly') === 'salary'
+  const monthLabel = format(parseISO(`${monthKey}-01`), 'MMMM yyyy')
+
+  const totals = weekStubs.reduce((acc, ws) => {
+    const gross = ws.summary.estimated_total ?? 0
+    const net   = Math.max(gross - ws.loanDed, 0)
+    return {
+      hours: acc.hours + (ws.summary.regular_hours ?? 0) + (ws.summary.overtime_hours ?? 0),
+      gross: acc.gross + gross,
+      loanDed: acc.loanDed + ws.loanDed,
+      net: acc.net + net,
+    }
+  }, { hours: 0, gross: 0, loanDed: 0, net: 0 })
+
+  return (
+    <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.875rem', color: '#1e293b', lineHeight: 1.7, padding: '0.5rem 0' }}>
+      <DocHeader title="Monthly Earnings Statement" ein={ein} />
+
+      <div style={{ display: 'flex', gap: '3rem', marginBottom: '20px' }}>
+        <InfoBlock label="Employee">
+          <p style={{ fontWeight: 700, margin: 0 }}>{emp.name}</p>
+          <p style={{ margin: 0 }}>{emp.pay_type?.toUpperCase()} · {isSalary ? 'Salaried' : 'Hourly'}</p>
+          <p style={{ margin: 0 }}>{isSalary ? `${formatCurrency(emp.pay_rate)}/week` : `${formatCurrency(emp.pay_rate)}/hr`}</p>
+        </InfoBlock>
+        <InfoBlock label="Month">
+          <p style={{ fontWeight: 700, margin: 0 }}>{monthLabel}</p>
+          <p style={{ margin: 0 }}>{weekStubs.length} week(s) included</p>
+        </InfoBlock>
+      </div>
+
+      <SectionLabel>Weekly Breakdown</SectionLabel>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px' }}>
+        <thead>
+          <tr style={{ background: '#f8fafc' }}>
+            <th style={th}>Week</th>
+            <th style={{ ...th, textAlign: 'right' }}>Hours</th>
+            <th style={{ ...th, textAlign: 'right' }}>Gross Pay</th>
+            <th style={{ ...th, textAlign: 'right' }}>Deductions</th>
+            <th style={{ ...th, textAlign: 'right' }}>Net Pay</th>
+          </tr>
+        </thead>
+        <tbody>
+          {weekStubs.map((ws, i) => {
+            const gross = ws.summary.estimated_total ?? 0
+            const net   = Math.max(gross - ws.loanDed, 0)
+            const hours = (ws.summary.regular_hours ?? 0) + (ws.summary.overtime_hours ?? 0)
+            return (
+              <tr key={i}>
+                <td style={td}>{format(parseISO(ws.period.start), 'MMM d')} – {format(parseISO(ws.period.end), 'MMM d')}</td>
+                <td style={{ ...td, textAlign: 'right' }}>{isSalary ? '—' : hours.toFixed(2)}</td>
+                <td style={{ ...td, textAlign: 'right' }}>{formatCurrency(gross)}</td>
+                <td style={{ ...td, textAlign: 'right', color: ws.loanDed > 0 ? '#ef4444' : undefined }}>
+                  {ws.loanDed > 0 ? `−${formatCurrency(ws.loanDed)}` : '—'}
+                </td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(net)}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+        <table style={{ width: '280px', borderCollapse: 'collapse', border: '1px solid #e2e8f0', borderRadius: '6px', overflow: 'hidden' }}>
+          <tbody>
+            <tr>
+              <td style={{ ...td, background: '#f8fafc' }}>Total Gross Pay</td>
+              <td style={{ ...td, textAlign: 'right', background: '#f8fafc' }}>{formatCurrency(totals.gross)}</td>
+            </tr>
+            {totals.loanDed > 0 && (
+              <tr>
+                <td style={{ ...td, color: '#ef4444' }}>Total Loan Deductions</td>
+                <td style={{ ...td, textAlign: 'right', color: '#ef4444' }}>−{formatCurrency(totals.loanDed)}</td>
+              </tr>
+            )}
+            <tr style={{ background: '#0f172a' }}>
+              <td style={{ padding: '10px', fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>MONTH NET PAY</td>
+              <td style={{ padding: '10px', textAlign: 'right', fontWeight: 800, color: '#fff', fontSize: '1.05rem' }}>{formatCurrency(totals.net)}</td>
             </tr>
           </tbody>
         </table>
@@ -714,6 +822,20 @@ function FormInput({ label, value, onChange, placeholder, type = 'text' }) {
     </div>
   )
 }
+function FormCheckbox({ label, hint, checked, onChange }) {
+  return (
+    <label className="flex items-start gap-2.5 cursor-pointer sm:col-span-2">
+      <input
+        type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)}
+        className="accent-brand-500 w-4 h-4 mt-0.5"
+      />
+      <span>
+        <span className="text-sm text-gray-700 block">{label}</span>
+        {hint && <span className="text-xs text-gray-400">{hint}</span>}
+      </span>
+    </label>
+  )
+}
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function AdminDocuments() {
@@ -730,7 +852,9 @@ export default function AdminDocuments() {
 
   // Pay Stub form
   const [stubEmpId,  setStubEmpId]  = useState('')
-  const [stubPeriod, setStubPeriod] = useState(0)
+  const [stubStart,  setStubStart]  = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'))
+  const [stubEnd,    setStubEnd]    = useState(format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'))
+  const [stubGroupByMonth, setStubGroupByMonth] = useState(false)
 
   // Employment Letter form
   const [letterEmpId,  setLetterEmpId]  = useState('')
@@ -767,30 +891,58 @@ export default function AdminDocuments() {
     setError('')
     setLoading(true)
     try {
-      const p = PERIODS[parseInt(stubPeriod)]
       const rp = PERIODS[parseInt(regPeriod)]
 
       if (selected === 'paystub') {
         const uid = parseInt(stubEmpId)
         const emp = employees.find((e) => e.id === uid)
         if (!emp) throw new Error('Select an employee.')
-        const [sumData, adjData, loanData] = await Promise.all([
-          getSummary({ start: p.start, end: p.end }),
-          listAdjustments({ user_id: uid, period_start: p.start, period_end: p.end }),
-          getPeriodLoanTotals(p.start, p.end),
-        ])
-        const empSummary = (sumData.summary ?? []).find((s) => s.user_id === uid)
-        if (!empSummary) throw new Error('No payroll data found for this employee and period.')
-        setPreview(
-          <PayStubDoc
-            emp={emp}
-            summary={empSummary}
-            adjustments={adjData.adjustments ?? []}
-            loanDed={loanData[uid] ?? 0}
-            period={p}
-            ein={ein}
-          />
-        )
+
+        const weeks = weeksInRange(stubStart, stubEnd)
+        if (!weeks.length) throw new Error('Select a valid date range.')
+
+        const weekStubs = (await Promise.all(weeks.map(async (wk) => {
+          const [sumData, adjData, loanData] = await Promise.all([
+            getSummary({ start: wk.start, end: wk.end }),
+            listAdjustments({ user_id: uid, period_start: wk.start, period_end: wk.end }),
+            getPeriodLoanTotals(wk.start, wk.end),
+          ])
+          const empSummary = (sumData.summary ?? []).find((s) => s.user_id === uid)
+          return empSummary
+            ? { period: wk, summary: empSummary, adjustments: adjData.adjustments ?? [], loanDed: loanData[uid] ?? 0 }
+            : null
+        }))).filter(Boolean)
+
+        if (!weekStubs.length) throw new Error('No payroll data found for this employee in the selected range.')
+
+        if (stubGroupByMonth && weekStubs.length > 1) {
+          // Group each week into the calendar month its start date falls in
+          const byMonth = {}
+          for (const ws of weekStubs) {
+            const key = format(parseISO(ws.period.start), 'yyyy-MM')
+            ;(byMonth[key] ??= []).push(ws)
+          }
+          const monthGroups = Object.keys(byMonth).sort().map((key) => ({ monthKey: key, weeks: byMonth[key] }))
+          setPreview(
+            <>
+              {monthGroups.map((mg, i) => (
+                <div key={mg.monthKey} style={i < monthGroups.length - 1 ? { pageBreakAfter: 'always' } : undefined}>
+                  <MonthlyEarningsDoc emp={emp} monthKey={mg.monthKey} weekStubs={mg.weeks} ein={ein} />
+                </div>
+              ))}
+            </>
+          )
+        } else {
+          setPreview(
+            <>
+              {weekStubs.map((ws, i) => (
+                <div key={i} style={i < weekStubs.length - 1 ? { pageBreakAfter: 'always' } : undefined}>
+                  <PayStubDoc emp={emp} summary={ws.summary} adjustments={ws.adjustments} loanDed={ws.loanDed} period={ws.period} ein={ein} />
+                </div>
+              ))}
+            </>
+          )
+        }
 
       } else if (selected === 'letter') {
         const emp = employees.find((e) => e.id === parseInt(letterEmpId))
@@ -903,9 +1055,17 @@ export default function AdminDocuments() {
                   <FormSelect label="Employee" value={stubEmpId} onChange={setStubEmpId}>
                     {activeEmps.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                   </FormSelect>
-                  <FormSelect label="Pay Period" value={stubPeriod} onChange={setStubPeriod}>
-                    {PERIODS.map((p, i) => <option key={i} value={i}>{p.label}</option>)}
-                  </FormSelect>
+                  <div />
+                  <FormInput label="Start Date" type="date" value={stubStart} onChange={setStubStart} />
+                  <FormInput label="End Date"   type="date" value={stubEnd}   onChange={setStubEnd} />
+                  {weeksInRange(stubStart, stubEnd).length > 1 && (
+                    <FormCheckbox
+                      label="Combine each month's weeks into one document"
+                      hint="Otherwise a separate page is generated for every week in the range"
+                      checked={stubGroupByMonth}
+                      onChange={setStubGroupByMonth}
+                    />
+                  )}
                 </>
               )}
 
