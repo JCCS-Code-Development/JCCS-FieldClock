@@ -387,8 +387,6 @@ export default function ClockPanel() {
 
   const dateFnsLocale = i18n.language.startsWith('es') ? es : enUS
   const now      = new Date()
-  const dayName  = format(now, 'EEEE',   { locale: dateFnsLocale })
-  const monthDay = format(now, 'MMMM d', { locale: dateFnsLocale })
   const mapPos   = position ? [position.lat, position.lng] : null
   const config   = STATUS_CONFIG[statusLabel] ?? null
 
@@ -399,29 +397,90 @@ export default function ClockPanel() {
   const selectedJobObj = jobs.find((j) => String(j.id) === String(selectedJobId))
 
   return (
-    <div className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:gap-6 w-full">
+    <div className="flex flex-col gap-3.5 lg:grid lg:grid-cols-2 lg:gap-6 w-full">
 
       {/* ── CLOCK SECTION — full width on mobile, left col on desktop ── */}
-      <div className="flex flex-col items-center gap-4 lg:gap-8 lg:py-2">
+      <div className="flex flex-col items-center gap-3.5 lg:gap-8 lg:py-2">
 
-        {/* Welcome */}
-        <p className="text-base font-semibold text-gray-700 lg:text-lg self-start lg:self-center">
-          {t('home.welcome', { name: firstName })}
-        </p>
-
-        {/* Date */}
-        <div className="text-center select-none">
-          <p className="text-xs font-semibold tracking-widest text-gray-400 uppercase">{dayName}</p>
-          <p className="text-3xl lg:text-5xl font-extralight text-gray-900 mt-0.5 leading-none tracking-tight">{monthDay}</p>
+        {/* Header: greeting + date, compact and left-aligned */}
+        <div className="w-full text-left select-none">
+          <p className="text-xl lg:text-2xl font-bold text-gray-900 leading-tight">
+            {t('home.welcome', { name: firstName })}
+          </p>
+          <p className="text-xs lg:text-sm text-gray-400 mt-0.5">
+            {t('home.todayIs', { date: format(now, 'EEEE, MMMM d', { locale: dateFnsLocale }) })}
+          </p>
         </div>
+
+        {/* Location picker — shown here (not buried below) so it's visible without scrolling on mobile */}
+        {!isClockedIn && (
+          <div className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-2">{t('home.selectLocation')}</p>
+            <div className="flex flex-col gap-2">
+              <div className="relative">
+                <select
+                  value={selectedJobId}
+                  onChange={(e) => { setSelectedJobId(e.target.value); setShowManual(false); setError(''); setForceVisitPicker(false) }}
+                  className="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-gray-800 outline-none focus:border-brand-500 appearance-none"
+                >
+                  <option value="">{t('home.selectJobSite')}</option>
+                  {jobs.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.name}{j.distance_meters != null
+                        ? ` · ${j.distance_meters < 1000 ? Math.round(j.distance_meters) + 'm' : (j.distance_meters / 1000).toFixed(1) + 'km'}`
+                        : ''}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
+              </div>
+              {selectedJobObj?.is_recurring_maintenance && !forceVisitPicker && (
+                <button onClick={() => setForceVisitPicker(true)} className="text-xs text-gray-400 hover:text-brand-500 transition-colors text-left">
+                  {t('visitType.needsEstimateOrEmergency')}
+                </button>
+              )}
+              {loadingJobs && <p className="text-xs text-gray-400">{t('home.loadingLocations')}</p>}
+              {(showManual || (!loadingJobs && jobs.length === 0)) ? (
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="text"
+                    placeholder={t('home.typeSiteName')}
+                    value={manualLocation}
+                    onChange={(e) => { setManualLocation(e.target.value); setError('') }}
+                    className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+                    autoFocus={showManual}
+                  />
+                  {position ? (
+                    <p className="text-xs text-gray-400">
+                      {t('home.gpsCapture', { coords: `${position.lat.toFixed(4)}°, ${position.lng.toFixed(4)}°` })}
+                      {locationLabel && ` · ${locationLabel}`}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-500">{t('home.gpsUnavailable')}</p>
+                  )}
+                  {manualLocation.trim() && (
+                    <p className="text-xs text-brand-500">{t('visitType.pendingReviewNotice')}</p>
+                  )}
+                </div>
+              ) : (
+                !selectedJobId && !loadingJobs && jobs.length > 0 && (
+                  <button onClick={() => setShowManual(true)}
+                    className="text-xs text-gray-400 hover:text-brand-500 transition-colors text-left">
+                    {t('home.notListed')}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Clock button */}
         <div className="relative flex items-center justify-center">
-          {isClockedIn && <span className="absolute w-44 h-44 lg:w-60 lg:h-60 rounded-full animate-ping bg-red-400/20" />}
+          {isClockedIn && <span className="absolute w-28 h-28 lg:w-60 lg:h-60 rounded-full animate-ping bg-red-400/20" />}
           <button
             onClick={handleToggle}
             disabled={loading || !isOnline}
-            className={`relative w-36 h-36 lg:w-52 lg:h-52 rounded-full flex flex-col items-center justify-center gap-2 text-white font-semibold shadow-2xl transition-all duration-300 active:scale-95 disabled:opacity-50 ring-[10px]
+            className={`relative w-24 h-24 lg:w-52 lg:h-52 rounded-full flex flex-col items-center justify-center gap-1 lg:gap-2 text-white font-semibold shadow-2xl transition-all duration-300 active:scale-95 disabled:opacity-50 ring-8 lg:ring-[10px]
               ${isClockedIn
                 ? 'bg-red-500 ring-red-100 shadow-red-300/50'
                 : 'bg-brand-500 ring-brand-100 shadow-brand-300/50'
@@ -431,10 +490,10 @@ export default function ClockPanel() {
               ? <Spinner size="lg" />
               : <>
                   {isClockedIn
-                    ? <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                    : <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    ? <svg className="w-8 h-8 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                    : <svg className="w-8 h-8 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                   }
-                  <span className="text-base font-bold tracking-wide">
+                  <span className="text-xs lg:text-base font-bold tracking-wide">
                     {isClockedIn ? t('home.clockOut') : t('home.clockIn')}
                   </span>
                 </>
@@ -442,18 +501,21 @@ export default function ClockPanel() {
           </button>
         </div>
 
-        {/* Status badge */}
+        {/* Status badge + current location, when clocked in */}
         {isClockedIn && config && statusLabel !== 'done' && (
-          <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold border ${config.text} ${config.bg} ${config.border}`}>
-            <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
-            {t(`status.${statusLabel}`)}
-          </span>
+          <div className="flex flex-col items-center gap-1.5">
+            <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold border ${config.text} ${config.bg} ${config.border}`}>
+              <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
+              {t(`status.${statusLabel}`)}
+            </span>
+            {displayLocation && <p className="text-xs text-gray-400">{displayLocation}</p>}
+          </div>
         )}
 
         {/* Today's total */}
         <div className="text-center">
-          <p className="text-[10px] tracking-widest text-gray-400 uppercase font-semibold mb-1.5">{t('home.todaysTotal')}</p>
-          <p className={`text-5xl font-mono font-bold tabular-nums leading-none ${dayTotal > 0 ? 'text-gray-900' : 'text-gray-200'}`}>
+          <p className="text-[10px] tracking-widest text-gray-400 uppercase font-semibold mb-1">{t('home.todaysTotal')}</p>
+          <p className={`text-3xl lg:text-5xl font-bold tabular-nums leading-none ${dayTotal > 0 ? 'text-gray-900' : 'text-gray-200'}`}>
             {formatElapsed(dayTotal)}
           </p>
         </div>
@@ -482,11 +544,11 @@ export default function ClockPanel() {
         {error && <p className="text-xs text-red-600 font-medium text-center">{error}</p>}
       </div>
 
-      {/* ── MAP + ACTIVITY SECTION — below on mobile, right col on desktop ── */}
+      {/* ── MAP + ACTIVITY SECTION — hidden on mobile (fits the clock screen without scrolling), right col on desktop ── */}
       <div className="flex flex-col gap-3">
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
 
-          <div className="h-44 lg:h-52 bg-gray-50 relative">
+          <div className="hidden lg:block h-52 bg-gray-50 relative">
             {mapPos ? (
               <MapContainer
                 center={mapPos} zoom={15}
@@ -508,77 +570,19 @@ export default function ClockPanel() {
             )}
           </div>
 
-          <div className="px-4 py-3 border-b border-gray-50">
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-2">
-              {isClockedIn
-                ? (statusLabel === 'traveling' ? t('home.headingTo') : t('home.clockedInAt'))
-                : t('home.selectLocation')}
-            </p>
-            {isClockedIn ? (
+          {isClockedIn && (
+            <div className="hidden lg:block px-4 py-3 border-b border-gray-50">
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-2">
+                {statusLabel === 'traveling' ? t('home.headingTo') : t('home.clockedInAt')}
+              </p>
               <div>
                 <p className="text-sm font-semibold text-gray-900">{displayLocation ?? t('home.unknown')}</p>
                 {locationLabel && displayLocation !== locationLabel && (
                   <p className="text-xs text-gray-400 mt-0.5">{locationLabel}</p>
                 )}
               </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <div className="relative">
-                  <select
-                    value={selectedJobId}
-                    onChange={(e) => { setSelectedJobId(e.target.value); setShowManual(false); setError(''); setForceVisitPicker(false) }}
-                    className="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-gray-800 outline-none focus:border-brand-500 appearance-none"
-                  >
-                    <option value="">{t('home.selectJobSite')}</option>
-                    {jobs.map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.name}{j.distance_meters != null
-                          ? ` · ${j.distance_meters < 1000 ? Math.round(j.distance_meters) + 'm' : (j.distance_meters / 1000).toFixed(1) + 'km'}`
-                          : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
-                </div>
-                {selectedJobObj?.is_recurring_maintenance && !forceVisitPicker && (
-                  <button onClick={() => setForceVisitPicker(true)} className="text-xs text-gray-400 hover:text-brand-500 transition-colors text-left">
-                    {t('visitType.needsEstimateOrEmergency')}
-                  </button>
-                )}
-                {loadingJobs && <p className="text-xs text-gray-400">{t('home.loadingLocations')}</p>}
-                {(showManual || (!loadingJobs && jobs.length === 0)) ? (
-                  <div className="flex flex-col gap-1">
-                    <input
-                      type="text"
-                      placeholder={t('home.typeSiteName')}
-                      value={manualLocation}
-                      onChange={(e) => { setManualLocation(e.target.value); setError('') }}
-                      className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
-                      autoFocus={showManual}
-                    />
-                    {position ? (
-                      <p className="text-xs text-gray-400">
-                        {t('home.gpsCapture', { coords: `${position.lat.toFixed(4)}°, ${position.lng.toFixed(4)}°` })}
-                        {locationLabel && ` · ${locationLabel}`}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-amber-500">{t('home.gpsUnavailable')}</p>
-                    )}
-                    {manualLocation.trim() && (
-                      <p className="text-xs text-brand-500">{t('visitType.pendingReviewNotice')}</p>
-                    )}
-                  </div>
-                ) : (
-                  !selectedJobId && !loadingJobs && jobs.length > 0 && (
-                    <button onClick={() => setShowManual(true)}
-                      className="text-xs text-gray-400 hover:text-brand-500 transition-colors text-left">
-                      {t('home.notListed')}
-                    </button>
-                  )
-                )}
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Today's activity — collapsible */}
           {(() => {

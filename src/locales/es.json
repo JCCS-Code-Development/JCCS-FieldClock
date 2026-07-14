@@ -29,6 +29,7 @@
   "offline": "Sin conexión — acciones de reloj no disponibles",
   "home": {
     "welcome": "¡Bienvenido, {{name}}!",
+    "todayIs": "Hoy es {{date}}",
     "slogan": "Selecciona un sitio de trabajo y toca para comenzar tu turno.",
     "clockIn": "Registrar Entrada",
     "clockOut": "Registrar Salida",

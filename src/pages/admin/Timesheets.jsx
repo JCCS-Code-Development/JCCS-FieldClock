@@ -78,22 +78,9 @@ function visitColor(entry) {
 }
 
 const STATUS_OPTIONS = [
-  { value: 'working',      label: 'Working' },
-  { value: 'lunch',        label: 'Lunch' },
-  { value: 'material_run', label: 'Material Run' },
-  { value: 'waiting',      label: 'Waiting' },
-  { value: 'traveling',    label: 'Traveling' },
-  { value: 'done',         label: 'Day End' },
+  { value: 'working',   label: 'Working' },
+  { value: 'traveling', label: 'Traveling' },
 ]
-
-const STATUS_COLORS = {
-  working:      'bg-green-100 text-green-700',
-  lunch:        'bg-amber-100 text-amber-700',
-  material_run: 'bg-violet-100 text-violet-700',
-  waiting:      'bg-orange-100 text-orange-700',
-  traveling:    'bg-sky-100 text-sky-700',
-  done:         'bg-gray-100 text-gray-500',
-}
 
 const EditIcon = () => (
   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -246,7 +233,7 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
       {/* Entry type */}
       <div>
         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Type</label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {STATUS_OPTIONS.map(opt => (
             <button key={opt.value} onClick={() => setStatusLabel(opt.value)}
               className={`py-2.5 rounded-xl text-xs font-semibold border-2 transition-colors ${
@@ -411,15 +398,18 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
             {entries.map(entry => {
               const mins     = entryMins(entry)
               const isDayEnd = entry.cost_category === 'day_end'
+              const isTravel = entry.status_label === 'traveling'
               const loc      = entry.job_name ?? (entry.notes?.startsWith('Location:') ? entry.notes.replace('Location: ', '') : null)
               const comment  = entry.notes?.startsWith('Adjustment:') ? entry.notes.replace('Adjustment: ', '')
                              : entry.notes?.startsWith('Location:')   ? ''
                              : (entry.notes ?? '')
               return (
                 <div key={entry.id} className={`flex items-center gap-2.5 px-4 py-3 ${isDayEnd ? 'opacity-40' : ''}`}>
-                  <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold shrink-0 ${STATUS_COLORS[entry.status_label] ?? 'bg-gray-100 text-gray-500'}`}>
-                    {STATUS_OPTIONS.find(o => o.value === entry.status_label)?.label ?? entry.status_label}
-                  </span>
+                  {isTravel && (
+                    <span className="inline-flex px-2 py-0.5 rounded-md text-xs font-semibold shrink-0 bg-sky-100 text-sky-700">
+                      Traveling
+                    </span>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-mono text-gray-700">
                       {formatTime(entry.start_time)}{' → '}
@@ -451,11 +441,10 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left border-b border-gray-100">
-                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-32">Type</th>
-                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Location</th>
-                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-28">Visit</th>
-                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-24">Start</th>
-                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-24">End</th>
+                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-40">Location</th>
+                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-32">Visit</th>
+                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-20">Start</th>
+                  <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-20">End</th>
                   <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide w-16">Hrs</th>
                   <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Comment</th>
                   <th className="px-4 py-2 w-16"></th>
@@ -465,18 +454,23 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                 {entries.map(entry => {
                   const mins     = entryMins(entry)
                   const isDayEnd = entry.cost_category === 'day_end'
+                  const isTravel = entry.status_label === 'traveling'
                   const loc      = entry.job_name ?? (entry.notes?.startsWith('Location:') ? entry.notes.replace('Location: ', '') : null)
                   const comment  = entry.notes?.startsWith('Adjustment:') ? entry.notes.replace('Adjustment: ', '')
                                  : entry.notes?.startsWith('Location:')   ? ''
                                  : (entry.notes ?? '')
                   return (
                     <tr key={entry.id} className={`group ${isDayEnd ? 'opacity-40' : ''}`}>
-                      <td className="px-4 py-2.5">
-                        <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${STATUS_COLORS[entry.status_label] ?? 'bg-gray-100 text-gray-500'}`}>
-                          {STATUS_OPTIONS.find(o => o.value === entry.status_label)?.label ?? entry.status_label}
+                      <td className="px-4 py-2.5 text-gray-600 text-xs truncate max-w-0">
+                        <span className="inline-flex items-center gap-1.5">
+                          {isTravel && (
+                            <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 bg-sky-100 text-sky-700">
+                              Traveling
+                            </span>
+                          )}
+                          <span className="truncate">{loc || <span className="text-gray-300">—</span>}</span>
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-gray-600 text-xs max-w-[140px] truncate">{loc || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-2.5">
                         {describeVisit(entry) ? (
                           <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap ${visitColor(entry)}`}>
@@ -484,13 +478,13 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                           </span>
                         ) : <span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-4 py-2.5 text-gray-700 font-mono text-xs">{formatTime(entry.start_time)}</td>
-                      <td className="px-4 py-2.5 text-xs">
+                      <td className="px-4 py-2.5 text-gray-700 font-mono text-xs whitespace-nowrap">{formatTime(entry.start_time)}</td>
+                      <td className="px-4 py-2.5 text-xs whitespace-nowrap">
                         {entry.end_time
                           ? <span className="text-gray-700 font-mono">{formatTime(entry.end_time)}</span>
                           : <span className="text-orange-500 font-medium">Active</span>}
                       </td>
-                      <td className="px-4 py-2.5 text-xs font-semibold text-gray-700">{isDayEnd ? '—' : fmtDur(mins)}</td>
+                      <td className="px-4 py-2.5 text-xs font-semibold text-gray-700 whitespace-nowrap">{isDayEnd ? '—' : fmtDur(mins)}</td>
                       <td className="px-4 py-2.5 text-xs text-gray-400 max-w-[180px] truncate" title={comment}>
                         {comment || <span className="text-gray-200">—</span>}
                       </td>

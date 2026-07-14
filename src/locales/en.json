@@ -29,6 +29,7 @@
   "offline": "No internet connection — clock actions unavailable",
   "home": {
     "welcome": "Welcome, {{name}}!",
+    "todayIs": "Today is {{date}}",
     "slogan": "Select a job site and tap to start your shift.",
     "clockIn": "Clock In",
     "clockOut": "Clock Out",
