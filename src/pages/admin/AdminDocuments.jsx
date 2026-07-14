@@ -846,7 +846,7 @@ export default function AdminDocuments() {
   const [error,      setError]      = useState('')
 
   // Shared optional fields
-  const [ein,      setEin]      = useState('')
+  const [ein,      setEin]      = useState('47-2422099')
   const [sigName,  setSigName]  = useState('')
   const [sigTitle, setSigTitle] = useState('')
 
@@ -901,17 +901,21 @@ export default function AdminDocuments() {
         const weeks = weeksInRange(stubStart, stubEnd)
         if (!weeks.length) throw new Error('Select a valid date range.')
 
-        const weekStubs = (await Promise.all(weeks.map(async (wk) => {
+        // Fetch one week at a time (not all at once) — a long date range can span
+        // dozens of weeks, and firing every week's requests in parallel can exceed
+        // the shared host's concurrent-connection limit (seen as a 508 error).
+        const weekStubs = []
+        for (const wk of weeks) {
           const [sumData, adjData, loanData] = await Promise.all([
             getSummary({ start: wk.start, end: wk.end }),
             listAdjustments({ user_id: uid, period_start: wk.start, period_end: wk.end }),
             getPeriodLoanTotals(wk.start, wk.end),
           ])
           const empSummary = (sumData.summary ?? []).find((s) => s.user_id === uid)
-          return empSummary
-            ? { period: wk, summary: empSummary, adjustments: adjData.adjustments ?? [], loanDed: loanData[uid] ?? 0 }
-            : null
-        }))).filter(Boolean)
+          if (empSummary) {
+            weekStubs.push({ period: wk, summary: empSummary, adjustments: adjData.adjustments ?? [], loanDed: loanData[uid] ?? 0 })
+          }
+        }
 
         if (!weekStubs.length) throw new Error('No payroll data found for this employee in the selected range.')
 
