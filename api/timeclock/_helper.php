@@ -22,38 +22,71 @@ function closeOpenEntry(PDO $pdo, int $userId, ?float $lat, ?float $lng): ?int {
     return $open['id'];
 }
 
-// Validate an optional visit_type/estimate_id pair. Exits with 422 on invalid input.
-function validateVisitType(PDO $pdo, ?string $visitType, ?int $estimateId, ?int $jobId): void {
-    if ($visitType === null) return;
-    $allowed = ['estimate', 'emergency', 'new_work_order', 'warranty', 'other'];
-    if (!in_array($visitType, $allowed)) {
+// Validate an optional visit_category and its required companion fields.
+// Exits with 422 on invalid input. $jobId is the job this visit is against
+// (an existing active job, or a pending_review location the caller registered).
+function validateVisitCategory(
+    PDO $pdo,
+    ?string $category,
+    ?int $estimateId,
+    ?string $estimateSubtype,
+    ?string $workOrderNumber,
+    ?string $engineerName,
+    ?string $visitDescription,
+    ?int $jobId
+): void {
+    if ($category === null) return; // recurring-maintenance / no classification needed
+
+    $allowed = ['work_order', 'estimate', 'regular', 'estimate_unknown', 'add_on', 'emergency', 'warranty'];
+    if (!in_array($category, $allowed)) {
         http_response_code(422);
-        echo json_encode(['error' => 'Invalid visit_type']);
+        echo json_encode(['error' => 'Invalid visit_category']);
         exit;
     }
-    if ($visitType === 'estimate') {
-        if (!$estimateId) {
-            http_response_code(422);
-            echo json_encode(['error' => 'estimate_id is required when visit_type is estimate']);
-            exit;
-        }
+
+    $fail = function (string $msg) {
+        http_response_code(422);
+        echo json_encode(['error' => $msg]);
+        exit;
+    };
+
+    if ($category === 'work_order') {
+        if (!$jobId) $fail('Work Order requires an existing job location');
+        if (!$workOrderNumber) $fail('Work order number is required');
+    } elseif ($category === 'estimate') {
+        if (!$jobId) $fail('Estimate requires an existing job location');
+        if (!$estimateId) $fail('estimate_id is required when visit_category is estimate');
+        $subtypes = ['regular', 'add_on', 'emergency', 'warranty'];
+        if (!$estimateSubtype || !in_array($estimateSubtype, $subtypes)) $fail('A valid estimate_subtype is required');
         $stmt = $pdo->prepare('SELECT id FROM job_estimates WHERE id = ? AND job_id = ? AND is_active = 1');
         $stmt->execute([$estimateId, $jobId]);
-        if (!$stmt->fetch()) {
-            http_response_code(422);
-            echo json_encode(['error' => 'Estimate not found for this job']);
-            exit;
-        }
+        if (!$stmt->fetch()) $fail('Estimate not found for this job');
+    } elseif ($category === 'add_on') {
+        if (!$engineerName)     $fail('Engineer name is required');
+        if (!$visitDescription) $fail('Original estimate description is required');
+    } else { // regular, estimate_unknown, emergency, warranty (new-location path)
+        if (!$engineerName)     $fail('Engineer name is required');
+        if (!$visitDescription) $fail('Description is required');
     }
 }
 
 // Open a new entry and return full timeclock status payload
-function openEntry(PDO $pdo, int $userId, ?int $jobId, string $statusLabel, string $costCategory, ?float $lat, ?float $lng, ?float $accuracy, ?bool $withinRadius = null, ?string $notes = null, ?string $visitType = null, ?int $estimateId = null): array {
+function openEntry(
+    PDO $pdo, int $userId, ?int $jobId, string $statusLabel, string $costCategory,
+    ?float $lat, ?float $lng, ?float $accuracy, ?bool $withinRadius = null, ?string $notes = null,
+    ?string $visitCategory = null, ?int $estimateId = null, ?string $estimateSubtype = null,
+    ?string $workOrderNumber = null, ?string $engineerName = null, ?string $visitDescription = null
+): array {
     $stmt = $pdo->prepare(
-        'INSERT INTO time_entries (user_id, job_id, visit_type, estimate_id, status_label, cost_category, start_time, start_lat, start_lng, gps_accuracy, within_radius, approval_status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO time_entries
+            (user_id, job_id, estimate_id, visit_category, estimate_subtype, work_order_number, engineer_name, visit_description,
+             status_label, cost_category, start_time, start_lat, start_lng, gps_accuracy, within_radius, approval_status, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)'
     );
-    $stmt->execute([$userId, $jobId, $visitType, $estimateId, $statusLabel, $costCategory, $lat, $lng, $accuracy, $withinRadius, 'approved', $notes]);
+    $stmt->execute([
+        $userId, $jobId, $estimateId, $visitCategory, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
+        $statusLabel, $costCategory, $lat, $lng, $accuracy, $withinRadius, 'approved', $notes,
+    ]);
     $newId = $pdo->lastInsertId();
 
     $entry = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
@@ -62,7 +95,7 @@ function openEntry(PDO $pdo, int $userId, ?int $jobId, string $statusLabel, stri
 
     $activeJob = null;
     if ($jobId) {
-        $j = $pdo->prepare('SELECT id, name, client_name, address, clock_in_radius_meters FROM jobs WHERE id = ?');
+        $j = $pdo->prepare('SELECT id, name, client_name, address, clock_in_radius_meters, status, is_recurring_maintenance FROM jobs WHERE id = ?');
         $j->execute([$jobId]);
         $activeJob = $j->fetch() ?: null;
     }

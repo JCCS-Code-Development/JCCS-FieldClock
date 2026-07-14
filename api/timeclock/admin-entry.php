@@ -62,12 +62,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $costCat     = $COST_MAP[$statusLabel] ?? 'direct_labor';
     $startTime   = $body['start_time'];
     $endTime     = !empty($body['end_time']) ? $body['end_time'] : null;
-    $jobId       = !empty($body['job_id'])   ? (int)$body['job_id'] : null;
-    $notes       = !empty($body['notes'])    ? sanitizeString($body['notes']) : null;
-    $visitType   = !empty($body['visit_type'])  ? trim((string)$body['visit_type']) : null;
-    $estimateId  = !empty($body['estimate_id']) ? (int)$body['estimate_id']         : null;
+    $jobId            = !empty($body['job_id'])   ? (int)$body['job_id'] : null;
+    $notes            = !empty($body['notes'])    ? sanitizeString($body['notes']) : null;
+    $visitCategory    = !empty($body['visit_category'])    ? trim((string)$body['visit_category'])    : null;
+    $estimateId       = !empty($body['estimate_id'])       ? (int)$body['estimate_id']                : null;
+    $estimateSubtype  = !empty($body['estimate_subtype'])  ? trim((string)$body['estimate_subtype'])  : null;
+    $workOrderNumber  = !empty($body['work_order_number']) ? trim((string)$body['work_order_number']) : null;
+    $engineerName     = !empty($body['engineer_name'])     ? trim((string)$body['engineer_name'])     : null;
+    $visitDescription = !empty($body['visit_description']) ? trim((string)$body['visit_description']) : null;
 
-    validateVisitType($pdo, $visitType, $estimateId, $jobId);
+    validateVisitCategory($pdo, $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription, $jobId);
 
     // Check for overlapping entries for this user
     if ($endTime) {
@@ -101,11 +105,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $pdo->prepare(
         'INSERT INTO time_entries
-            (user_id, job_id, visit_type, estimate_id, status_label, cost_category, start_time, end_time,
-             start_lat, start_lng, end_lat, end_lng, approval_status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'approved\', ?)'
-    )->execute([$userId, $jobId, $visitType, $estimateId, $statusLabel, $costCat, $startTime, $endTime,
-                $startLat, $startLng, $endLat, $endLng, $notes]);
+            (user_id, job_id, estimate_id, visit_category, estimate_subtype, work_order_number, engineer_name, visit_description,
+             status_label, cost_category, start_time, end_time, start_lat, start_lng, end_lat, end_lng, approval_status, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'approved\', ?)'
+    )->execute([$userId, $jobId, $estimateId, $visitCategory, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
+                $statusLabel, $costCat, $startTime, $endTime, $startLat, $startLng, $endLat, $endLng, $notes]);
 
     echo json_encode(['entry' => fetchEntry($pdo, (int)$pdo->lastInsertId())]);
     exit;
@@ -155,9 +159,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     if (array_key_exists('notes', $body)) {
         $fields[] = 'notes = ?'; $params[] = !empty($body['notes']) ? sanitizeString($body['notes']) : null;
     }
-    if (array_key_exists('visit_type', $body)) {
-        $newVisitType  = !empty($body['visit_type'])  ? trim((string)$body['visit_type']) : null;
-        $newEstimateId = !empty($body['estimate_id']) ? (int)$body['estimate_id']         : null;
+    if (array_key_exists('visit_category', $body)) {
+        $newVisitCategory    = !empty($body['visit_category'])    ? trim((string)$body['visit_category'])    : null;
+        $newEstimateId       = !empty($body['estimate_id'])       ? (int)$body['estimate_id']                : null;
+        $newEstimateSubtype  = !empty($body['estimate_subtype'])  ? trim((string)$body['estimate_subtype'])  : null;
+        $newWorkOrderNumber  = !empty($body['work_order_number']) ? trim((string)$body['work_order_number']) : null;
+        $newEngineerName     = !empty($body['engineer_name'])     ? trim((string)$body['engineer_name'])     : null;
+        $newVisitDescription = !empty($body['visit_description']) ? trim((string)$body['visit_description']) : null;
 
         if (array_key_exists('job_id', $body) && !empty($body['job_id'])) {
             $jobForValidation = (int)$body['job_id'];
@@ -166,10 +174,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $curJob->execute([$id]);
             $jobForValidation = (int)($curJob->fetch()['job_id'] ?? 0);
         }
-        validateVisitType($pdo, $newVisitType, $newEstimateId, $jobForValidation);
+        validateVisitCategory($pdo, $newVisitCategory, $newEstimateId, $newEstimateSubtype, $newWorkOrderNumber, $newEngineerName, $newVisitDescription, $jobForValidation);
 
-        $fields[] = 'visit_type = ?';  $params[] = $newVisitType;
-        $fields[] = 'estimate_id = ?'; $params[] = $newEstimateId;
+        $fields[] = 'visit_category = ?';    $params[] = $newVisitCategory;
+        $fields[] = 'estimate_id = ?';       $params[] = $newEstimateId;
+        $fields[] = 'estimate_subtype = ?';  $params[] = $newEstimateSubtype;
+        $fields[] = 'work_order_number = ?'; $params[] = $newWorkOrderNumber;
+        $fields[] = 'engineer_name = ?';     $params[] = $newEngineerName;
+        $fields[] = 'visit_description = ?'; $params[] = $newVisitDescription;
     }
 
     if (empty($fields)) { http_response_code(422); exit(json_encode(['error' => 'No fields to update'])); }

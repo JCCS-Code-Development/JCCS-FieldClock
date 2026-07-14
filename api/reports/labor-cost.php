@@ -14,7 +14,7 @@ $pdo     = getPDO();
 
 $selectCol = match($groupBy) {
     'employee'   => 'u.name as group_label, te.user_id as group_id',
-    'visit_type' => 'COALESCE(te.visit_type, "unspecified") as group_label, te.visit_type as group_id',
+    'visit_type' => 'COALESCE(te.visit_category, te.visit_type, "unspecified") as group_label, COALESCE(te.visit_category, te.visit_type) as group_id',
     default      => 'COALESCE(j.name, "No Job") as group_label, te.job_id as group_id',
 };
 

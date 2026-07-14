@@ -13,8 +13,12 @@ const COST_LABELS = {
 }
 
 const VISIT_TYPE_LABELS = {
-  estimate: 'Estimate', emergency: 'Emergency', new_work_order: 'New Work Order',
-  warranty: 'Warranty', other: 'Other', unspecified: 'Unspecified',
+  // current categories
+  work_order: 'Work Order', estimate: 'Estimate', regular: 'Regular',
+  estimate_unknown: 'Estimate (# unknown)', add_on: 'Add-On',
+  emergency: 'Emergency', warranty: 'Warranty', unspecified: 'Unspecified',
+  // retained for entries logged before this restructure
+  new_work_order: 'New Work Order (legacy)', other: 'Other (legacy)',
 }
 
 export default function AdminReports() {

@@ -14,27 +14,67 @@ import { listEstimates } from '../../api/estimates'
 import { getDailyMileage } from '../../api/gps'
 import { formatTime } from '../../utils/format'
 
-const VISIT_TYPE_OPTIONS = [
-  { value: 'estimate',       label: 'Estimate#' },
-  { value: 'emergency',      label: 'Emergency' },
-  { value: 'new_work_order', label: 'New Work Order' },
-  { value: 'warranty',       label: 'Warranty' },
-  { value: 'other',          label: 'Other' },
+const EXISTING_VISIT_OPTIONS = [
+  { value: 'work_order', label: 'Work Order' },
+  { value: 'estimate',   label: 'Estimate' },
+]
+const NEW_LOCATION_VISIT_OPTIONS = [
+  { value: 'regular',          label: 'Regular' },
+  { value: 'estimate_unknown', label: 'Estimate (# unknown)' },
+  { value: 'add_on',           label: 'Add-On' },
+  { value: 'emergency',        label: 'Emergency' },
+  { value: 'warranty',         label: 'Warranty' },
+]
+const ESTIMATE_SUBTYPE_OPTIONS = [
+  { value: 'regular',   label: 'Regular' },
+  { value: 'add_on',    label: 'Add-On' },
+  { value: 'emergency', label: 'Emergency' },
+  { value: 'warranty',  label: 'Warranty' },
 ]
 
-const VISIT_TYPE_LABELS = {
-  estimate: 'Estimate', emergency: 'Emergency', new_work_order: 'New WO', warranty: 'Warranty', other: 'Other',
+const VISIT_CATEGORY_LABELS = {
+  work_order: 'Work Order', estimate: 'Estimate', regular: 'Regular',
+  estimate_unknown: 'Estimate (# unknown)', add_on: 'Add-On', emergency: 'Emergency', warranty: 'Warranty',
+}
+const VISIT_CATEGORY_COLORS = {
+  work_order: 'bg-blue-100 text-blue-700', estimate: 'bg-indigo-100 text-indigo-700',
+  regular: 'bg-gray-100 text-gray-600', estimate_unknown: 'bg-indigo-50 text-indigo-600',
+  add_on: 'bg-purple-100 text-purple-700', emergency: 'bg-red-100 text-red-700', warranty: 'bg-teal-100 text-teal-700',
 }
 
+// Retained only to label/color entries logged before this restructure
+const VISIT_TYPE_LABELS = {
+  estimate: 'Estimate', emergency: 'Emergency', new_work_order: 'New WO (legacy)', warranty: 'Warranty', other: 'Other (legacy)',
+}
 const VISIT_TYPE_COLORS = {
   estimate: 'bg-indigo-100 text-indigo-700', emergency: 'bg-red-100 text-red-700',
   new_work_order: 'bg-blue-100 text-blue-700', warranty: 'bg-teal-100 text-teal-700', other: 'bg-gray-100 text-gray-500',
 }
 
-function visitTypeLabel(entry) {
-  if (!entry.visit_type) return null
-  if (entry.visit_type === 'estimate' && entry.estimate_number) return `Est. #${entry.estimate_number}`
-  return VISIT_TYPE_LABELS[entry.visit_type] ?? entry.visit_type
+function describeVisit(entry) {
+  if (entry.visit_category) {
+    if (entry.visit_category === 'work_order') {
+      return entry.work_order_number ? `WO #${entry.work_order_number}` : 'Work Order'
+    }
+    if (entry.visit_category === 'estimate') {
+      const base = entry.estimate_number ? `Est. #${entry.estimate_number}` : 'Estimate'
+      const sub  = entry.estimate_subtype && entry.estimate_subtype !== 'regular'
+        ? ` · ${VISIT_CATEGORY_LABELS[entry.estimate_subtype] ?? entry.estimate_subtype}` : ''
+      return base + sub
+    }
+    return VISIT_CATEGORY_LABELS[entry.visit_category] ?? entry.visit_category
+  }
+  if (entry.visit_type) {
+    if (entry.visit_type === 'estimate' && entry.estimate_number) return `Est. #${entry.estimate_number}`
+    return VISIT_TYPE_LABELS[entry.visit_type] ?? entry.visit_type
+  }
+  return null
+}
+
+function visitColor(entry) {
+  if (entry.visit_category) return VISIT_CATEGORY_COLORS[entry.visit_category] ?? 'bg-gray-100 text-gray-500'
+  if (entry.visit_type)     return VISIT_TYPE_COLORS[entry.visit_type] ?? 'bg-gray-100 text-gray-500'
+  return 'bg-gray-100 text-gray-500'
 }
 
 const STATUS_OPTIONS = [
@@ -118,10 +158,16 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
   const [error,       setError]       = useState('')
   const [saving,      setSaving]      = useState(false)
 
-  const [visitType,   setVisitType]   = useState(entry?.visit_type ?? '')
-  const [estimateId,  setEstimateId]  = useState(entry?.estimate_id ? String(entry.estimate_id) : '')
+  const [visitCategory,     setVisitCategory]     = useState(entry?.visit_category ?? '')
+  const [estimateId,        setEstimateId]        = useState(entry?.estimate_id ? String(entry.estimate_id) : '')
+  const [estimateSubtype,   setEstimateSubtype]   = useState(entry?.estimate_subtype ?? '')
+  const [workOrderNumber,   setWorkOrderNumber]   = useState(entry?.work_order_number ?? '')
+  const [engineerName,      setEngineerName]      = useState(entry?.engineer_name ?? '')
+  const [visitDescription,  setVisitDescription]  = useState(entry?.visit_description ?? '')
   const [estimates,   setEstimates]   = useState([])
   const [loadingEstimates, setLoadingEstimates] = useState(false)
+
+  const isNewLocationCategory = visitCategory && visitCategory !== 'work_order' && visitCategory !== 'estimate'
 
   // Fetch the selected job's estimates whenever the job changes
   useEffect(() => {
@@ -152,10 +198,14 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
         status_label: statusLabel,
         start_time:   `${entryDate} ${startTime}:00`,
         end_time:     endTime ? `${entryDate} ${endTime}:00` : null,
-        job_id:       jobId ? parseInt(jobId) : null,
-        notes:        notes.trim() || null,
-        visit_type:   visitType || null,
-        estimate_id:  visitType === 'estimate' && estimateId ? parseInt(estimateId) : null,
+        job_id:             jobId ? parseInt(jobId) : null,
+        notes:              notes.trim() || null,
+        visit_category:     visitCategory || null,
+        estimate_id:        visitCategory === 'estimate' && estimateId ? parseInt(estimateId) : null,
+        estimate_subtype:   visitCategory === 'estimate' ? (estimateSubtype || null) : null,
+        work_order_number:  visitCategory === 'work_order' ? (workOrderNumber.trim() || null) : null,
+        engineer_name:      isNewLocationCategory ? (engineerName.trim() || null) : null,
+        visit_description:  isNewLocationCategory ? (visitDescription.trim() || null) : null,
       }
       await onSave(isNew ? { ...payload, user_id: userId } : { ...payload, id: entry.id })
       onClose()
@@ -246,31 +296,62 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
         </div>
       </div>
 
-      {/* Visit type */}
+      {/* Visit category */}
       <div>
-        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Visit Type (optional)</label>
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+          Visit Category (optional) {jobId ? '' : '— new/unlisted location'}
+        </label>
         <div className="grid grid-cols-3 gap-2">
-          {VISIT_TYPE_OPTIONS.map(opt => (
+          {(jobId ? EXISTING_VISIT_OPTIONS : NEW_LOCATION_VISIT_OPTIONS).map(opt => (
             <button key={opt.value}
-              onClick={() => setVisitType(visitType === opt.value ? '' : opt.value)}
+              onClick={() => setVisitCategory(visitCategory === opt.value ? '' : opt.value)}
               className={`py-2 rounded-xl text-xs font-semibold border-2 transition-colors ${
-                visitType === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                visitCategory === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
               }`}>
               {opt.label}
             </button>
           ))}
         </div>
-        {visitType === 'estimate' && (
-          <div className="relative mt-2">
-            <select value={estimateId} onChange={e => setEstimateId(e.target.value)}
-              disabled={loadingEstimates}
-              className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 pr-8 text-sm outline-none focus:border-brand-500 appearance-none bg-white transition-colors disabled:opacity-60">
-              <option value="">{loadingEstimates ? 'Loading estimates…' : '— Select an estimate —'}</option>
-              {estimates.map(est => (
-                <option key={est.id} value={est.id}>#{est.estimate_number}{est.description ? ` · ${est.description}` : ''}</option>
+
+        {visitCategory === 'estimate' && (
+          <>
+            <div className="relative mt-2">
+              <select value={estimateId} onChange={e => setEstimateId(e.target.value)}
+                disabled={loadingEstimates}
+                className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 pr-8 text-sm outline-none focus:border-brand-500 appearance-none bg-white transition-colors disabled:opacity-60">
+                <option value="">{loadingEstimates ? 'Loading estimates…' : '— Select an estimate —'}</option>
+                {estimates.map(est => (
+                  <option key={est.id} value={est.id}>#{est.estimate_number}{est.description ? ` · ${est.description}` : ''}</option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
+            </div>
+            <div className="grid grid-cols-4 gap-2 mt-2">
+              {ESTIMATE_SUBTYPE_OPTIONS.map(opt => (
+                <button key={opt.value}
+                  onClick={() => setEstimateSubtype(opt.value)}
+                  className={`py-1.5 rounded-xl text-[11px] font-semibold border-2 transition-colors ${
+                    estimateSubtype === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                  }`}>
+                  {opt.label}
+                </button>
               ))}
-            </select>
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
+            </div>
+          </>
+        )}
+
+        {visitCategory === 'work_order' && (
+          <input value={workOrderNumber} onChange={e => setWorkOrderNumber(e.target.value)} placeholder="Work Order #"
+            className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500 mt-2" />
+        )}
+
+        {isNewLocationCategory && (
+          <div className="flex flex-col gap-2 mt-2">
+            <input value={engineerName} onChange={e => setEngineerName(e.target.value)} placeholder="Engineer"
+              className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500" />
+            <textarea rows={2} value={visitDescription} onChange={e => setVisitDescription(e.target.value)}
+              placeholder={visitCategory === 'add_on' ? 'Original Estimate Description' : 'Description'}
+              className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500 resize-none" />
           </div>
         )}
       </div>
@@ -347,8 +428,8 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                     {(loc || comment) && (
                       <p className="text-xs text-gray-400 truncate mt-0.5">{loc || comment}</p>
                     )}
-                    {visitTypeLabel(entry) && (
-                      <p className="text-[10px] font-semibold text-gray-400 mt-0.5">{visitTypeLabel(entry)}</p>
+                    {describeVisit(entry) && (
+                      <p className="text-[10px] font-semibold text-gray-400 mt-0.5">{describeVisit(entry)}</p>
                     )}
                   </div>
                   <span className="text-xs font-semibold text-gray-700 shrink-0 w-10 text-right">{isDayEnd ? '' : fmtDur(mins)}</span>
@@ -397,9 +478,9 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                       </td>
                       <td className="px-4 py-2.5 text-gray-600 text-xs max-w-[140px] truncate">{loc || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-2.5">
-                        {visitTypeLabel(entry) ? (
-                          <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap ${VISIT_TYPE_COLORS[entry.visit_type] ?? 'bg-gray-100 text-gray-500'}`}>
-                            {visitTypeLabel(entry)}
+                        {describeVisit(entry) ? (
+                          <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap ${visitColor(entry)}`}>
+                            {describeVisit(entry)}
                           </span>
                         ) : <span className="text-gray-300">—</span>}
                       </td>

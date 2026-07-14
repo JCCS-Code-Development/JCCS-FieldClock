@@ -20,7 +20,7 @@ $pdo  = getPDO();
 
 // Current open entry for this user
 $stmt = $pdo->prepare(
-    'SELECT te.*, j.name as job_name, j.client_name, j.address, j.clock_in_radius_meters
+    'SELECT te.*, j.name as job_name, j.client_name, j.address, j.clock_in_radius_meters, j.is_recurring_maintenance
      FROM time_entries te
      LEFT JOIN jobs j ON j.id = te.job_id
      WHERE te.user_id = ? AND te.end_time IS NULL
@@ -32,11 +32,12 @@ $entry = $stmt->fetch() ?: null;
 $activeJob = null;
 if ($entry && $entry['job_id']) {
     $activeJob = [
-        'id'                    => $entry['job_id'],
-        'name'                  => $entry['job_name'],
-        'client_name'           => $entry['client_name'],
-        'address'               => $entry['address'],
-        'clock_in_radius_meters'=> $entry['clock_in_radius_meters'],
+        'id'                       => $entry['job_id'],
+        'name'                     => $entry['job_name'],
+        'client_name'              => $entry['client_name'],
+        'address'                  => $entry['address'],
+        'clock_in_radius_meters'   => $entry['clock_in_radius_meters'],
+        'is_recurring_maintenance' => $entry['is_recurring_maintenance'],
     ];
 }
 

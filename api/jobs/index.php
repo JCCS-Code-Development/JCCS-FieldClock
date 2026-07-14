@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $status   = isset($_GET['status']) ? sanitizeString($_GET['status']) : null;
     $assigned = isset($_GET['assigned']) && $_GET['assigned'] === 'true';
 
-    $sql    = 'SELECT j.*, GROUP_CONCAT(ja.user_id) as assigned_user_ids FROM jobs j';
+    $sql    = 'SELECT j.*, GROUP_CONCAT(ja.user_id) as assigned_user_ids, MAX(ru.name) as registered_by_name FROM jobs j';
     $params = [];
 
     if ($assigned) {
@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $params[':uid'] = $auth['user_id'];
     }
     $sql .= ' LEFT JOIN job_assignments ja ON ja.job_id = j.id';
+    $sql .= ' LEFT JOIN users ru ON ru.id = j.registered_by';
     $sql .= ' WHERE 1=1';
     if ($status) { $sql .= ' AND j.status = :status'; $params[':status'] = $status; }
     $sql .= ' GROUP BY j.id ORDER BY j.name';

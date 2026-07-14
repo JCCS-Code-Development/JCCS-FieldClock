@@ -24,7 +24,7 @@ if ($method === 'GET') {
     requireAdmin($auth);
     $body = jsonBody();
     $pdo->prepare(
-        'UPDATE jobs SET name=?, client_name=?, address=?, latitude=?, longitude=?, clock_in_radius_meters=?, status=?, notes=?, updated_at=NOW() WHERE id=?'
+        'UPDATE jobs SET name=?, client_name=?, address=?, latitude=?, longitude=?, clock_in_radius_meters=?, status=?, notes=?, is_recurring_maintenance=?, updated_at=NOW() WHERE id=?'
     )->execute([
         sanitizeString($body['name'] ?? ''),
         sanitizeString($body['client_name'] ?? ''),
@@ -34,6 +34,7 @@ if ($method === 'GET') {
         (int)($body['clock_in_radius_meters'] ?? 300),
         sanitizeString($body['status'] ?? 'active'),
         sanitizeString($body['notes']  ?? ''),
+        !empty($body['is_recurring_maintenance']) ? 1 : 0,
         $id,
     ]);
     echo json_encode(['message' => 'Updated']);

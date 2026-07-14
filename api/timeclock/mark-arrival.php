@@ -23,9 +23,13 @@ requireFields($body, ['job_id']);
 $jobId      = (int)$body['job_id'];
 $lat        = isset($body['lat'])      ? (float)$body['lat']      : null;
 $lng        = isset($body['lng'])      ? (float)$body['lng']      : null;
-$acc        = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
-$visitType  = !empty($body['visit_type'])  ? trim((string)$body['visit_type']) : null;
-$estimateId = !empty($body['estimate_id']) ? (int)$body['estimate_id']         : null;
+$acc              = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
+$visitCategory    = !empty($body['visit_category'])    ? trim((string)$body['visit_category'])    : null;
+$estimateId       = !empty($body['estimate_id'])       ? (int)$body['estimate_id']                : null;
+$estimateSubtype  = !empty($body['estimate_subtype'])  ? trim((string)$body['estimate_subtype'])  : null;
+$workOrderNumber  = !empty($body['work_order_number']) ? trim((string)$body['work_order_number']) : null;
+$engineerName     = !empty($body['engineer_name'])     ? trim((string)$body['engineer_name'])     : null;
+$visitDescription = !empty($body['visit_description']) ? trim((string)$body['visit_description']) : null;
 
 $pdo = getPDO();
 requireHourly($auth, $pdo);
@@ -35,7 +39,7 @@ $job->execute([$jobId]);
 $job = $job->fetch();
 if (!$job) { http_response_code(404); exit(json_encode(['error' => 'Job not found'])); }
 
-validateVisitType($pdo, $visitType, $estimateId, $jobId);
+validateVisitCategory($pdo, $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription, $jobId);
 
 // GPS radius check
 $withinRadius = null;
@@ -46,7 +50,10 @@ if ($lat !== null && $lng !== null && $job['latitude'] && $job['longitude']) {
 }
 
 closeOpenEntry($pdo, $auth['user_id'], $lat, $lng);
-$result = openEntry($pdo, $auth['user_id'], $jobId, 'working', 'direct_labor', $lat, $lng, $acc, $withinRadius, null, $visitType, $estimateId);
+$result = openEntry(
+    $pdo, $auth['user_id'], $jobId, 'working', 'direct_labor', $lat, $lng, $acc, $withinRadius, null,
+    $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription
+);
 
 echo json_encode([
     'timeclock'       => $result,

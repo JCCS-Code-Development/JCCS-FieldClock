@@ -20,3 +20,6 @@ export const deleteJob = (id) =>
 
 export const assignEmployees = (jobId, userIds) =>
   client.post('/jobs/assign.php', { job_id: jobId, user_ids: userIds }).then((r) => r.data)
+
+export const registerJob = (data) =>
+  client.post('/jobs/register.php', data).then((r) => r.data)

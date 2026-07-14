@@ -11,7 +11,7 @@ import { listEmployees } from '../../api/employees'
 import { listEstimates, createEstimate, updateEstimate } from '../../api/estimates'
 import JobsMap from '../../components/admin/JobsMap'
 
-const EMPTY = { name: '', client_name: '', address: '', latitude: '', longitude: '', clock_in_radius_meters: 300, status: 'active', notes: '' }
+const EMPTY = { name: '', client_name: '', address: '', latitude: '', longitude: '', clock_in_radius_meters: 300, status: 'active', notes: '', is_recurring_maintenance: false }
 
 async function searchAddresses(query) {
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&countrycodes=us&q=${encodeURIComponent(query)}`
@@ -144,9 +144,36 @@ export default function AdminJobs() {
     load()
   }
 
+  const handleApprove = async () => {
+    setSaving(true)
+    try {
+      await updateJob(modal.id, { ...form, status: 'active' })
+      if (assignedIds.length > 0) await assignEmployees(modal.id, assignedIds)
+      setModal(null)
+      load()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!confirm('Reject this location? It stays on file (marked cancelled) so any time already logged against it is preserved.')) return
+    setSaving(true)
+    try {
+      await updateJob(modal.id, { ...form, status: 'cancelled' })
+      setModal(null)
+      load()
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const toggleAssign = (id) =>
     setAssignedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
+
+  const pendingJobs = jobs.filter((j) => j.status === 'pending_review')
+  const listedJobs   = jobs.filter((j) => j.status !== 'pending_review')
 
   const columns = [
     { key: 'name', label: 'Job Title' },
@@ -169,12 +196,33 @@ export default function AdminJobs() {
         actions={<Button onClick={openCreate}>+ New Job</Button>}
       />
 
-      {!loading && jobs.length > 0 && (
-        <JobsMap jobs={jobs} onJobClick={openEdit} />
+      {!loading && pendingJobs.length > 0 && (
+        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-800 mb-2">
+            {pendingJobs.length} location{pendingJobs.length === 1 ? '' : 's'} awaiting review
+          </p>
+          <div className="flex flex-col gap-2">
+            {pendingJobs.map((j) => (
+              <div key={j.id} className="flex items-center justify-between gap-3 bg-white rounded-xl px-4 py-2.5 border border-amber-100">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">{j.name}</p>
+                  <p className="text-xs text-gray-400">
+                    Registered by {j.registered_by_name ?? 'an employee'} on {new Date(j.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <Button size="sm" onClick={() => openEdit(j)}>Review</Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!loading && listedJobs.length > 0 && (
+        <JobsMap jobs={listedJobs} onJobClick={openEdit} />
       )}
 
       {loading ? <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-        : <DataTable columns={columns} data={jobs} emptyMessage="No jobs yet." />}
+        : <DataTable columns={columns} data={listedJobs} emptyMessage="No jobs yet." />}
 
       <Modal isOpen={!!modal} onClose={() => setModal(null)} title={modal === 'create' ? 'New Job' : 'Edit Job'} size="lg">
         <div className="flex flex-col gap-4">
@@ -261,6 +309,16 @@ export default function AdminJobs() {
                 rows={2} value={form.notes} onChange={set('notes')}
               />
             </div>
+            <label className="col-span-2 flex items-center gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!form.is_recurring_maintenance}
+                onChange={(e) => setForm((f) => ({ ...f, is_recurring_maintenance: e.target.checked }))}
+                className="accent-brand-500 w-4 h-4"
+              />
+              <span className="text-sm text-gray-700">Recurring maintenance location</span>
+              <span className="text-xs text-gray-400">— skips the Work Order/Estimate picker at clock-in by default</span>
+            </label>
           </div>
 
           {/* Employee assignment */}
@@ -328,10 +386,23 @@ export default function AdminJobs() {
             </div>
           )}
 
-          <div className="flex gap-3 pt-2">
-            <Button variant="secondary" fullWidth onClick={() => setModal(null)}>Cancel</Button>
-            <Button fullWidth loading={saving} onClick={handleSave}>Save Job</Button>
-          </div>
+          {modal && modal !== 'create' && modal.status === 'pending_review' ? (
+            <div className="flex flex-col gap-2 pt-2">
+              <p className="text-xs text-gray-400">
+                Confirm the client name/address/radius above, then approve this location so it appears
+                for everyone, or reject it if it was registered in error.
+              </p>
+              <div className="flex gap-3">
+                <Button variant="secondary" fullWidth onClick={handleReject} disabled={saving}>Reject</Button>
+                <Button fullWidth loading={saving} onClick={handleApprove}>Approve Location</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" fullWidth onClick={() => setModal(null)}>Cancel</Button>
+              <Button fullWidth loading={saving} onClick={handleSave}>Save Job</Button>
+            </div>
+          )}
         </div>
       </Modal>
     </div>

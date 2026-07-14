@@ -22,11 +22,21 @@ $lng  = isset($body['lng']) ? (float)$body['lng'] : null;
 $acc  = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
 $pdo  = getPDO();
 requireHourly($auth, $pdo);
-$last = $pdo->prepare('SELECT job_id, visit_type, estimate_id FROM time_entries WHERE user_id = ? ORDER BY start_time DESC LIMIT 1');
+$last = $pdo->prepare(
+    'SELECT job_id, estimate_id, visit_category, estimate_subtype, work_order_number, engineer_name, visit_description
+     FROM time_entries WHERE user_id = ? ORDER BY start_time DESC LIMIT 1'
+);
 $last->execute([$auth['user_id']]);
-$prev       = $last->fetch();
-$jobId      = $prev['job_id']      ?? null;
-$visitType  = $prev['visit_type']  ?? null;
-$estimateId = $prev['estimate_id'] ?? null;
+$prev             = $last->fetch();
+$jobId            = $prev['job_id']            ?? null;
+$estimateId       = $prev['estimate_id']       ?? null;
+$visitCategory    = $prev['visit_category']    ?? null;
+$estimateSubtype  = $prev['estimate_subtype']  ?? null;
+$workOrderNumber  = $prev['work_order_number'] ?? null;
+$engineerName     = $prev['engineer_name']     ?? null;
+$visitDescription = $prev['visit_description'] ?? null;
 closeOpenEntry($pdo, $auth['user_id'], $lat, $lng);
-echo json_encode(openEntry($pdo, $auth['user_id'], $jobId, 'material_run', 'material_pickup', $lat, $lng, $acc, null, null, $visitType, $estimateId));
+echo json_encode(openEntry(
+    $pdo, $auth['user_id'], $jobId, 'material_run', 'material_pickup', $lat, $lng, $acc, null, null,
+    $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription
+));
