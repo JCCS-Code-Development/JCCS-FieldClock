@@ -1,9 +1,10 @@
-// Groups a list of jobs by client_name (the hospital/company they belong to),
-// sorted alphabetically by client, with jobs missing a client bucketed last.
-export function groupJobsByClient(jobs) {
+// Groups a list of jobs by company (the hospital/business the job belongs to —
+// distinct from client_name, which is the contact/client on file for that job),
+// sorted alphabetically by company, with jobs missing a company bucketed last.
+export function groupJobsByCompany(jobs) {
   const groups = {}
   for (const j of jobs ?? []) {
-    const key = j.client_name?.trim() || 'Other'
+    const key = j.company?.trim() || 'Other'
     if (!groups[key]) groups[key] = []
     groups[key].push(j)
   }
@@ -13,8 +14,8 @@ export function groupJobsByClient(jobs) {
       if (b === 'Other') return -1
       return a.localeCompare(b)
     })
-    .map((client) => ({
-      client,
-      jobs: groups[client].sort((a, b) => a.name.localeCompare(b.name)),
+    .map((company) => ({
+      company,
+      jobs: groups[company].sort((a, b) => a.name.localeCompare(b.name)),
     }))
 }

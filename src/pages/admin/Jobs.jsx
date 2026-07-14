@@ -10,9 +10,9 @@ import { listJobs, createJob, updateJob, deleteJob, assignEmployees } from '../.
 import { listEmployees } from '../../api/employees'
 import { listEstimates, createEstimate, updateEstimate } from '../../api/estimates'
 import JobsMap from '../../components/admin/JobsMap'
-import { groupJobsByClient } from '../../utils/jobs'
+import { groupJobsByCompany } from '../../utils/jobs'
 
-const EMPTY = { name: '', client_name: '', address: '', latitude: '', longitude: '', clock_in_radius_meters: 300, status: 'active', notes: '', is_recurring_maintenance: false }
+const EMPTY = { name: '', client_name: '', company: '', address: '', latitude: '', longitude: '', clock_in_radius_meters: 300, status: 'active', notes: '', is_recurring_maintenance: false }
 
 async function searchAddresses(query) {
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&countrycodes=us&q=${encodeURIComponent(query)}`
@@ -175,13 +175,14 @@ export default function AdminJobs() {
 
   const pendingJobs = jobs.filter((j) => j.status === 'pending_review')
   const listedJobs   = jobs.filter((j) => j.status !== 'pending_review')
-  const groupedJobs  = groupJobsByClient(listedJobs)
+  const groupedJobs  = groupJobsByCompany(listedJobs)
 
   const columns = [
-    { key: 'name', label: 'Job Title' },
+    { key: 'name', label: 'Job Title', className: 'w-44' },
+    { key: 'client_name', label: 'Client', className: 'w-40', render: (v) => v || <span className="text-gray-300">—</span> },
     { key: 'address', label: 'Address' },
-    { key: 'status', label: 'Status', render: (v) => <Badge variant={v}>{v}</Badge> },
-    { key: 'id', label: '', render: (_, row) => (
+    { key: 'status', label: 'Status', className: 'w-24', render: (v) => <Badge variant={v}>{v}</Badge> },
+    { key: 'id', label: '', className: 'w-44', render: (_, row) => (
       <div className="flex gap-2">
         <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(row) }}>Edit</Button>
         <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDelete(row.id) }}>Delete</Button>
@@ -227,10 +228,10 @@ export default function AdminJobs() {
           <p className="text-center text-gray-400 py-16 text-sm">No jobs yet.</p>
         ) : (
           <div className="flex flex-col gap-8">
-            {groupedJobs.map(({ client, jobs: groupJobs }) => (
-              <div key={client}>
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">{client}</h3>
-                <DataTable columns={columns} data={groupJobs} />
+            {groupedJobs.map(({ company, jobs: groupJobs }) => (
+              <div key={company}>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">{company}</h3>
+                <DataTable columns={columns} data={groupJobs} fixed />
               </div>
             ))}
           </div>
@@ -240,6 +241,8 @@ export default function AdminJobs() {
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
             <Input label="Job Title *" value={form.name} onChange={set('name')} className="col-span-2" />
+            <Input label="Company" value={form.company} onChange={set('company')} className="col-span-2"
+              helperText="The hospital/business this job belongs to — used to group jobs on lists" />
             <Input label="Client Name *" value={form.client_name} onChange={set('client_name')} className="col-span-2" />
             <div className="col-span-2 flex flex-col gap-1" ref={addrRef}>
               <label className="text-sm font-medium text-gray-700">Address *</label>

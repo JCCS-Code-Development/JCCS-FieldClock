@@ -44,10 +44,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $body = jsonBody();
     requireFields($body, ['name', 'client_name', 'address']);
 
-    $stmt = $pdo->prepare('INSERT INTO jobs (name, client_name, address, latitude, longitude, clock_in_radius_meters, status, notes) VALUES (?,?,?,?,?,?,?,?)');
+    $stmt = $pdo->prepare('INSERT INTO jobs (name, client_name, company, address, latitude, longitude, clock_in_radius_meters, status, notes) VALUES (?,?,?,?,?,?,?,?,?)');
     $stmt->execute([
         sanitizeString($body['name']),
         sanitizeString($body['client_name']),
+        !empty($body['company']) ? sanitizeString($body['company']) : null,
         sanitizeString($body['address']),
         $body['latitude']  ?? null,
         $body['longitude'] ?? null,

@@ -13,7 +13,7 @@ import { listJobs } from '../../api/jobs'
 import { listEstimates } from '../../api/estimates'
 import { getDailyMileage } from '../../api/gps'
 import { formatTime } from '../../utils/format'
-import { groupJobsByClient } from '../../utils/jobs'
+import { groupJobsByCompany } from '../../utils/jobs'
 
 const EXISTING_VISIT_OPTIONS = [
   { value: 'work_order', label: 'Work Order' },
@@ -276,10 +276,10 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
           <select value={jobId} onChange={e => setJobId(e.target.value)}
             className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 pr-8 text-sm outline-none focus:border-brand-500 appearance-none bg-white transition-colors">
             <option value="">— No project assigned —</option>
-            {groupJobsByClient(jobs).map(({ client, jobs: groupJobs }) => (
-              <optgroup key={client} label={client}>
+            {groupJobsByCompany(jobs).map(({ company, jobs: groupJobs }) => (
+              <optgroup key={company} label={company}>
                 {groupJobs.map(j => (
-                  <option key={j.id} value={j.id}>{j.name}</option>
+                  <option key={j.id} value={j.id}>{j.name}{j.client_name ? ` · ${j.client_name}` : ''}</option>
                 ))}
               </optgroup>
             ))}
