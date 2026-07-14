@@ -10,6 +10,7 @@ import { listJobs, createJob, updateJob, deleteJob, assignEmployees } from '../.
 import { listEmployees } from '../../api/employees'
 import { listEstimates, createEstimate, updateEstimate } from '../../api/estimates'
 import JobsMap from '../../components/admin/JobsMap'
+import { groupJobsByClient } from '../../utils/jobs'
 
 const EMPTY = { name: '', client_name: '', address: '', latitude: '', longitude: '', clock_in_radius_meters: 300, status: 'active', notes: '', is_recurring_maintenance: false }
 
@@ -174,10 +175,10 @@ export default function AdminJobs() {
 
   const pendingJobs = jobs.filter((j) => j.status === 'pending_review')
   const listedJobs   = jobs.filter((j) => j.status !== 'pending_review')
+  const groupedJobs  = groupJobsByClient(listedJobs)
 
   const columns = [
     { key: 'name', label: 'Job Title' },
-    { key: 'client_name', label: 'Client' },
     { key: 'address', label: 'Address' },
     { key: 'status', label: 'Status', render: (v) => <Badge variant={v}>{v}</Badge> },
     { key: 'id', label: '', render: (_, row) => (
@@ -222,7 +223,18 @@ export default function AdminJobs() {
       )}
 
       {loading ? <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-        : <DataTable columns={columns} data={listedJobs} emptyMessage="No jobs yet." />}
+        : groupedJobs.length === 0 ? (
+          <p className="text-center text-gray-400 py-16 text-sm">No jobs yet.</p>
+        ) : (
+          <div className="flex flex-col gap-8">
+            {groupedJobs.map(({ client, jobs: groupJobs }) => (
+              <div key={client}>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">{client}</h3>
+                <DataTable columns={columns} data={groupJobs} />
+              </div>
+            ))}
+          </div>
+        )}
 
       <Modal isOpen={!!modal} onClose={() => setModal(null)} title={modal === 'create' ? 'New Job' : 'Edit Job'} size="lg">
         <div className="flex flex-col gap-4">

@@ -12,6 +12,7 @@ import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { getStatus, dayStart, dayEnd, setTraveling, markArrival, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
 import { getNearbyJobs, listJobs, registerJob } from '../../api/jobs'
 import { listEstimates } from '../../api/estimates'
+import { groupJobsByClient } from '../../utils/jobs'
 import Spinner from '../ui/Spinner'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
@@ -531,12 +532,16 @@ export default function ClockPanel() {
                     className="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-gray-800 outline-none focus:border-brand-500 appearance-none"
                   >
                     <option value="">{t('home.selectJobSite')}</option>
-                    {jobs.map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.name}{j.distance_meters != null
-                          ? ` · ${j.distance_meters < 1000 ? Math.round(j.distance_meters) + 'm' : (j.distance_meters / 1000).toFixed(1) + 'km'}`
-                          : ''}
-                      </option>
+                    {groupJobsByClient(jobs).map(({ client, jobs: groupJobs }) => (
+                      <optgroup key={client} label={client}>
+                        {groupJobs.map((j) => (
+                          <option key={j.id} value={j.id}>
+                            {j.name}{j.distance_meters != null
+                              ? ` · ${j.distance_meters < 1000 ? Math.round(j.distance_meters) + 'm' : (j.distance_meters / 1000).toFixed(1) + 'km'}`
+                              : ''}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
