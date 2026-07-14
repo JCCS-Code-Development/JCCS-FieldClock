@@ -73,11 +73,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     validateVisitCategory($pdo, $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription, $jobId);
 
-    // Check for overlapping entries for this user
+    // Check for overlapping entries for this user (day_end markers are zero-duration
+    // clock-out stamps that are never given an end_time, so they must be excluded here
+    // or they'd falsely "overlap" with everything for that employee forever)
     if ($endTime) {
         $overlap = $pdo->prepare(
             'SELECT id FROM time_entries
              WHERE user_id = ?
+               AND cost_category != \'day_end\'
                AND start_time < ?
                AND (end_time IS NULL OR end_time > ?)
              LIMIT 1'
@@ -200,6 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $overlap = $pdo->prepare(
                 'SELECT id FROM time_entries
                  WHERE user_id = ? AND id != ?
+                   AND cost_category != \'day_end\'
                    AND start_time < ?
                    AND (end_time IS NULL OR end_time > ?)
                  LIMIT 1'
