@@ -100,6 +100,8 @@ export default function AdminDashboard() {
 
   if (loading) return <div className="flex justify-center py-24"><Spinner size="lg" /></div>
 
+  const isSalaried = user?.pay_structure === 'salary'
+
   return (
     <div className="flex flex-col gap-4 w-full">
       <div>
@@ -108,14 +110,18 @@ export default function AdminDashboard() {
         <p className="text-sm text-gray-500 mt-0.5">{t('dashboard.overview')}</p>
       </div>
 
-      {/* Your clock */}
-      <div className="lg:hidden">
-        <CompactClock t={t} />
-      </div>
-      <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 p-6">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">{t('dashboard.yourClock')}</p>
-        <ClockPanel />
-      </div>
+      {/* Your clock — hourly admins only; salaried admins don't clock in/out at all */}
+      {!isSalaried && (
+        <>
+          <div className="lg:hidden">
+            <CompactClock t={t} />
+          </div>
+          <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 p-6">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">{t('dashboard.yourClock')}</p>
+            <ClockPanel />
+          </div>
+        </>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
