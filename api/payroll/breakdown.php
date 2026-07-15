@@ -18,7 +18,7 @@ $pdo    = getPDO();
 $stmt = $pdo->prepare(
     "SELECT te.*, j.name as job_name,
             DATE(te.start_time) as work_date,
-            TIMESTAMPDIFF(MINUTE, te.start_time, te.end_time) as minutes
+            ROUND(TIMESTAMPDIFF(SECOND, te.start_time, te.end_time) / 60) as minutes
      FROM time_entries te
      LEFT JOIN jobs j ON j.id = te.job_id
      WHERE te.user_id = :uid

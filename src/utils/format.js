@@ -9,7 +9,7 @@ export const formatCurrency = (n) =>
 
 export const formatDuration = (startIso, endIso) => {
   if (!startIso || !endIso) return '—'
-  const mins = differenceInMinutes(parseISO(endIso), parseISO(startIso))
+  const mins = differenceInMinutes(parseISO(endIso), parseISO(startIso), { roundingMethod: 'round' })
   const h = Math.floor(mins / 60)
   const m = mins % 60
   return h > 0 ? `${h}h ${m}m` : `${m}m`

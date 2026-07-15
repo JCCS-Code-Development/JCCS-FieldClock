@@ -19,7 +19,7 @@ $selectCol = match($groupBy) {
 };
 
 $sql = "SELECT $selectCol, te.cost_category,
-               SUM(TIMESTAMPDIFF(MINUTE, te.start_time, te.end_time)) / 60.0 as hours,
+               SUM(ROUND(TIMESTAMPDIFF(SECOND, te.start_time, te.end_time) / 60)) / 60.0 as hours,
                u.pay_rate, u.overtime_rate, u.pay_type
         FROM time_entries te
         JOIN users u ON u.id = te.user_id

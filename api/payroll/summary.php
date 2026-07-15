@@ -17,7 +17,7 @@ $pdo   = getPDO();
 // Fetch all approved, closed entries in range
 $entries = $pdo->prepare(
     "SELECT te.user_id, te.cost_category, te.start_time, te.end_time,
-            TIMESTAMPDIFF(MINUTE, te.start_time, te.end_time) as minutes,
+            ROUND(TIMESTAMPDIFF(SECOND, te.start_time, te.end_time) / 60) as minutes,
             YEARWEEK(te.start_time, 3) as iso_week
      FROM time_entries te
      WHERE DATE(te.start_time) BETWEEN :start AND :end

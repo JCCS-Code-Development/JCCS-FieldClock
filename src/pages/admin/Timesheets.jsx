@@ -115,7 +115,7 @@ function fmtDur(mins) {
 
 function entryMins(entry) {
   if (!entry.end_time) return 0
-  return Math.max(0, differenceInMinutes(new Date(entry.end_time), new Date(entry.start_time)))
+  return Math.max(0, differenceInMinutes(new Date(entry.end_time), new Date(entry.start_time), { roundingMethod: 'round' }))
 }
 
 function totalMins(entries) {

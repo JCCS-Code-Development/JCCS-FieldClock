@@ -15,7 +15,7 @@ $entries = $pdo->prepare("
     SELECT te.user_id,
            YEARWEEK(te.start_time, 3)     AS iso_week,
            QUARTER(te.start_time)          AS quarter,
-           SUM(TIMESTAMPDIFF(MINUTE, te.start_time, te.end_time)) AS minutes
+           SUM(ROUND(TIMESTAMPDIFF(SECOND, te.start_time, te.end_time) / 60)) AS minutes
     FROM time_entries te
     WHERE YEAR(te.start_time) = :year
       AND te.approval_status = 'approved'

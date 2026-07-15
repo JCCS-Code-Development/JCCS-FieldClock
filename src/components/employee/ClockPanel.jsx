@@ -102,7 +102,7 @@ function formatElapsed(s) {
 
 function formatDur(start, end) {
   const ms = (end ? new Date(end) : new Date()) - new Date(start)
-  const mins = Math.floor(ms / 60000)
+  const mins = Math.round(ms / 60000)
   if (mins < 1) return '< 1m'
   if (mins < 60) return `${mins}m`
   return `${Math.floor(mins / 60)}h ${mins % 60 > 0 ? (mins % 60) + 'm' : ''}`
@@ -672,8 +672,9 @@ export default function ClockPanel({ showHeader = true }) {
         const hasReq = myRequests.some(r => String(r.entry_id) === String(e.id) && r.status === 'pending')
         const cfg = ENTRY_CFG[e.status_label] ?? ENTRY_CFG.done
         const durMs = e.end_time ? new Date(e.end_time) - new Date(e.start_time) : 0
-        const dh = Math.floor(durMs / 3600000)
-        const dm = Math.floor((durMs % 3600000) / 60000)
+        const durMins = Math.round(durMs / 60000)
+        const dh = Math.floor(durMins / 60)
+        const dm = durMins % 60
         return (
           <div className="fixed inset-0 z-[1100] flex flex-col justify-end" onClick={() => setDetailSheet(null)}>
             <div className="absolute inset-0 bg-black/50" />

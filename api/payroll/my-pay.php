@@ -18,7 +18,7 @@ $u = $user->fetch();
 
 $entries = $pdo->prepare(
     "SELECT cost_category, start_time, end_time,
-            TIMESTAMPDIFF(MINUTE, start_time, IFNULL(end_time, NOW())) as minutes,
+            ROUND(TIMESTAMPDIFF(SECOND, start_time, IFNULL(end_time, NOW())) / 60) as minutes,
             YEARWEEK(start_time, 3) as iso_week,
             approval_status
      FROM time_entries
