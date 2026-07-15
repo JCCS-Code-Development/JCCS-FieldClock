@@ -365,7 +365,10 @@ function MonthlyEarningsDoc({ emp, monthKey, weekStubs, ein }) {
 }
 
 // ─── Doc 2: Employment & Salary Verification Letter ───────────────────────────
-function EmploymentLetterDoc({ emp, jobTitle, purpose, ein, sigName, sigTitle }) {
+function EmploymentLetterDoc({
+  emp, jobTitle, purpose, ein, sigName, sigTitle,
+  clientServed, activity, startDate, avgIncome,
+}) {
   const today = format(new Date(), 'MMMM d, yyyy')
   const purposeLabels = {
     general:     'general purposes',
@@ -374,26 +377,48 @@ function EmploymentLetterDoc({ emp, jobTitle, purpose, ein, sigName, sigTitle })
     immigration: 'visa or immigration purposes',
     government:  'government benefit application purposes',
   }
-  const isSalary    = (emp.pay_structure ?? 'hourly') === 'salary'
-  const payDesc     = isSalary
+  const isSalary      = (emp.pay_structure ?? 'hourly') === 'salary'
+  const isIndependent = emp.pay_type === '1099'
+  const payDesc        = isSalary
     ? `${formatCurrency(emp.pay_rate)} per week (salaried)`
     : `${formatCurrency(emp.pay_rate)} per hour (hourly, ${emp.pay_type?.toUpperCase()})`
+  const startDateFmt = startDate ? format(parseISO(startDate), 'MMMM d, yyyy') : null
 
   return (
     <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.9rem', color: '#1e293b', lineHeight: 1.9 }}>
       <DocHeader title="Employment Verification" ein={ein} />
 
-      <p style={{ marginBottom: '1.5rem' }}>{today}</p>
+      <p style={{ marginBottom: '1.5rem' }}>Date of issuance: {today}</p>
       <p style={{ fontWeight: 700, marginBottom: '0.25rem' }}>To Whom It May Concern,</p>
 
       <p style={{ marginBottom: '1rem' }}>
-        This letter is to confirm that <strong>{emp.name}</strong> is currently employed with <strong>{COMPANY.name}</strong>
+        This letter is to confirm that <strong>{emp.name}</strong> is currently
+        {isIndependent ? <> engaged as an <strong>independent contractor</strong> by</> : <> employed with</>} <strong>{COMPANY.name}</strong>
         {jobTitle && <> in the position of <strong>{jobTitle}</strong></>}. This letter is being issued upon request
         for {purposeLabels[purpose] ?? 'general purposes'}.
       </p>
 
+      {isIndependent && clientServed && (
+        <p style={{ marginBottom: '1rem' }}>
+          {emp.name} renders independent contractor services to <strong>{clientServed}</strong>.
+        </p>
+      )}
+
+      {isIndependent && activity && (
+        <p style={{ marginBottom: '1rem' }}>
+          The activity {emp.name} performs as an independent contractor consists of: <strong>{activity}</strong>.
+        </p>
+      )}
+
+      {startDateFmt && (
+        <p style={{ marginBottom: '1rem' }}>
+          {emp.name} began this work on <strong>{startDateFmt}</strong>.
+        </p>
+      )}
+
       <p style={{ marginBottom: '1rem' }}>
         {emp.name}'s current rate of compensation is <strong>{payDesc}</strong>.
+        {avgIncome && <> {emp.name}'s average total income is <strong>{avgIncome}</strong>.</>}
       </p>
 
       <p style={{ marginBottom: '2rem' }}>
@@ -857,9 +882,13 @@ export default function AdminDocuments() {
   const [stubGroupByMonth, setStubGroupByMonth] = useState(false)
 
   // Employment Letter form
-  const [letterEmpId,  setLetterEmpId]  = useState('')
-  const [jobTitle,     setJobTitle]     = useState('')
-  const [purpose,      setPurpose]      = useState('general')
+  const [letterEmpId,   setLetterEmpId]   = useState('')
+  const [jobTitle,      setJobTitle]      = useState('')
+  const [purpose,       setPurpose]       = useState('general')
+  const [clientServed,  setClientServed]  = useState('')
+  const [activity,      setActivity]      = useState('')
+  const [letterStartDate, setLetterStartDate] = useState('')
+  const [avgIncome,     setAvgIncome]     = useState('')
 
   // Annual / 1099 form
   const [annualEmpId, setAnnualEmpId] = useState('all')
@@ -959,6 +988,10 @@ export default function AdminDocuments() {
             ein={ein}
             sigName={sigName}
             sigTitle={sigTitle}
+            clientServed={clientServed}
+            activity={activity}
+            startDate={letterStartDate}
+            avgIncome={avgIncome}
           />
         )
 
@@ -1074,19 +1107,31 @@ export default function AdminDocuments() {
               )}
 
               {/* ── Employment Letter ── */}
-              {selected === 'letter' && (
-                <>
-                  <FormSelect label="Employee" value={letterEmpId} onChange={setLetterEmpId}>
-                    {activeEmps.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-                  </FormSelect>
-                  <FormInput label="Job Title (optional)" value={jobTitle} onChange={setJobTitle} placeholder="e.g. Field Technician" />
-                  <FormSelect label="Purpose" value={purpose} onChange={setPurpose}>
-                    {PURPOSES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                  </FormSelect>
-                  <FormInput label="Signed By (optional)" value={sigName} onChange={setSigName} placeholder="e.g. Jane Smith" />
-                  <FormInput label="Signer Title (optional)" value={sigTitle} onChange={setSigTitle} placeholder="e.g. Office Manager" />
-                </>
-              )}
+              {selected === 'letter' && (() => {
+                const letterEmp = activeEmps.find((e) => e.id === parseInt(letterEmpId))
+                const isIndependent = letterEmp?.pay_type === '1099'
+                return (
+                  <>
+                    <FormSelect label="Employee" value={letterEmpId} onChange={setLetterEmpId}>
+                      {activeEmps.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                    </FormSelect>
+                    <FormInput label="Job Title (optional)" value={jobTitle} onChange={setJobTitle} placeholder="e.g. Field Technician" />
+                    <FormSelect label="Purpose" value={purpose} onChange={setPurpose}>
+                      {PURPOSES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </FormSelect>
+                    <FormInput label="Start Date" type="date" value={letterStartDate} onChange={setLetterStartDate} />
+                    <FormInput label="Average Total Income (optional)" value={avgIncome} onChange={setAvgIncome} placeholder="e.g. $3,200 per month" />
+                    {isIndependent && (
+                      <>
+                        <FormInput label="Company / Client Served" value={clientServed} onChange={setClientServed} placeholder="e.g. JCCS Services and affiliated clients" />
+                        <FormInput label="Activity Performed (as independent contractor)" value={activity} onChange={setActivity} placeholder="e.g. HVAC installation and repair" />
+                      </>
+                    )}
+                    <FormInput label="Signed By (optional)" value={sigName} onChange={setSigName} placeholder="e.g. Jane Smith" />
+                    <FormInput label="Signer Title (optional)" value={sigTitle} onChange={setSigTitle} placeholder="e.g. Office Manager" />
+                  </>
+                )
+              })()}
 
               {/* ── Annual Summary ── */}
               {selected === 'annual' && (
