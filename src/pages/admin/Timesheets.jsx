@@ -804,7 +804,7 @@ export default function AdminTimesheets() {
                 <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Hours</p>
                   {isSalary
-                    ? <p className="text-xs font-semibold text-indigo-500 mt-1.5">Fixed</p>
+                    ? <p className="text-xs font-semibold text-brand-500 mt-1.5">Fixed</p>
                     : <p className="text-lg font-bold text-gray-900">{(periodMins / 60).toFixed(1)}h</p>
                   }
                 </div>
@@ -867,9 +867,9 @@ export default function AdminTimesheets() {
             {/* Time log */}
             {tab === 'log' && (
               isSalary
-                ? <div className="bg-white rounded-2xl border border-indigo-100 flex flex-col items-center justify-center py-16 gap-3">
-                    <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-2xl">💼</div>
-                    <p className="text-sm font-semibold text-indigo-700">Fixed Salary Employee</p>
+                ? <div className="bg-white rounded-2xl border border-gray-100 flex flex-col items-center justify-center py-16 gap-3">
+                    <div className="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center text-2xl">💼</div>
+                    <p className="text-sm font-semibold text-brand-600">Fixed Salary Employee</p>
                     <p className="text-xs text-gray-400 text-center max-w-xs">
                       {selectedEmp.name} is on a fixed weekly salary of ${selectedEmp.pay_rate ?? 0}.<br />
                       Hours are not tracked for salaried employees.
