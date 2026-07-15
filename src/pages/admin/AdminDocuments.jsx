@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { format, startOfWeek, endOfWeek, subWeeks, addWeeks, parseISO } from 'date-fns'
+import { es as esLocale } from 'date-fns/locale'
 import PageHeader from '../../components/admin/PageHeader'
 import Button from '../../components/ui/Button'
 import { listEmployees } from '../../api/employees'
@@ -365,72 +366,122 @@ function MonthlyEarningsDoc({ emp, monthKey, weekStubs, ein }) {
 }
 
 // ─── Doc 2: Employment & Salary Verification Letter ───────────────────────────
+const LETTER_I18N = {
+  en: {
+    docTitle:     'Employment Verification',
+    issuedLabel:  'Date of issuance',
+    salutation:   'To Whom It May Concern,',
+    purposeLabels: {
+      general:     'general purposes',
+      housing:     'housing / rental application purposes',
+      bank:        'bank or loan application purposes',
+      immigration: 'visa or immigration purposes',
+      government:  'government benefit application purposes',
+    },
+    confirm: (name, verb, company, jobTitle, purposeLabel) => (
+      <>This letter is to confirm that <strong>{name}</strong> is currently {verb} <strong>{company}</strong>
+        {jobTitle && <> in the position of <strong>{jobTitle}</strong></>}. This letter is being issued upon request for {purposeLabel}.</>
+    ),
+    verbEmployed:    'employed with',
+    verbIndependent: <>engaged as an <strong>independent contractor</strong> by</>,
+    clientServed: (name, client) => <>{name} renders independent contractor services to <strong>{client}</strong>.</>,
+    activity:     (name, act)    => <>The activity {name} performs as an independent contractor consists of: <strong>{act}</strong>.</>,
+    startDate:    (name, date)   => <>{name} began this work on <strong>{date}</strong>.</>,
+    compensation: (name, payDesc) => <>{name}'s current rate of compensation is <strong>{payDesc}</strong>.</>,
+    avgIncome:    (name, amount)  => <> {name}'s average total income is <strong>{amount}</strong>.</>,
+    payWeekly:  'per week (salaried)',
+    payHourly:  (type) => `per hour (hourly, ${type})`,
+    closing: (phone) => <>Should you require any additional information or have any questions regarding this matter, please do not hesitate to contact our office at {phone}.</>,
+    sincerely:   'Sincerely,',
+    signerTitle: 'Authorized Representative',
+    dateFmt:     'MMMM d, yyyy',
+  },
+  es: {
+    docTitle:     'Verificación de Empleo y Salario',
+    issuedLabel:  'Fecha de expedición',
+    salutation:   'A Quien Corresponda,',
+    purposeLabels: {
+      general:     'fines generales',
+      housing:     'trámites de vivienda o arrendamiento',
+      bank:        'trámites bancarios o de crédito',
+      immigration: 'trámites de visa o inmigración',
+      government:  'solicitud de beneficios gubernamentales',
+    },
+    confirm: (name, verb, company, jobTitle, purposeLabel) => (
+      <>Por medio de la presente se confirma que <strong>{name}</strong> actualmente {verb} <strong>{company}</strong>
+        {jobTitle && <> en el cargo de <strong>{jobTitle}</strong></>}. Esta carta se expide a solicitud del interesado para efectos de {purposeLabel}.</>
+    ),
+    verbEmployed:    'se encuentra empleado(a) con',
+    verbIndependent: <>presta sus servicios como <strong>contratista independiente</strong> para</>,
+    clientServed: (name, client) => <>{name} presta servicios como contratista independiente a <strong>{client}</strong>.</>,
+    activity:     (name, act)    => <>La actividad que {name} realiza como contratista independiente consiste en: <strong>{act}</strong>.</>,
+    startDate:    (name, date)   => <>{name} inició esta labor el <strong>{date}</strong>.</>,
+    compensation: (name, payDesc) => <>La tarifa de compensación actual de {name} es de <strong>{payDesc}</strong>.</>,
+    avgIncome:    (name, amount)  => <> El ingreso total promedio de {name} es de <strong>{amount}</strong>.</>,
+    payWeekly:  'por semana (salario fijo)',
+    payHourly:  (type) => `por hora (${type})`,
+    closing: (phone) => <>Si requiere información adicional o tiene alguna pregunta al respecto, no dude en comunicarse con nuestra oficina al {phone}.</>,
+    sincerely:   'Atentamente,',
+    signerTitle: 'Representante Autorizado',
+    dateFmt:     "d 'de' MMMM 'de' yyyy",
+  },
+}
+
 function EmploymentLetterDoc({
   emp, jobTitle, purpose, ein, sigName, sigTitle,
-  clientServed, activity, startDate, avgIncome,
+  clientServed, activity, startDate, avgIncome, language = 'en',
 }) {
-  const today = format(new Date(), 'MMMM d, yyyy')
-  const purposeLabels = {
-    general:     'general purposes',
-    housing:     'housing / rental application purposes',
-    bank:        'bank or loan application purposes',
-    immigration: 'visa or immigration purposes',
-    government:  'government benefit application purposes',
-  }
+  const T = LETTER_I18N[language] ?? LETTER_I18N.en
+  const dateOpts = language === 'es' ? { locale: esLocale } : undefined
+  const today = format(new Date(), T.dateFmt, dateOpts)
   const isSalary      = (emp.pay_structure ?? 'hourly') === 'salary'
   const isIndependent = emp.pay_type === '1099'
-  const payDesc        = isSalary
-    ? `${formatCurrency(emp.pay_rate)} per week (salaried)`
-    : `${formatCurrency(emp.pay_rate)} per hour (hourly, ${emp.pay_type?.toUpperCase()})`
-  const startDateFmt = startDate ? format(parseISO(startDate), 'MMMM d, yyyy') : null
+  const payDesc = isSalary
+    ? `${formatCurrency(emp.pay_rate)} ${T.payWeekly}`
+    : `${formatCurrency(emp.pay_rate)} ${T.payHourly(emp.pay_type?.toUpperCase())}`
+  const startDateFmt = startDate ? format(parseISO(startDate), T.dateFmt, dateOpts) : null
 
   return (
     <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.9rem', color: '#1e293b', lineHeight: 1.9 }}>
-      <DocHeader title="Employment Verification" ein={ein} />
+      <DocHeader title={T.docTitle} ein={ein} />
 
-      <p style={{ marginBottom: '1.5rem' }}>Date of issuance: {today}</p>
-      <p style={{ fontWeight: 700, marginBottom: '0.25rem' }}>To Whom It May Concern,</p>
+      <p style={{ marginBottom: '1.5rem' }}>{T.issuedLabel}: {today}</p>
+      <p style={{ fontWeight: 700, marginBottom: '0.25rem' }}>{T.salutation}</p>
 
       <p style={{ marginBottom: '1rem' }}>
-        This letter is to confirm that <strong>{emp.name}</strong> is currently
-        {isIndependent ? <> engaged as an <strong>independent contractor</strong> by</> : <> employed with</>} <strong>{COMPANY.name}</strong>
-        {jobTitle && <> in the position of <strong>{jobTitle}</strong></>}. This letter is being issued upon request
-        for {purposeLabels[purpose] ?? 'general purposes'}.
+        {T.confirm(
+          emp.name,
+          isIndependent ? T.verbIndependent : T.verbEmployed,
+          COMPANY.name,
+          jobTitle,
+          T.purposeLabels[purpose] ?? T.purposeLabels.general
+        )}
       </p>
 
       {isIndependent && clientServed && (
-        <p style={{ marginBottom: '1rem' }}>
-          {emp.name} renders independent contractor services to <strong>{clientServed}</strong>.
-        </p>
+        <p style={{ marginBottom: '1rem' }}>{T.clientServed(emp.name, clientServed)}</p>
       )}
 
       {isIndependent && activity && (
-        <p style={{ marginBottom: '1rem' }}>
-          The activity {emp.name} performs as an independent contractor consists of: <strong>{activity}</strong>.
-        </p>
+        <p style={{ marginBottom: '1rem' }}>{T.activity(emp.name, activity)}</p>
       )}
 
       {startDateFmt && (
-        <p style={{ marginBottom: '1rem' }}>
-          {emp.name} began this work on <strong>{startDateFmt}</strong>.
-        </p>
+        <p style={{ marginBottom: '1rem' }}>{T.startDate(emp.name, startDateFmt)}</p>
       )}
 
       <p style={{ marginBottom: '1rem' }}>
-        {emp.name}'s current rate of compensation is <strong>{payDesc}</strong>.
-        {avgIncome && <> {emp.name}'s average total income is <strong>{avgIncome}</strong>.</>}
+        {T.compensation(emp.name, payDesc)}
+        {avgIncome && T.avgIncome(emp.name, avgIncome)}
       </p>
 
-      <p style={{ marginBottom: '2rem' }}>
-        Should you require any additional information or have any questions regarding this matter, please do not hesitate
-        to contact our office at {COMPANY.phone}.
-      </p>
+      <p style={{ marginBottom: '2rem' }}>{T.closing(COMPANY.phone)}</p>
 
-      <p style={{ marginBottom: '5rem' }}>Sincerely,</p>
+      <p style={{ marginBottom: '5rem' }}>{T.sincerely}</p>
 
       <div style={{ borderTop: '1px solid #1e293b', width: '240px', paddingTop: '6px' }}>
         <p style={{ margin: 0, fontWeight: 700 }}>{sigName || '____________________________'}</p>
-        <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>{sigTitle || 'Authorized Representative'}</p>
+        <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>{sigTitle || T.signerTitle}</p>
         <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>{COMPANY.name}</p>
       </div>
 
@@ -889,6 +940,7 @@ export default function AdminDocuments() {
   const [activity,      setActivity]      = useState('')
   const [letterStartDate, setLetterStartDate] = useState('')
   const [avgIncome,     setAvgIncome]     = useState('')
+  const [letterLanguage, setLetterLanguage] = useState('en')
 
   // Annual / 1099 form
   const [annualEmpId, setAnnualEmpId] = useState('all')
@@ -992,6 +1044,7 @@ export default function AdminDocuments() {
             activity={activity}
             startDate={letterStartDate}
             avgIncome={avgIncome}
+            language={letterLanguage}
           />
         )
 
@@ -1118,6 +1171,10 @@ export default function AdminDocuments() {
                     <FormInput label="Job Title (optional)" value={jobTitle} onChange={setJobTitle} placeholder="e.g. Field Technician" />
                     <FormSelect label="Purpose" value={purpose} onChange={setPurpose}>
                       {PURPOSES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </FormSelect>
+                    <FormSelect label="Language" value={letterLanguage} onChange={setLetterLanguage}>
+                      <option value="en">English</option>
+                      <option value="es">Español</option>
                     </FormSelect>
                     <FormInput label="Start Date" type="date" value={letterStartDate} onChange={setLetterStartDate} />
                     <FormInput label="Average Total Income (optional)" value={avgIncome} onChange={setAvgIncome} placeholder="e.g. $3,200 per month" />
