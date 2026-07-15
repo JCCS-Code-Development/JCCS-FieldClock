@@ -25,8 +25,8 @@ requireHourly($auth, $pdo);
 
 $pdo->beginTransaction();
 try {
-    closeOpenEntry($pdo, $auth['user_id'], $lat, $lng);
-    $result = openEntry($pdo, $auth['user_id'], null, 'done', 'day_end', $lat, $lng, $acc);
+    closeOpenEntry($pdo, $auth['user_id'], $lat, $lng, source: 'day_end');
+    $result = openEntry($pdo, $auth['user_id'], null, 'done', 'day_end', $lat, $lng, $acc, source: 'day_end');
     $pdo->commit();
     echo json_encode($result);
 } catch (Throwable $e) {

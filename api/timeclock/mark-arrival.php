@@ -49,10 +49,11 @@ if ($lat !== null && $lng !== null && $job['latitude'] && $job['longitude']) {
     $withinRadius   = $distanceMeters <= $job['clock_in_radius_meters'];
 }
 
-closeOpenEntry($pdo, $auth['user_id'], $lat, $lng);
+closeOpenEntry($pdo, $auth['user_id'], $lat, $lng, source: 'mark_arrival');
 $result = openEntry(
     $pdo, $auth['user_id'], $jobId, 'working', 'direct_labor', $lat, $lng, $acc, $withinRadius, null,
-    $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription
+    $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
+    source: 'mark_arrival'
 );
 
 echo json_encode([

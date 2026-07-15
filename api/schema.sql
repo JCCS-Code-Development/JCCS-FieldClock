@@ -118,6 +118,8 @@ CREATE TABLE `work_order_photos` (
 CREATE TABLE `time_entries` (
   `id`               INT UNSIGNED  NOT NULL AUTO_INCREMENT,
   `user_id`          INT UNSIGNED  NOT NULL,
+  `created_by`       INT UNSIGNED  NULL,
+  `created_via`      VARCHAR(40)   NULL,
   `job_id`           INT UNSIGNED  NULL,
   `work_order_id`    INT UNSIGNED  NULL,
   `status_label`     ENUM('traveling','working','lunch','material_run','waiting','done') NULL,
@@ -135,6 +137,8 @@ CREATE TABLE `time_entries` (
   `approved_at`      TIMESTAMP     NULL,
   `rejection_reason` TEXT          NULL,
   `notes`            TEXT          NULL,
+  `last_edited_by`   INT UNSIGNED  NULL,
+  `last_edited_at`   TIMESTAMP     NULL,
   `created_at`       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -146,6 +150,22 @@ CREATE TABLE `time_entries` (
   CONSTRAINT `fk_te_job`      FOREIGN KEY (`job_id`)        REFERENCES `jobs`        (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_te_wo`       FOREIGN KEY (`work_order_id`) REFERENCES `work_orders` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_te_approver` FOREIGN KEY (`approved_by`)   REFERENCES `users`       (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- No FK on entry_id (on purpose) — history must survive even if the entry
+-- itself is later deleted, so a deletion's audit record is never lost.
+CREATE TABLE `time_entry_history` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `entry_id`   INT UNSIGNED NOT NULL,
+  `action`     ENUM('create','update','delete') NOT NULL,
+  `changed_by` INT UNSIGNED NULL,
+  `source`     VARCHAR(40) NOT NULL,
+  `old_values` JSON NULL,
+  `new_values` JSON NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_teh_entry` (`entry_id`),
+  KEY `idx_teh_changed_by` (`changed_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `pay_periods` (

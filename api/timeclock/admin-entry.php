@@ -108,13 +108,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $pdo->prepare(
         'INSERT INTO time_entries
-            (user_id, job_id, estimate_id, visit_category, estimate_subtype, work_order_number, engineer_name, visit_description,
+            (user_id, created_by, created_via, job_id, estimate_id, visit_category, estimate_subtype, work_order_number, engineer_name, visit_description,
              status_label, cost_category, start_time, end_time, start_lat, start_lng, end_lat, end_lng, approval_status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'approved\', ?)'
-    )->execute([$userId, $jobId, $estimateId, $visitCategory, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
+         VALUES (?, ?, \'admin_entry\', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'approved\', ?)'
+    )->execute([$userId, $auth['user_id'], $jobId, $estimateId, $visitCategory, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
                 $statusLabel, $costCat, $startTime, $endTime, $startLat, $startLng, $endLat, $endLng, $notes]);
 
-    echo json_encode(['entry' => fetchEntry($pdo, (int)$pdo->lastInsertId())]);
+    $newId = (int)$pdo->lastInsertId();
+    $newRow = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
+    $newRow->execute([$newId]);
+    logTimeEntryHistory($pdo, $newId, 'create', $auth['user_id'], 'admin_entry', null, $newRow->fetch());
+
+    echo json_encode(['entry' => fetchEntry($pdo, $newId)]);
     exit;
 }
 
@@ -124,6 +129,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     $id   = (int)($body['id'] ?? 0);
 
     if (!$id) { http_response_code(422); exit(json_encode(['error' => 'id is required'])); }
+
+    $oldRowStmt = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
+    $oldRowStmt->execute([$id]);
+    $oldRow = $oldRowStmt->fetch();
+    if (!$oldRow) { http_response_code(404); exit(json_encode(['error' => 'Entry not found'])); }
 
     $fields = [];
     $params = [];
@@ -193,12 +203,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     $newStart = $body['start_time'] ?? null;
     $newEnd   = array_key_exists('end_time', $body) ? ($body['end_time'] ?: null) : null;
     if ($newStart || $newEnd) {
-        // Get current entry to fill in whichever value isn't being changed
-        $cur = $pdo->prepare('SELECT user_id, start_time, end_time FROM time_entries WHERE id = ?');
-        $cur->execute([$id]);
-        $cur = $cur->fetch();
-        $checkStart = $newStart ?? $cur['start_time'];
-        $checkEnd   = $newEnd   ?? $cur['end_time'];
+        // Fill in whichever value isn't being changed from the pre-edit row
+        $checkStart = $newStart ?? $oldRow['start_time'];
+        $checkEnd   = $newEnd   ?? $oldRow['end_time'];
         if ($checkEnd) {
             $overlap = $pdo->prepare(
                 'SELECT id FROM time_entries
@@ -208,7 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                    AND (end_time IS NULL OR end_time > ?)
                  LIMIT 1'
             );
-            $overlap->execute([$cur['user_id'], $id, $checkEnd, $checkStart]);
+            $overlap->execute([$oldRow['user_id'], $id, $checkEnd, $checkStart]);
             if ($overlap->fetch()) {
                 http_response_code(422);
                 exit(json_encode(['error' => 'These times overlap with another entry for this employee.']));
@@ -216,8 +223,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         }
     }
 
+    $fields[] = 'last_edited_by = ?'; $params[] = $auth['user_id'];
+    $fields[] = 'last_edited_at = NOW()';
     $params[] = $id;
     $pdo->prepare('UPDATE time_entries SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+
+    $newRowStmt = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
+    $newRowStmt->execute([$id]);
+    logTimeEntryHistory($pdo, $id, 'update', $auth['user_id'], 'admin_entry', $oldRow, $newRowStmt->fetch());
 
     echo json_encode(['entry' => fetchEntry($pdo, $id)]);
     exit;
@@ -227,6 +240,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
 if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     $id = (int)($_GET['id'] ?? 0);
     if (!$id) { http_response_code(422); exit(json_encode(['error' => 'id is required'])); }
+
+    $oldRowStmt = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
+    $oldRowStmt->execute([$id]);
+    $oldRow = $oldRowStmt->fetch();
+    if ($oldRow) {
+        logTimeEntryHistory($pdo, $id, 'delete', $auth['user_id'], 'admin_entry', $oldRow, null);
+    }
 
     $pdo->prepare('DELETE FROM time_entries WHERE id = ?')->execute([$id]);
     echo json_encode(['success' => true]);

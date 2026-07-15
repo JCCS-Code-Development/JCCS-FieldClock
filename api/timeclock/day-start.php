@@ -61,6 +61,7 @@ if ($openRow = $open->fetch()) {
 
 $result = openEntry(
     $pdo, $auth['user_id'], $jobId, 'working', 'direct_labor', $lat, $lng, $acc, null, $notes,
-    $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription
+    $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
+    source: 'day_start'
 );
 echo json_encode($result);

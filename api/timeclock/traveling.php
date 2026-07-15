@@ -36,6 +36,6 @@ if (!$assigned->fetch()) {
     exit(json_encode(['error' => 'You are not assigned to this job']));
 }
 
-closeOpenEntry($pdo, $auth['user_id'], $lat, $lng);
-$result = openEntry($pdo, $auth['user_id'], $jobId, 'traveling', 'travel', $lat, $lng, $acc);
+closeOpenEntry($pdo, $auth['user_id'], $lat, $lng, source: 'traveling');
+$result = openEntry($pdo, $auth['user_id'], $jobId, 'traveling', 'travel', $lat, $lng, $acc, source: 'traveling');
 echo json_encode(['timeclock' => $result]);

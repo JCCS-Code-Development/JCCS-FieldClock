@@ -11,14 +11,37 @@ function requireHourly(array $auth, PDO $pdo): void {
     }
 }
 
+// Record a create/update/delete against time_entries — who/what did it, and
+// (for update/delete) the values that were there before. This is the only
+// way to ever answer "why does this entry look different than I expect" —
+// there is no other history kept anywhere.
+function logTimeEntryHistory(
+    PDO $pdo, int $entryId, string $action, ?int $changedBy, string $source,
+    ?array $oldValues, ?array $newValues
+): void {
+    $pdo->prepare(
+        'INSERT INTO time_entry_history (entry_id, action, changed_by, source, old_values, new_values)
+         VALUES (?, ?, ?, ?, ?, ?)'
+    )->execute([
+        $entryId, $action, $changedBy, $source,
+        $oldValues !== null ? json_encode($oldValues) : null,
+        $newValues !== null ? json_encode($newValues) : null,
+    ]);
+}
+
 // Close the current open entry and return its id (or null if none)
-function closeOpenEntry(PDO $pdo, int $userId, ?float $lat, ?float $lng): ?int {
-    $stmt = $pdo->prepare('SELECT id FROM time_entries WHERE user_id = ? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1');
+function closeOpenEntry(PDO $pdo, int $userId, ?float $lat, ?float $lng, string $source = 'self_service'): ?int {
+    $stmt = $pdo->prepare('SELECT * FROM time_entries WHERE user_id = ? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1');
     $stmt->execute([$userId]);
     $open = $stmt->fetch();
     if (!$open) return null;
-    $pdo->prepare('UPDATE time_entries SET end_time = NOW(), end_lat = ?, end_lng = ? WHERE id = ?')
-        ->execute([$lat, $lng, $open['id']]);
+    $pdo->prepare('UPDATE time_entries SET end_time = NOW(), end_lat = ?, end_lng = ?, last_edited_by = ?, last_edited_at = NOW() WHERE id = ?')
+        ->execute([$lat, $lng, $userId, $open['id']]);
+
+    $new = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
+    $new->execute([$open['id']]);
+    logTimeEntryHistory($pdo, (int)$open['id'], 'update', $userId, $source, $open, $new->fetch());
+
     return $open['id'];
 }
 
@@ -75,16 +98,17 @@ function openEntry(
     PDO $pdo, int $userId, ?int $jobId, string $statusLabel, string $costCategory,
     ?float $lat, ?float $lng, ?float $accuracy, ?bool $withinRadius = null, ?string $notes = null,
     ?string $visitCategory = null, ?int $estimateId = null, ?string $estimateSubtype = null,
-    ?string $workOrderNumber = null, ?string $engineerName = null, ?string $visitDescription = null
+    ?string $workOrderNumber = null, ?string $engineerName = null, ?string $visitDescription = null,
+    string $source = 'self_service'
 ): array {
     $stmt = $pdo->prepare(
         'INSERT INTO time_entries
-            (user_id, job_id, estimate_id, visit_category, estimate_subtype, work_order_number, engineer_name, visit_description,
+            (user_id, created_by, created_via, job_id, estimate_id, visit_category, estimate_subtype, work_order_number, engineer_name, visit_description,
              status_label, cost_category, start_time, start_lat, start_lng, gps_accuracy, within_radius, approval_status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)'
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
-        $userId, $jobId, $estimateId, $visitCategory, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
+        $userId, $userId, $source, $jobId, $estimateId, $visitCategory, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
         $statusLabel, $costCategory, $lat, $lng, $accuracy, $withinRadius, 'approved', $notes,
     ]);
     $newId = $pdo->lastInsertId();
@@ -92,6 +116,8 @@ function openEntry(
     $entry = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
     $entry->execute([$newId]);
     $entry = $entry->fetch();
+
+    logTimeEntryHistory($pdo, (int)$newId, 'create', $userId, $source, null, $entry);
 
     $activeJob = null;
     if ($jobId) {

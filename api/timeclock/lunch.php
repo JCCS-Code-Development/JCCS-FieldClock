@@ -35,8 +35,9 @@ $estimateSubtype  = $prev['estimate_subtype']  ?? null;
 $workOrderNumber  = $prev['work_order_number'] ?? null;
 $engineerName     = $prev['engineer_name']     ?? null;
 $visitDescription = $prev['visit_description'] ?? null;
-closeOpenEntry($pdo, $auth['user_id'], $lat, $lng);
+closeOpenEntry($pdo, $auth['user_id'], $lat, $lng, source: 'lunch');
 echo json_encode(openEntry(
     $pdo, $auth['user_id'], $jobId, 'lunch', 'paid_lunch', $lat, $lng, $acc, null, null,
-    $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription
+    $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
+    source: 'lunch'
 ));

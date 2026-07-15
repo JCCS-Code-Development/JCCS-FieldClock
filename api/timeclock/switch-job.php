@@ -64,14 +64,15 @@ if ($jobId) {
     }
 }
 
-closeOpenEntry($pdo, $auth['user_id'], null, null);
+closeOpenEntry($pdo, $auth['user_id'], null, null, source: 'switch_job');
 $result = openEntry(
     $pdo,
     $auth['user_id'],
     $jobId,
     $open['status_label'],
     $open['cost_category'],
-    null, null, null
+    null, null, null,
+    source: 'switch_job'
 );
 
 echo json_encode($result);

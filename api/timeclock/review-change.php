@@ -13,6 +13,7 @@ require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
 require_once __DIR__ . '/../middleware/auth.php';
 require_once __DIR__ . '/../middleware/validate.php';
+require_once __DIR__ . '/_helper.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit; }
 
@@ -42,8 +43,21 @@ if ($action === 'approved') {
     if (!empty($req['requested_start'])) { $updates[] = 'start_time = ?'; $params[] = $req['requested_start']; }
     if (!empty($req['requested_end']))   { $updates[] = 'end_time = ?';   $params[] = $req['requested_end']; }
     if ($updates) {
-        $params[] = (int)$req['entry_id'];
+        $entryId = (int)$req['entry_id'];
+        $oldRowStmt = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
+        $oldRowStmt->execute([$entryId]);
+        $oldRow = $oldRowStmt->fetch();
+
+        $updates[] = 'last_edited_by = ?'; $params[] = $auth['user_id'];
+        $updates[] = 'last_edited_at = NOW()';
+        $params[] = $entryId;
         $pdo->prepare('UPDATE time_entries SET ' . implode(', ', $updates) . ' WHERE id = ?')->execute($params);
+
+        if ($oldRow) {
+            $newRowStmt = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
+            $newRowStmt->execute([$entryId]);
+            logTimeEntryHistory($pdo, $entryId, 'update', $auth['user_id'], 'change_request_approval', $oldRow, $newRowStmt->fetch());
+        }
     }
 }
 
