@@ -14,6 +14,7 @@ const COMPANY = {
   name:    'JCCS Services LLC',
   address: '1200 Woodruff Rd, Greenville, SC 29607, Suite B-3',
   phone:   '864-907-9052',
+  email:   'lauragarcia@jccs-services.com',
 }
 
 // ─── Period helpers ───────────────────────────────────────────────────────────
@@ -133,7 +134,7 @@ function DocHeader({ title, ein }) {
           <div>
             <p style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.15 }}>{COMPANY.name}</p>
             <p style={{ fontSize: '0.78rem', color: '#334155', margin: '3px 0 0' }}>{COMPANY.address}</p>
-            <p style={{ fontSize: '0.78rem', color: '#334155', margin: '1px 0 0' }}>{COMPANY.phone}{ein ? ` · EIN: ${ein}` : ''}</p>
+            <p style={{ fontSize: '0.78rem', color: '#334155', margin: '1px 0 0' }}>{COMPANY.phone} · {COMPANY.email}{ein ? ` · EIN: ${ein}` : ''}</p>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -391,7 +392,7 @@ const LETTER_I18N = {
     avgIncome:    (name, amount)  => <> {name}'s average total income is <strong>{amount}</strong>.</>,
     payWeekly:  'per week (salaried)',
     payHourly:  (type) => `per hour (hourly, ${type})`,
-    closing: (phone) => <>Should you require any additional information or have any questions regarding this matter, please do not hesitate to contact our office at {phone}.</>,
+    closing: (phone, email) => <>Should you require any additional information or have any questions regarding this matter, please do not hesitate to contact our office at {phone} or {email}.</>,
     sincerely:   'Sincerely,',
     signerTitle: 'Authorized Representative',
     dateFmt:     'MMMM d, yyyy',
@@ -420,7 +421,7 @@ const LETTER_I18N = {
     avgIncome:    (name, amount)  => <> El ingreso total promedio de {name} es de <strong>{amount}</strong>.</>,
     payWeekly:  'por semana (salario fijo)',
     payHourly:  (type) => `por hora (${type})`,
-    closing: (phone) => <>Si requiere información adicional o tiene alguna pregunta al respecto, no dude en comunicarse con nuestra oficina al {phone}.</>,
+    closing: (phone, email) => <>Si requiere información adicional o tiene alguna pregunta al respecto, no dude en comunicarse con nuestra oficina al {phone} o al correo {email}.</>,
     sincerely:   'Atentamente,',
     signerTitle: 'Representante Autorizado',
     dateFmt:     "d 'de' MMMM 'de' yyyy",
@@ -475,7 +476,7 @@ function EmploymentLetterDoc({
         {avgIncome && T.avgIncome(emp.name, avgIncome)}
       </p>
 
-      <p style={{ marginBottom: '2rem' }}>{T.closing(COMPANY.phone)}</p>
+      <p style={{ marginBottom: '2rem' }}>{T.closing(COMPANY.phone, COMPANY.email)}</p>
 
       <p style={{ marginBottom: '5rem' }}>{T.sincerely}</p>
 
