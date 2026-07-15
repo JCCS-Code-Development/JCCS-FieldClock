@@ -436,7 +436,7 @@ function EmploymentLetterDoc({
   const dateOpts = language === 'es' ? { locale: esLocale } : undefined
   const today = format(new Date(), T.dateFmt, dateOpts)
   const isSalary      = (emp.pay_structure ?? 'hourly') === 'salary'
-  const isIndependent = emp.pay_type === '1099'
+  const isIndependent = emp.role === 'contractor'
   const payDesc = isSalary
     ? `${formatCurrency(emp.pay_rate)} ${T.payWeekly}`
     : `${formatCurrency(emp.pay_rate)} ${T.payHourly(emp.pay_type?.toUpperCase())}`
@@ -1163,7 +1163,7 @@ export default function AdminDocuments() {
               {/* ── Employment Letter ── */}
               {selected === 'letter' && (() => {
                 const letterEmp = activeEmps.find((e) => e.id === parseInt(letterEmpId))
-                const isIndependent = letterEmp?.pay_type === '1099'
+                const isIndependent = letterEmp?.role === 'contractor'
                 return (
                   <>
                     <FormSelect label="Employee" value={letterEmpId} onChange={setLetterEmpId}>
