@@ -10,7 +10,7 @@ import ClockPanel from '../../components/employee/ClockPanel'
 import { getStatus } from '../../api/timeclock'
 import { useTimeclockStore } from '../../store/timeclockStore'
 import { useAuthStore } from '../../store/authStore'
-import { getPending } from '../../api/approvals'
+import { getChangeRequests } from '../../api/timeclock'
 import { listJobs } from '../../api/jobs'
 
 export default function AdminDashboard() {
@@ -25,9 +25,9 @@ export default function AdminDashboard() {
   useEffect(() => {
     Promise.all([
       getStatus().catch(() => ({ active_employees: [] })),
-      getPending().catch(() => ({ entries: [] })),
+      getChangeRequests({ status: 'pending' }).catch(() => ({ requests: [] })),
       listJobs({ status: 'active' }).catch(() => ({ jobs: [] })),
-    ]).then(([status, approvals, jobs]) => {
+    ]).then(([status, changeRequests, jobs]) => {
       setTimeclockData({
         statusLabel:  status.statusLabel  ?? null,
         currentEntry: status.currentEntry ?? null,
@@ -36,7 +36,7 @@ export default function AdminDashboard() {
       })
       setStats({
         clockedIn:        status.active_employees ?? [],
-        pendingApprovals: approvals.entries?.length ?? 0,
+        pendingApprovals: changeRequests.requests?.length ?? 0,
         activeJobs:       jobs.jobs?.length ?? 0,
       })
     }).finally(() => setLoading(false))

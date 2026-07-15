@@ -109,15 +109,15 @@ foreach ($userMap as $uid => $u) {
             $weekBase = $hrs * (float)$u['pay_rate'];
         }
 
-        $gasWk = ($u['gas_weekly_allowance'] !== null) ? (float)$u['gas_weekly_allowance'] : 0;
-
         $qtrs[$q]['hours']     = ($qtrs[$q]['hours']     ?? 0) + $hrs;
         $qtrs[$q]['reg_hours'] = ($qtrs[$q]['reg_hours'] ?? 0) + $regHrs;
         $qtrs[$q]['ot_hours']  = ($qtrs[$q]['ot_hours']  ?? 0) + $otHrs;
         $qtrs[$q]['base']      = ($qtrs[$q]['base']      ?? 0) + $weekBase;
-        $qtrs[$q]['gas']       = ($qtrs[$q]['gas']       ?? 0) + $gasWk;
     }
 
+    // Gas allowance comes only from explicit, admin-approved pay_adjustments rows
+    // (the "Review Gas Allowances" action) — never auto-computed from the employee's
+    // gas_weekly_allowance profile field, or it would double-count on top of that adjustment.
     foreach ($ud['adj_gas']   ?? [] as $q => $amt) { $qtrs[$q]['gas']   = ($qtrs[$q]['gas']   ?? 0) + $amt; }
     foreach ($ud['adj_bonus'] ?? [] as $q => $amt) { $qtrs[$q]['bonus'] = ($qtrs[$q]['bonus'] ?? 0) + $amt; }
     foreach ($ud['loans']     ?? [] as $q => $amt) { $qtrs[$q]['loan_ded'] = ($qtrs[$q]['loan_ded'] ?? 0) + $amt; }

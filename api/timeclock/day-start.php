@@ -45,12 +45,18 @@ if ($jobId) {
 
 validateVisitCategory($pdo, $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription, $jobId);
 
-// Block only if there is an active (non-day_end) open entry today
-$open = $pdo->prepare('SELECT id FROM time_entries WHERE user_id = ? AND end_time IS NULL AND cost_category != ? AND DATE(start_time) = CURDATE()');
+// Block if there is any active (non-day_end) open entry, even from a prior day —
+// a forgotten clock-out that spans midnight must be resolved (by the employee
+// finishing it, or an admin correcting it) rather than silently orphaned while a
+// second entry opens and both accrue hours in payroll.
+$open = $pdo->prepare('SELECT id, DATE(start_time) as start_date FROM time_entries WHERE user_id = ? AND end_time IS NULL AND cost_category != ?');
 $open->execute([$auth['user_id'], 'day_end']);
-if ($open->fetch()) {
+if ($openRow = $open->fetch()) {
     http_response_code(409);
-    exit(json_encode(['error' => 'Day already started']));
+    $msg = $openRow['start_date'] === date('Y-m-d')
+        ? 'Day already started'
+        : "You have an entry open since {$openRow['start_date']} that was never clocked out. Contact your admin to fix it before starting a new day.";
+    exit(json_encode(['error' => $msg]));
 }
 
 $result = openEntry(

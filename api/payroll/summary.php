@@ -106,9 +106,15 @@ foreach ($byUser as $uid => $data) {
         $baseGross  = $totalHours * $rate;
     }
 
-    $gasTotal = $u['gas_weekly_allowance'] !== null ? ($u['gas_weekly_allowance'] * $weeksWorked) : 0;
+    // Gas allowance is only ever added via an explicit, admin-approved pay_adjustments
+    // row (the "Review Gas Allowances" action) — never auto-computed from the employee's
+    // gas_weekly_allowance profile field, or it would double-count on top of that adjustment.
+    $gasTotal = 0;
     $adjTotal = 0;
-    foreach ($data['adjustments'] ?? [] as $adj) { $adjTotal += $adj['amount']; }
+    foreach ($data['adjustments'] ?? [] as $adj) {
+        $adjTotal += $adj['amount'];
+        if ($adj['type'] === 'gas_allowance') $gasTotal += $adj['amount'];
+    }
 
     $summary[] = [
         'user_id'         => $uid,
@@ -122,7 +128,7 @@ foreach ($byUser as $uid => $data) {
         'base_gross'      => round($baseGross, 2),
         'gas_total'       => round($gasTotal, 2),
         'adjustments_total' => round($adjTotal, 2),
-        'estimated_total' => round($baseGross + $gasTotal + $adjTotal, 2),
+        'estimated_total' => round($baseGross + $adjTotal, 2),
         'category_hours'  => array_map(fn($h) => round($h, 2), $categoryHours),
         'weeks_worked'    => $weeksWorked,
     ];

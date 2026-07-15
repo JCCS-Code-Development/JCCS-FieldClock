@@ -73,14 +73,17 @@ if ($isSalary) {
     $baseGross = $totalApproved * $rate;
 }
 
-$gasTotal = $u['gas_weekly_allowance'] !== null ? ($u['gas_weekly_allowance'] * $weeksWorked) : 0;
-
 $adj = $pdo->prepare(
     "SELECT type, amount, description FROM pay_adjustments WHERE user_id = :uid AND period_start >= :start AND period_end <= :end"
 );
 $adj->execute([':uid' => $uid, ':start' => $start, ':end' => $end]);
 $adjustments = $adj->fetchAll();
 $adjTotal = array_sum(array_column($adjustments, 'amount'));
+
+// Gas allowance is only ever added via an explicit, admin-approved pay_adjustments
+// row (the "Review Gas Allowances" action) — never auto-computed from the employee's
+// gas_weekly_allowance profile field, or it would double-count on top of that adjustment.
+$gasTotal = array_sum(array_map(fn($a) => $a['type'] === 'gas_allowance' ? $a['amount'] : 0, $adjustments));
 
 echo json_encode([
     'user'              => $u,
@@ -95,7 +98,7 @@ echo json_encode([
     'gas_weekly_allowance' => $u['gas_weekly_allowance'],
     'adjustments'       => $adjustments,
     'adjustments_total' => round($adjTotal, 2),
-    'estimated_total'   => round($baseGross + $gasTotal + $adjTotal, 2),
+    'estimated_total'   => round($baseGross + $adjTotal, 2),
     'category_hours'    => array_map(fn($h) => round($h, 2), $categoryHours),
     'weeks_worked'      => $weeksWorked,
     'today_hours'       => round($todayMinutes / 60, 2),

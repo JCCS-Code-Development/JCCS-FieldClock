@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/cors.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
 require_once __DIR__ . '/../middleware/validate.php';
@@ -18,15 +19,33 @@ $user->execute([$identifier, $identifier]);
 $user = $user->fetch();
 if (!$user) { http_response_code(404); exit(json_encode(['error' => 'User not found'])); }
 
-$otp = $pdo->prepare(
-    'SELECT id FROM otp_codes WHERE user_id = ? AND code = ? AND expires_at > NOW() AND used_at IS NULL ORDER BY id DESC LIMIT 1'
+// The most recent outstanding (unexpired, unused) code for this user — attempts are
+// tracked per-code so a fresh code (via send-otp.php) always gets a fresh allowance.
+$current = $pdo->prepare(
+    'SELECT id, code, attempts FROM otp_codes WHERE user_id = ? AND expires_at > NOW() AND used_at IS NULL ORDER BY id DESC LIMIT 1'
 );
-$otp->execute([$user['id'], $code]);
-$otp = $otp->fetch();
-if (!$otp) {
+$current->execute([$user['id']]);
+$current = $current->fetch();
+
+if (!$current) {
     http_response_code(401);
     exit(json_encode(['error' => 'Invalid or expired code']));
 }
+
+if ($current['attempts'] >= OTP_MAX_ATTEMPTS) {
+    // Lock this code out entirely so it can't keep being guessed against.
+    $pdo->prepare('UPDATE otp_codes SET used_at = NOW() WHERE id = ?')->execute([$current['id']]);
+    http_response_code(429);
+    exit(json_encode(['error' => 'Too many incorrect attempts. Request a new code.']));
+}
+
+if (!hash_equals($current['code'], $code)) {
+    $pdo->prepare('UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?')->execute([$current['id']]);
+    http_response_code(401);
+    exit(json_encode(['error' => 'Invalid or expired code']));
+}
+
+$otp = $current;
 
 $pdo->prepare('UPDATE otp_codes SET used_at = NOW() WHERE id = ?')->execute([$otp['id']]);
 
@@ -43,9 +62,11 @@ echo json_encode([
         'name'          => $user['name'],
         'email'         => $user['email'],
         'phone'         => $user['phone'],
-        'role'          => $user['role'],
-        'pay_type'      => $user['pay_type'],
-        'pay_structure' => $user['pay_structure'] ?? 'hourly',
+        'role'               => $user['role'],
+        'pay_type'           => $user['pay_type'],
+        'pay_structure'      => $user['pay_structure'] ?? 'hourly',
+        'default_job_id'     => $user['default_job_id'],
+        'preferred_language' => $user['preferred_language'] ?? 'en',
     ],
 ]);
 exit;
