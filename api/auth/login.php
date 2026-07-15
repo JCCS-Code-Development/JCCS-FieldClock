@@ -53,6 +53,7 @@ echo json_encode([
         'phone'              => $user['phone'],
         'role'               => $user['role'],
         'pay_type'           => $user['pay_type'],
+        'pay_structure'      => $user['pay_structure'],
         'preferred_language' => $user['preferred_language'] ?? 'en',
     ],
 ]);

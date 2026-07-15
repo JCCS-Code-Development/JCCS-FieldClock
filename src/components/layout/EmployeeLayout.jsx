@@ -25,6 +25,7 @@ const JobsIcon  = ({ s = 'w-6 h-6' }) => <svg className={s} fill="none" viewBox=
 const PayIcon   = ({ s = 'w-6 h-6' }) => <svg className={s} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="2" y="5" width="20" height="14" rx="2"/><path strokeLinecap="round" d="M2 10h20M6 15h4M14 15h4"/></svg>
 const DocsIcon  = ({ s = 'w-6 h-6' }) => <svg className={s} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
 const LogoutIcon = ({ s = 'w-4 h-4' }) => <svg className={s} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline strokeLinecap="round" strokeLinejoin="round" points="16 17 21 12 16 7"/><line strokeLinecap="round" x1="21" y1="12" x2="9" y2="12"/></svg>
+const AdminIcon  = ({ s = 'w-4 h-4' }) => <svg className={s} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/></svg>
 
 // ── Desktop sidebar nav item ───────────────────────────────────────
 function SidebarItem({ to, icon: Icon, label, end, onClick }) {
@@ -87,6 +88,12 @@ export default function EmployeeLayout() {
           {NAV.map(item => <SidebarItem key={item.to} {...item} />)}
         </nav>
         <div className="border-t border-brand-700/60">
+          {user?.role === 'admin' && (
+            <button onClick={() => navigate('/admin')}
+              className="flex items-center gap-3 px-5 py-3 text-sm font-medium text-brand-100/80 hover:bg-brand-700 hover:text-white transition-colors w-full">
+              <AdminIcon s="w-5 h-5" /> {t('nav.adminDashboard')}
+            </button>
+          )}
           <div className="px-5 py-3">
             <LangSwitcher className="text-brand-400/70 hover:text-brand-100" />
           </div>
@@ -209,6 +216,12 @@ export default function EmployeeLayout() {
               </div>
               {/* Actions */}
               <div className="px-5 py-4 flex flex-col gap-3">
+                {user?.role === 'admin' && (
+                  <button onClick={() => { setProfileOpen(false); navigate('/admin') }}
+                    className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-brand-500/10 text-brand-500 text-sm font-semibold active:bg-brand-500/20 transition-colors">
+                    <AdminIcon s="w-4 h-4" /> {t('nav.adminDashboard')}
+                  </button>
+                )}
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-700">Language</span>
                   <LangSwitcher className="text-gray-500" />
