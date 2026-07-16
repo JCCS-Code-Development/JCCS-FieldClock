@@ -5,29 +5,28 @@ import { formatCurrency } from '../../utils/format'
 
 // Usable vertical space on a US Letter page inside PrintOverlay's @page
 // margins (0.7in top/bottom), minus a small safety buffer.
-const PRINT_PAGE_HEIGHT_PX = (11 - 0.7 - 0.7 - 0.1) * 96
+const PRINT_PAGE_HEIGHT_PX = (11 - 0.7 - 0.7 - 0.2) * 96
 
-// Shrinks `ref`'s element (via CSS transform) just before printing so its
-// content always fits on exactly one page, however many rows it has —
-// instead of a fixed font size that works today but overflows once more
-// rows are added. Restores full size after printing/cancelling so the
-// on-screen preview stays readable.
+// Shrinks `ref`'s element just before printing so its content always fits
+// on exactly one page, however many rows it has — instead of a fixed font
+// size that works today but overflows once more rows are added. Uses
+// `zoom` rather than `transform: scale()`: a transform only changes the
+// painted size, not the layout size the print engine uses to decide where
+// to break pages, so it doesn't actually prevent a second page — `zoom`
+// changes the real layout size, which pagination respects. Restores full
+// size after printing/cancelling so the on-screen preview stays readable.
 function useShrinkToFitOnePage(ref, deps) {
   useEffect(() => {
     const el = ref.current
     if (!el) return
     const fit = () => {
-      el.style.transform = 'none'
-      el.style.width = '100%'
+      el.style.zoom = 1
       const naturalHeight = el.scrollHeight
       if (naturalHeight > PRINT_PAGE_HEIGHT_PX) {
-        const scale = PRINT_PAGE_HEIGHT_PX / naturalHeight
-        el.style.transform = `scale(${scale})`
-        el.style.transformOrigin = 'top left'
-        el.style.width = `${(1 / scale) * 100}%`
+        el.style.zoom = PRINT_PAGE_HEIGHT_PX / naturalHeight
       }
     }
-    const reset = () => { el.style.transform = 'none'; el.style.width = '100%' }
+    const reset = () => { el.style.zoom = 1 }
     window.addEventListener('beforeprint', fit)
     window.addEventListener('afterprint', reset)
     return () => {
