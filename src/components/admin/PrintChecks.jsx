@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { formatCurrency } from '../../utils/format'
 import { format } from 'date-fns'
 import { registerChecks } from '../../api/checks'
+import { Weekly1099ReportDoc, PrintOverlay } from './WeeklyPayrollReportDoc'
 
 // ── Amount → words ────────────────────────────────────────────────────────
 const ONES = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
@@ -398,6 +399,7 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
   const [regSaving, setRegSaving] = useState(false)
   const [regStatus, setRegStatus] = useState(null) // null | 'saved' | 'error'
   const [regError,  setRegError]  = useState('')
+  const [showReport, setShowReport] = useState(false)
 
   // Default check date to the Friday of the FOLLOWING week
   // (period.end = Sunday of pay week; +5 days = Friday of next week)
@@ -467,7 +469,9 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
     }
   }
 
-  return createPortal(
+  return (
+    <>
+      {createPortal(
     <div id="print-checks-root"
       style={{ position: 'fixed', inset: 0, background: '#d1d5db', zIndex: 9999, overflowY: 'auto' }}>
 
@@ -610,6 +614,15 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
               transition: 'background 0.2s',
             }}>
             {regSaving ? 'Saving…' : regStatus === 'saved' ? '✓ Saved to Registry' : 'Save to Registry'}
+          </button>
+          <button
+            onClick={() => setShowReport(true)}
+            style={{
+              padding: '8px 20px', borderRadius: 8,
+              background: '#0d9488', color: '#fff', border: 'none', cursor: 'pointer',
+              fontWeight: 600, fontSize: 13,
+            }}>
+            Weekly Payroll Report (1099)
           </button>
           <span style={{ fontSize: 11, color: '#64748b' }}>
             Saves check numbers for selected payees who have a check # entered
@@ -769,5 +782,18 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
       </div>
     </div>,
     document.body
+      )}
+      {showReport && (
+        <PrintOverlay onClose={() => setShowReport(false)}>
+          <Weekly1099ReportDoc
+            summaryData={employees}
+            gasByUser={gasByUser}
+            bonusByUser={bonusByUser}
+            loanDeductions={loanDeductions}
+            period={period}
+          />
+        </PrintOverlay>
+      )}
+    </>
   )
 }
