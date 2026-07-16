@@ -1,7 +1,42 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { format, parseISO, getISOWeek } from 'date-fns'
 import { formatCurrency } from '../../utils/format'
+
+// Usable vertical space on a US Letter page inside PrintOverlay's @page
+// margins (0.7in top/bottom), minus a small safety buffer.
+const PRINT_PAGE_HEIGHT_PX = (11 - 0.7 - 0.7 - 0.1) * 96
+
+// Shrinks `ref`'s element (via CSS transform) just before printing so its
+// content always fits on exactly one page, however many rows it has —
+// instead of a fixed font size that works today but overflows once more
+// rows are added. Restores full size after printing/cancelling so the
+// on-screen preview stays readable.
+function useShrinkToFitOnePage(ref, deps) {
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const fit = () => {
+      el.style.transform = 'none'
+      el.style.width = '100%'
+      const naturalHeight = el.scrollHeight
+      if (naturalHeight > PRINT_PAGE_HEIGHT_PX) {
+        const scale = PRINT_PAGE_HEIGHT_PX / naturalHeight
+        el.style.transform = `scale(${scale})`
+        el.style.transformOrigin = 'top left'
+        el.style.width = `${(1 / scale) * 100}%`
+      }
+    }
+    const reset = () => { el.style.transform = 'none'; el.style.width = '100%' }
+    window.addEventListener('beforeprint', fit)
+    window.addEventListener('afterprint', reset)
+    return () => {
+      window.removeEventListener('beforeprint', fit)
+      window.removeEventListener('afterprint', reset)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
+}
 
 const COMPANY = {
   name:    'JCCS Services LLC',
@@ -9,7 +44,7 @@ const COMPANY = {
   phone:   '864-907-9052',
   email:   'lauragarcia@jccs-services.com',
 }
-const DOC_BLUE = '#1e3a8a'
+const DOC_ACCENT = '#15803d' // green, to match the app's brand aesthetic
 
 const th = {
   padding: '6px 10px',
@@ -52,8 +87,11 @@ export function Weekly1099ReportDoc({ summaryData, gasByUser = {}, bonusByUser =
 
   const cols = ['Employee', '$/Hour', 'Hours', 'Gross', 'Gas', 'Bonus', 'Loan Ded.', 'Net']
 
+  const rootRef = useRef(null)
+  useShrinkToFitOnePage(rootRef, [rows.length])
+
   return (
-    <div style={{ fontFamily: 'Arial, "Helvetica Neue", sans-serif', fontSize: '0.8rem', color: '#1e293b', lineHeight: 1.5 }}>
+    <div ref={rootRef} style={{ fontFamily: 'Arial, "Helvetica Neue", sans-serif', fontSize: '0.8rem', color: '#1e293b', lineHeight: 1.5 }}>
       <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px' }}>Weekly Payroll Report</h1>
       <p style={{ marginBottom: '18px', fontSize: '0.8rem', color: '#475569' }}>
         Filter: {weekNum ? `Week ${weekNum} ` : ''}({fmtShort(period.start)} - {fmtShort(period.end)}) | Year: {format(parseISO(period.start), 'yyyy')} | Group: 1099 Employees
@@ -62,7 +100,7 @@ export function Weekly1099ReportDoc({ summaryData, gasByUser = {}, bonusByUser =
 
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
-          <tr style={{ background: DOC_BLUE }}>
+          <tr style={{ background: DOC_ACCENT }}>
             {cols.map((h) => (
               <th key={h} style={{ ...th, color: '#fff', background: 'transparent', borderBottom: 'none', textAlign: h === 'Employee' ? 'left' : 'right' }}>{h}</th>
             ))}
@@ -86,14 +124,14 @@ export function Weekly1099ReportDoc({ summaryData, gasByUser = {}, bonusByUser =
             totals.net   += net
             return (
               <tr key={emp.user_id} style={{ background: i % 2 ? '#f8fafc' : '#fff' }}>
-                <td style={td}><strong>{emp.name}</strong></td>
+                <td style={{ ...td, whiteSpace: 'nowrap' }}><strong>{emp.name}</strong></td>
                 <td style={{ ...td, textAlign: 'right' }}>{formatCurrency(emp.pay_rate ?? 0)}</td>
                 <td style={{ ...td, textAlign: 'right' }}>{(emp.regular_hours ?? 0).toFixed(2)}</td>
                 <td style={{ ...td, textAlign: 'right' }}>{formatCurrency(gross)}</td>
                 <td style={{ ...td, textAlign: 'right', color: gas > 0 ? '#16a34a' : undefined }}>{gas > 0 ? `+${formatCurrency(gas)}` : formatCurrency(0)}</td>
                 <td style={{ ...td, textAlign: 'right', color: bon > 0 ? '#16a34a' : undefined }}>{bon > 0 ? `+${formatCurrency(bon)}` : formatCurrency(0)}</td>
                 <td style={{ ...td, textAlign: 'right', color: loan > 0 ? '#ef4444' : undefined }}>{loan > 0 ? `-${formatCurrency(loan)}` : formatCurrency(0)}</td>
-                <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: DOC_BLUE }}>{formatCurrency(net)}</td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: DOC_ACCENT }}>{formatCurrency(net)}</td>
               </tr>
             )
           })}
@@ -116,7 +154,7 @@ export function Weekly1099ReportDoc({ summaryData, gasByUser = {}, bonusByUser =
               <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#16a34a', borderBottom: 'none' }}>{totals.gas > 0 ? `+${formatCurrency(totals.gas)}` : formatCurrency(0)}</td>
               <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#16a34a', borderBottom: 'none' }}>{totals.bonus > 0 ? `+${formatCurrency(totals.bonus)}` : formatCurrency(0)}</td>
               <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#ef4444', borderBottom: 'none' }}>{totals.loan > 0 ? `-${formatCurrency(totals.loan)}` : formatCurrency(0)}</td>
-              <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: DOC_BLUE, borderBottom: 'none' }}>{formatCurrency(totals.net)}</td>
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: DOC_ACCENT, borderBottom: 'none' }}>{formatCurrency(totals.net)}</td>
             </tr>
           </tfoot>
         )}
