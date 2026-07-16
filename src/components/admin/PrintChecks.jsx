@@ -31,20 +31,24 @@ function amountToWords(amount) {
 // Increase F if fields print too high; decrease if too low. 1mm = 0.0394in.
 const F = 0.098 // ~2.5mm down
 
+// Horizontal correction for the date and dollar-amount fields only (calibrated
+// via test print). Negative moves left. 1cm = 0.3937in.
+const H = -0.3937 // ~1cm left
+
 // ── Check field positions — extracted from Keynote templates via PPTX export ─
 // All measurements in inches from the physical paper top-left corner.
 // Positions match Employee_1099_Check_Template.key
 const CHECK_EMP = {
-  date:     { top: `${(0.6832 + F).toFixed(4)}in`, left: '6.9466in', w: '1.3322in' },
-  checkNum: { top: `${(1.1906 + F).toFixed(4)}in`, left: '7.0050in', w: '1.2155in' },
+  date:     { top: `${(0.6832 + F).toFixed(4)}in`, left: `${(6.9466 + H).toFixed(4)}in`, w: '1.3322in' },
+  checkNum: { top: `${(1.1906 + F).toFixed(4)}in`, left: `${(7.0050 + H).toFixed(4)}in`, w: '1.2155in' },
   payTo:    { top: `${(1.1906 + F).toFixed(4)}in`, left: '0.9896in', w: '5.6981in' },
   words:    { top: `${(1.5239 + F).toFixed(4)}in`, left: '0.3137in', w: '7.0499in' },
   memo:     { top: `${(2.3646 + F).toFixed(4)}in`, left: '1.0544in', w: '2.5251in' },
 }
 // Positions match Contractor_Check_Template.key
 const CHECK_CON = {
-  date:     { top: `${(0.6832 + F).toFixed(4)}in`, left: '6.9466in', w: '1.3322in' },
-  checkNum: { top: `${(1.1906 + F).toFixed(4)}in`, left: '7.0050in', w: '1.2155in' },
+  date:     { top: `${(0.6832 + F).toFixed(4)}in`, left: `${(6.9466 + H).toFixed(4)}in`, w: '1.3322in' },
+  checkNum: { top: `${(1.1906 + F).toFixed(4)}in`, left: `${(7.0050 + H).toFixed(4)}in`, w: '1.2155in' },
   payTo:    { top: `${(1.1973 + F).toFixed(4)}in`, left: '0.9896in', w: '5.6981in' },
   words:    { top: `${(1.5307 + F).toFixed(4)}in`, left: '0.3137in', w: '7.0499in' },
   memo:     { top: `${(2.2158 + F).toFixed(4)}in`, left: '1.0211in', w: '2.5251in' },
