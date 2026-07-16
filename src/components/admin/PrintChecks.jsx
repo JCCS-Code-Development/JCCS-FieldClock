@@ -332,7 +332,6 @@ function FlatRateCheckPage({ fr, today, periodStart, periodEnd, checkNum }) {
       <div style={{ position: 'absolute', top: CHECK_CON.payTo.top, left: CHECK_CON.payTo.left, width: CHECK_CON.payTo.w, overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', fontWeight: 600, color: '#000' }}>{fr.user_name}</div>
       <div style={{ position: 'absolute', top: CHECK_CON.words.top, left: CHECK_CON.words.left, width: CHECK_CON.words.w, overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{amountToWords(amount)}</div>
       <div style={{ position: 'absolute', top: CHECK_CON.memo.top, left: CHECK_CON.memo.left, width: CHECK_CON.memo.w, fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{fr.user_name}</div>
-      <div style={{ position: 'absolute', top: CHECK_CON.address.top, left: CHECK_CON.address.left, width: CHECK_CON.address.w, fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000' }}>{fr.user_name}</div>
 
       {/* Employee copy (middle) */}
       <div style={{ position: 'absolute', top: `${SEC.check + 0.35}in`, bottom: `${11 - SEC.stub + 0.3}in`, left: '0.75in', right: '0.75in', overflow: 'hidden' }}>
