@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, getISOWeek } from 'date-fns'
 import { formatCurrency } from '../../utils/format'
 
 const COMPANY = {
@@ -28,28 +28,6 @@ const td = {
   color: '#1e293b',
 }
 
-function DocHeader({ title, ein }) {
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <img src="/jccs-logo.jpg" alt="JCCS Services" style={{ height: '54px', width: 'auto' }} />
-          <div>
-            <p style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.15 }}>{COMPANY.name}</p>
-            <p style={{ fontSize: '0.78rem', color: '#334155', margin: '3px 0 0' }}>{COMPANY.address}</p>
-            <p style={{ fontSize: '0.78rem', color: '#334155', margin: '1px 0 0' }}>{COMPANY.phone} · {COMPANY.email}{ein ? ` · EIN: ${ein}` : ''}</p>
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: '1.15rem', fontWeight: 800, color: DOC_BLUE, textTransform: 'uppercase', letterSpacing: '0.02em', margin: 0, lineHeight: 1.2, maxWidth: '220px' }}>{title}</p>
-          <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '4px 0 0' }}>Generated: {format(new Date(), 'MMMM d, yyyy')}</p>
-        </div>
-      </div>
-      <div style={{ borderBottom: `2.5px solid ${DOC_BLUE}`, marginTop: '14px', marginBottom: '20px' }} />
-    </div>
-  )
-}
-
 function DocFooter() {
   return (
     <p style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2rem', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
@@ -61,77 +39,82 @@ function DocFooter() {
 // ── Weekly Payroll Report (1099 employees only) ────────────────────────────
 // gasByUser/bonusByUser: { [user_id]: amount } — already-aggregated per-user
 // totals for the period, matching the shape PrintChecks already computes.
+//
+// Loan deductions are subtracted from Net here, matching how they work
+// everywhere else in FieldClock (a real repayment reduces take-home pay) —
+// this intentionally differs from a reference report the amounts were
+// modeled after, which added a "Net Loans" figure into the total instead.
 export function Weekly1099ReportDoc({ summaryData, gasByUser = {}, bonusByUser = {}, loanDeductions = {}, period, ein }) {
   const rows = summaryData.filter((e) => e.pay_type === '1099')
-  const totals = { hours: 0, base: 0, gas: 0, bonus: 0, loan: 0, gross: 0, net: 0 }
+  const totals = { hours: 0, gross: 0, gas: 0, bonus: 0, loan: 0, net: 0 }
+  const weekNum = (() => { try { return getISOWeek(parseISO(period.start)) } catch { return null } })()
+  const fmtShort = (iso) => { try { return format(parseISO(iso), 'MM/dd') } catch { return iso } }
+
+  const cols = ['Employee', '$/Hour', 'Hours', 'Gross', 'Gas', 'Bonus', 'Loan Ded.', 'Net']
 
   return (
-    <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.8rem', color: '#1e293b', lineHeight: 1.5 }}>
-      <DocHeader title="Weekly Payroll Report" ein={ein} />
-
-      <p style={{ marginBottom: '4px', fontSize: '1rem', fontWeight: 700, color: DOC_BLUE }}>
-        Week of {format(parseISO(period.start), 'MMMM d')} – {format(parseISO(period.end), 'MMMM d, yyyy')}
-      </p>
-      <p style={{ marginBottom: '16px', fontSize: '0.78rem', color: '#64748b' }}>
-        1099 employee payroll summary — archived copy
+    <div style={{ fontFamily: 'Arial, "Helvetica Neue", sans-serif', fontSize: '0.8rem', color: '#1e293b', lineHeight: 1.5 }}>
+      <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px' }}>Weekly Payroll Report</h1>
+      <p style={{ marginBottom: '18px', fontSize: '0.8rem', color: '#475569' }}>
+        Filter: {weekNum ? `Week ${weekNum} ` : ''}({fmtShort(period.start)} - {fmtShort(period.end)}) | Year: {format(parseISO(period.start), 'yyyy')} | Group: 1099 Employees
+        {ein ? ` | EIN: ${ein}` : ''}
       </p>
 
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
-          <tr style={{ background: '#0f172a' }}>
-            {['Employee','Hours','Base Pay','Gas','Bonus','Loan Ded.','Gross','Net Pay'].map((h) => (
-              <th key={h} style={{ ...th, color: '#cbd5e1', background: 'transparent', borderBottom: 'none', textAlign: h === 'Employee' ? 'left' : 'right' }}>{h}</th>
+          <tr style={{ background: DOC_BLUE }}>
+            {cols.map((h) => (
+              <th key={h} style={{ ...th, color: '#fff', background: 'transparent', borderBottom: 'none', textAlign: h === 'Employee' ? 'left' : 'right' }}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '20px 10px' }}>No 1099 employees with pay this period.</td></tr>
+            <tr><td colSpan={cols.length} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '20px 10px' }}>No 1099 employees with pay this period.</td></tr>
           )}
-          {rows.map((emp) => {
+          {rows.map((emp, i) => {
             const gas  = (emp.gas_total ?? 0) + (gasByUser[emp.user_id] ?? 0)
             const bon  = bonusByUser[emp.user_id] ?? 0
             const loan = loanDeductions[emp.user_id] ?? 0
-            const gross = emp.estimated_total ?? 0
-            const net   = Math.max(gross - loan, 0)
+            const gross = emp.base_gross ?? 0
+            const net   = Math.max(gross + gas + bon - loan, 0)
             totals.hours += emp.regular_hours ?? 0
-            totals.base  += emp.base_gross    ?? 0
+            totals.gross += gross
             totals.gas   += gas
             totals.bonus += bon
             totals.loan  += loan
-            totals.gross += gross
             totals.net   += net
             return (
-              <tr key={emp.user_id}>
+              <tr key={emp.user_id} style={{ background: i % 2 ? '#f8fafc' : '#fff' }}>
                 <td style={td}><strong>{emp.name}</strong></td>
-                <td style={{ ...td, textAlign: 'right' }}>{(emp.regular_hours ?? 0).toFixed(1)}</td>
-                <td style={{ ...td, textAlign: 'right' }}>{formatCurrency(emp.base_gross ?? 0)}</td>
-                <td style={{ ...td, textAlign: 'right' }}>{gas > 0 ? formatCurrency(gas) : '—'}</td>
-                <td style={{ ...td, textAlign: 'right' }}>{bon > 0 ? formatCurrency(bon) : '—'}</td>
-                <td style={{ ...td, textAlign: 'right', color: loan > 0 ? '#ef4444' : undefined }}>{loan > 0 ? `(${formatCurrency(loan)})` : '—'}</td>
-                <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(gross)}</td>
-                <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{formatCurrency(net)}</td>
+                <td style={{ ...td, textAlign: 'right' }}>{formatCurrency(emp.pay_rate ?? 0)}</td>
+                <td style={{ ...td, textAlign: 'right' }}>{(emp.regular_hours ?? 0).toFixed(2)}</td>
+                <td style={{ ...td, textAlign: 'right' }}>{formatCurrency(gross)}</td>
+                <td style={{ ...td, textAlign: 'right', color: gas > 0 ? '#16a34a' : undefined }}>{gas > 0 ? `+${formatCurrency(gas)}` : formatCurrency(0)}</td>
+                <td style={{ ...td, textAlign: 'right', color: bon > 0 ? '#16a34a' : undefined }}>{bon > 0 ? `+${formatCurrency(bon)}` : formatCurrency(0)}</td>
+                <td style={{ ...td, textAlign: 'right', color: loan > 0 ? '#ef4444' : undefined }}>{loan > 0 ? `-${formatCurrency(loan)}` : formatCurrency(0)}</td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: DOC_BLUE }}>{formatCurrency(net)}</td>
               </tr>
             )
           })}
         </tbody>
         {rows.length > 0 && (
           <tfoot>
-            <tr style={{ background: '#0f172a' }}>
-              <td style={{ ...td, color: '#fff', fontWeight: 700 }}>TOTAL</td>
-              <td style={{ ...td, textAlign: 'right', color: '#fff', fontWeight: 700 }}>{totals.hours.toFixed(1)}</td>
-              <td style={{ ...td, textAlign: 'right', color: '#fff', fontWeight: 700 }}>{formatCurrency(totals.base)}</td>
-              <td style={{ ...td, textAlign: 'right', color: '#fff', fontWeight: 700 }}>{formatCurrency(totals.gas)}</td>
-              <td style={{ ...td, textAlign: 'right', color: '#fff', fontWeight: 700 }}>{formatCurrency(totals.bonus)}</td>
-              <td style={{ ...td, textAlign: 'right', color: '#fca5a5', fontWeight: 700 }}>{totals.loan > 0 ? `(${formatCurrency(totals.loan)})` : '—'}</td>
-              <td style={{ ...td, textAlign: 'right', color: '#fff', fontWeight: 700 }}>{formatCurrency(totals.gross)}</td>
-              <td style={{ ...td, textAlign: 'right', color: '#fff', fontWeight: 700 }}>{formatCurrency(totals.net)}</td>
+            <tr style={{ background: '#f1f5f9' }}>
+              <td style={{ ...td, fontWeight: 700, borderBottom: 'none' }}>WEEKLY TOTALS:</td>
+              <td style={{ ...td, borderBottom: 'none' }}></td>
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700, borderBottom: 'none' }}>{totals.hours.toFixed(2)}</td>
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700, borderBottom: 'none' }}>{formatCurrency(totals.gross)}</td>
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#16a34a', borderBottom: 'none' }}>{totals.gas > 0 ? `+${formatCurrency(totals.gas)}` : formatCurrency(0)}</td>
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#16a34a', borderBottom: 'none' }}>{totals.bonus > 0 ? `+${formatCurrency(totals.bonus)}` : formatCurrency(0)}</td>
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#ef4444', borderBottom: 'none' }}>{totals.loan > 0 ? `-${formatCurrency(totals.loan)}` : formatCurrency(0)}</td>
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: DOC_BLUE, borderBottom: 'none' }}>{formatCurrency(totals.net)}</td>
             </tr>
           </tfoot>
         )}
       </table>
 
-      {/* Signature row */}
+      {/* Signature row — for physical archiving sign-off */}
       <div style={{ marginTop: '36px', display: 'flex', gap: '4rem' }}>
         {['Prepared by', 'Approved by'].map((label) => (
           <div key={label} style={{ flex: 1 }}>
