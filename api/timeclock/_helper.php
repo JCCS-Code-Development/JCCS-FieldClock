@@ -105,7 +105,7 @@ function openEntry(
         'INSERT INTO time_entries
             (user_id, created_by, created_via, job_id, estimate_id, visit_category, estimate_subtype, work_order_number, engineer_name, visit_description,
              status_label, cost_category, start_time, start_lat, start_lng, gps_accuracy, within_radius, approval_status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)'
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
         $userId, $userId, $source, $jobId, $estimateId, $visitCategory, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
