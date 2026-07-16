@@ -355,7 +355,14 @@ function FlatRateCheckPage({ fr, today, periodStart, periodEnd, checkNum }) {
 
 // ── Main component ────────────────────────────────────────────────────────
 export default function PrintChecks({ employees, flatRatePayments = [], period, gasByUser, bonusByUser, loanDeductions, onClose }) {
+  const [showReport, setShowReport] = useState(false)
+
+  // Skip while the Weekly Payroll Report overlay is open — its own print
+  // stylesheet hides everything except #doc-print-root, and this one hides
+  // everything except #print-checks-root, so having both active at once
+  // hides both containers and the printed page comes out blank.
   useEffect(() => {
+    if (showReport) return
     const style = document.createElement('style')
     style.id = 'print-checks-css'
     style.textContent = `
@@ -393,13 +400,12 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
     `
     document.head.appendChild(style)
     return () => document.getElementById('print-checks-css')?.remove()
-  }, [])
+  }, [showReport])
 
   const [checkNums, setCheckNums] = useState({})
   const [regSaving, setRegSaving] = useState(false)
   const [regStatus, setRegStatus] = useState(null) // null | 'saved' | 'error'
   const [regError,  setRegError]  = useState('')
-  const [showReport, setShowReport] = useState(false)
 
   // Default check date to the Friday of the FOLLOWING week
   // (period.end = Sunday of pay week; +5 days = Friday of next week)

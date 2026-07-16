@@ -97,6 +97,14 @@ export function Weekly1099ReportDoc({ summaryData, gasByUser = {}, bonusByUser =
               </tr>
             )
           })}
+          {/* Blank rows — for writing in checks prepared later in the week */}
+          {Array.from({ length: 6 }, (_, i) => (
+            <tr key={`blank-${i}`}>
+              {cols.map((h) => (
+                <td key={h} style={{ ...td, height: '26px', borderBottom: '1px solid #e2e8f0' }}>&nbsp;</td>
+              ))}
+            </tr>
+          ))}
         </tbody>
         {rows.length > 0 && (
           <tfoot>
@@ -115,14 +123,10 @@ export function Weekly1099ReportDoc({ summaryData, gasByUser = {}, bonusByUser =
       </table>
 
       {/* Signature row — for physical archiving sign-off */}
-      <div style={{ marginTop: '36px', display: 'flex', gap: '4rem' }}>
-        {['Prepared by', 'Approved by'].map((label) => (
-          <div key={label} style={{ flex: 1 }}>
-            <div style={{ borderBottom: '1px solid #1e293b', marginBottom: '6px', height: '28px' }}></div>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>{label}</p>
-            <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>Date: _______________</p>
-          </div>
-        ))}
+      <div style={{ marginTop: '36px', maxWidth: '260px' }}>
+        <div style={{ borderBottom: '1px solid #1e293b', marginBottom: '6px', height: '28px' }}></div>
+        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>Prepared by</p>
+        <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>Date: _______________</p>
       </div>
 
       <DocFooter />
