@@ -102,6 +102,13 @@ const DOC_TYPES = [
     color: 'bg-rose-50 border-rose-200',
     dot: 'bg-rose-500',
   },
+  {
+    id: 'weekly1099',
+    title: 'Weekly Payroll Report',
+    desc: '1099 employee payroll summary for one week — for physical archiving.',
+    color: 'bg-teal-50 border-teal-200',
+    dot: 'bg-teal-500',
+  },
 ]
 
 // ─── Shared inline styles ─────────────────────────────────────────────────────
@@ -734,6 +741,99 @@ function PayrollRegisterDoc({ summaryData, adjustments, loanDeductions, period, 
   )
 }
 
+// ─── Doc 5b: Weekly Payroll Report (1099 employees only) ─────────────────────
+function Weekly1099ReportDoc({ summaryData, adjustments, loanDeductions, period, ein }) {
+  const gasByUser   = {}
+  const bonusByUser = {}
+  adjustments.forEach((a) => {
+    if (a.type === 'gas_allowance') gasByUser[a.user_id] = (gasByUser[a.user_id] ?? 0) + parseFloat(a.amount)
+    else bonusByUser[a.user_id] = (bonusByUser[a.user_id] ?? 0) + parseFloat(a.amount)
+  })
+  const rows = summaryData.filter((e) => e.pay_type === '1099')
+  const totals = { hours: 0, base: 0, gas: 0, bonus: 0, loan: 0, gross: 0, net: 0 }
+
+  return (
+    <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.8rem', color: '#1e293b', lineHeight: 1.5 }}>
+      <DocHeader title="Weekly Payroll Report" ein={ein} />
+
+      <p style={{ marginBottom: '4px', fontSize: '1rem', fontWeight: 700, color: DOC_BLUE }}>
+        Week of {format(parseISO(period.start), 'MMMM d')} – {format(parseISO(period.end), 'MMMM d, yyyy')}
+      </p>
+      <p style={{ marginBottom: '16px', fontSize: '0.78rem', color: '#64748b' }}>
+        1099 employee payroll summary — archived copy
+      </p>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ background: '#0f172a' }}>
+            {['Employee','Hours','Base Pay','Gas','Bonus','Loan Ded.','Gross','Net Pay'].map((h) => (
+              <th key={h} style={{ ...th, color: '#cbd5e1', background: 'transparent', borderBottom: 'none', textAlign: h === 'Employee' ? 'left' : 'right' }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && (
+            <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '20px 10px' }}>No 1099 employees with pay this period.</td></tr>
+          )}
+          {rows.map((emp) => {
+            const gas  = (emp.gas_total ?? 0) + (gasByUser[emp.user_id] ?? 0)
+            const bon  = bonusByUser[emp.user_id] ?? 0
+            const loan = loanDeductions[emp.user_id] ?? 0
+            const gross = emp.estimated_total ?? 0
+            const net   = Math.max(gross - loan, 0)
+            totals.hours += emp.regular_hours ?? 0
+            totals.base  += emp.base_gross    ?? 0
+            totals.gas   += gas
+            totals.bonus += bon
+            totals.loan  += loan
+            totals.gross += gross
+            totals.net   += net
+            return (
+              <tr key={emp.user_id}>
+                <td style={td}><strong>{emp.name}</strong></td>
+                <td style={{ ...td, textAlign: 'right' }}>{(emp.regular_hours ?? 0).toFixed(1)}</td>
+                <td style={{ ...td, textAlign: 'right' }}>{formatCurrency(emp.base_gross ?? 0)}</td>
+                <td style={{ ...td, textAlign: 'right' }}>{gas > 0 ? formatCurrency(gas) : '—'}</td>
+                <td style={{ ...td, textAlign: 'right' }}>{bon > 0 ? formatCurrency(bon) : '—'}</td>
+                <td style={{ ...td, textAlign: 'right', color: loan > 0 ? '#ef4444' : undefined }}>{loan > 0 ? `(${formatCurrency(loan)})` : '—'}</td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(gross)}</td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{formatCurrency(net)}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+        {rows.length > 0 && (
+          <tfoot>
+            <tr style={{ background: '#0f172a' }}>
+              <td style={{ ...td, color: '#fff', fontWeight: 700 }}>TOTAL</td>
+              <td style={{ ...td, textAlign: 'right', color: '#fff', fontWeight: 700 }}>{totals.hours.toFixed(1)}</td>
+              <td style={{ ...td, textAlign: 'right', color: '#fff', fontWeight: 700 }}>{formatCurrency(totals.base)}</td>
+              <td style={{ ...td, textAlign: 'right', color: '#fff', fontWeight: 700 }}>{formatCurrency(totals.gas)}</td>
+              <td style={{ ...td, textAlign: 'right', color: '#fff', fontWeight: 700 }}>{formatCurrency(totals.bonus)}</td>
+              <td style={{ ...td, textAlign: 'right', color: '#fca5a5', fontWeight: 700 }}>{totals.loan > 0 ? `(${formatCurrency(totals.loan)})` : '—'}</td>
+              <td style={{ ...td, textAlign: 'right', color: '#fff', fontWeight: 700 }}>{formatCurrency(totals.gross)}</td>
+              <td style={{ ...td, textAlign: 'right', color: '#fff', fontWeight: 700 }}>{formatCurrency(totals.net)}</td>
+            </tr>
+          </tfoot>
+        )}
+      </table>
+
+      {/* Signature row */}
+      <div style={{ marginTop: '36px', display: 'flex', gap: '4rem' }}>
+        {['Prepared by', 'Approved by'].map((label) => (
+          <div key={label} style={{ flex: 1 }}>
+            <div style={{ borderBottom: '1px solid #1e293b', marginBottom: '6px', height: '28px' }}></div>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>{label}</p>
+            <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>Date: _______________</p>
+          </div>
+        ))}
+      </div>
+
+      <DocFooter />
+    </div>
+  )
+}
+
 // ─── Doc 6: 1099 Contractor Summary ──────────────────────────────────────────
 function Contractor1099Doc({ employees, year, ein }) {
   const contractors = employees.filter((e) => e.pay_type === '1099')
@@ -1091,6 +1191,22 @@ export default function AdminDocuments() {
       } else if (selected === 'contractor') {
         const data = await getAnnualSummary(year)
         setPreview(<Contractor1099Doc employees={data.employees ?? []} year={year} ein={ein} />)
+
+      } else if (selected === 'weekly1099') {
+        const [sumData, adjData, loanData] = await Promise.all([
+          getSummary({ start: rp.start, end: rp.end }),
+          listAdjustments({ period_start: rp.start, period_end: rp.end }),
+          getPeriodLoanTotals(rp.start, rp.end),
+        ])
+        setPreview(
+          <Weekly1099ReportDoc
+            summaryData={sumData.summary ?? []}
+            adjustments={adjData.adjustments ?? []}
+            loanDeductions={loanData}
+            period={rp}
+            ein={ein}
+          />
+        )
       }
 
     } catch (err) {
@@ -1226,6 +1342,13 @@ export default function AdminDocuments() {
               {selected === 'contractor' && (
                 <FormSelect label="Tax Year" value={year} onChange={(v) => setYear(parseInt(v))}>
                   {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                </FormSelect>
+              )}
+
+              {/* ── Weekly Payroll Report (1099) ── */}
+              {selected === 'weekly1099' && (
+                <FormSelect label="Week" value={regPeriod} onChange={setRegPeriod}>
+                  {PERIODS.map((p, i) => <option key={i} value={i}>{p.label}</option>)}
                 </FormSelect>
               )}
 
