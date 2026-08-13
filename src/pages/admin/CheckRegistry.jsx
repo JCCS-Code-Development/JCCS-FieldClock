@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { format } from 'date-fns'
-import { listChecks, updateCheck, voidCheck, previewNetAmountFix, applyNetAmountFix } from '../../api/checks'
+import { listChecks, updateCheck, voidCheck } from '../../api/checks'
 import { formatCurrency } from '../../utils/format'
 import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
@@ -114,115 +114,6 @@ function UpdateModal({ check, onClose, onSaved }) {
   )
 }
 
-function NetFixModal({ onClose, onApplied }) {
-  const [loading, setLoading] = useState(true)
-  const [corrections, setCorrections] = useState([])
-  const [totalDelta, setTotalDelta] = useState(0)
-  const [error, setError]     = useState('')
-  const [applying, setApplying] = useState(false)
-  const [applied, setApplied] = useState(null) // null | { applied, total_delta }
-
-  useEffect(() => {
-    previewNetAmountFix()
-      .then(res => {
-        setCorrections(res.corrections ?? [])
-        setTotalDelta(res.total_delta ?? 0)
-      })
-      .catch(() => setError('Failed to load preview. Please try again.'))
-      .finally(() => setLoading(false))
-  }, [])
-
-  const handleApply = async () => {
-    setApplying(true)
-    setError('')
-    try {
-      const res = await applyNetAmountFix()
-      setApplied(res)
-      onApplied()
-    } catch {
-      setError('Failed to apply corrections. Please try again.')
-    } finally {
-      setApplying(false)
-    }
-  }
-
-  if (loading) {
-    return <div className="flex justify-center py-10"><Spinner size="lg" /></div>
-  }
-
-  if (applied) {
-    return (
-      <div className="space-y-4">
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-700">
-          Corrected {applied.applied} check{applied.applied === 1 ? '' : 's'}
-          {applied.applied > 0 && <> — total reduced by {formatCurrency(applied.total_delta)}</>}.
-        </div>
-        <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors">
-          Done
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-500">
-        Finds 1099 checks where a loan deduction applied that period but the registered amount
-        still shows the pre-deduction (gross) figure instead of what the check actually paid.
-      </p>
-
-      {error && <p className="text-xs text-red-600">{error}</p>}
-
-      {corrections.length === 0
-        ? <p className="text-sm text-gray-500 bg-gray-50 rounded-xl p-4">No corrections needed — everything already matches.</p>
-        : (
-          <>
-            <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-100">
-              <table className="w-full text-xs">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr className="text-gray-500 uppercase tracking-wide text-[10px]">
-                    <th className="text-left px-3 py-2">Check #</th>
-                    <th className="text-left px-3 py-2">Payee</th>
-                    <th className="text-right px-3 py-2">Old</th>
-                    <th className="text-right px-3 py-2">Loan Ded.</th>
-                    <th className="text-right px-3 py-2">New</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {corrections.map(c => (
-                    <tr key={c.id} className="border-t border-gray-100">
-                      <td className="px-3 py-2 font-semibold text-gray-900">#{c.check_number}</td>
-                      <td className="px-3 py-2 text-gray-600 truncate max-w-[120px]">{c.payee_name}</td>
-                      <td className="px-3 py-2 text-right text-gray-500">{formatCurrency(c.old_amount)}</td>
-                      <td className="px-3 py-2 text-right text-red-500">−{formatCurrency(c.loan_deduction)}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-gray-900">{formatCurrency(c.new_amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-xs text-gray-500">
-              {corrections.length} check{corrections.length === 1 ? '' : 's'} · total reduction {formatCurrency(totalDelta)}
-            </p>
-          </>
-        )
-      }
-
-      <div className="flex gap-2 pt-1">
-        <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-          {corrections.length === 0 ? 'Close' : 'Cancel'}
-        </button>
-        {corrections.length > 0 && (
-          <button onClick={handleApply} disabled={applying}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 disabled:opacity-50 transition-colors">
-            {applying ? 'Applying…' : `Apply ${corrections.length} Correction${corrections.length === 1 ? '' : 's'}`}
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
 export default function CheckRegistry() {
   const [checks, setChecks]   = useState([])
   const [counts, setCounts]   = useState({ total: 0, issued: 0, voided: 0, processed_online: 0, processed_in_person: 0 })
@@ -232,7 +123,6 @@ export default function CheckRegistry() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo]     = useState('')
   const [selected, setSelected] = useState(null)
-  const [netFixOpen, setNetFixOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -266,15 +156,9 @@ export default function CheckRegistry() {
   return (
     <div className="flex flex-col gap-4 w-full">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Check Registry</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Track and update check status</p>
-        </div>
-        <button onClick={() => setNetFixOpen(true)}
-          className="text-xs font-semibold text-brand-600 border border-brand-200 rounded-full px-3.5 py-2 hover:bg-brand-50 transition-colors whitespace-nowrap">
-          Fix Historical Net Amounts
-        </button>
+      <div>
+        <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Check Registry</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Track and update check status</p>
       </div>
 
       {/* Summary counts */}
@@ -370,16 +254,6 @@ export default function CheckRegistry() {
             check={selected}
             onClose={() => setSelected(null)}
             onSaved={handleSaved}
-          />
-        )}
-      </Modal>
-
-      {/* Net-pay correction modal */}
-      <Modal isOpen={netFixOpen} onClose={() => setNetFixOpen(false)} title="Fix Historical Net Amounts">
-        {netFixOpen && (
-          <NetFixModal
-            onClose={() => setNetFixOpen(false)}
-            onApplied={load}
           />
         )}
       </Modal>
