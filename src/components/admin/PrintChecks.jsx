@@ -429,7 +429,13 @@ export default function PrintChecks({ employees, flatRatePayments = [], period, 
       .filter(e => e.amount > 0),
     ...employees
       .filter(e => e.pay_type !== 'w2')
-      .map(e => ({ key: `u-${e.user_id}`, name: e.name, amount: e.estimated_total ?? 0, user_id: e.user_id }))
+      .map(e => ({
+        key: `u-${e.user_id}`,
+        name: e.name,
+        // Net of loan deduction — must match the netPay actually printed on the check below.
+        amount: Math.max((e.estimated_total ?? 0) - (loanDeductions[e.user_id] ?? 0), 0),
+        user_id: e.user_id,
+      }))
       .filter(e => e.amount > 0),
     ...flatRatePayments.map(fr => ({ key: `fr-${fr.id}`, name: fr.user_name, amount: parseFloat(fr.amount), user_id: null })),
   ]
