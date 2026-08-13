@@ -23,8 +23,21 @@ $acc  = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
 $pdo  = getPDO();
 requireHourly($auth, $pdo);
 
-$pdo->beginTransaction();
 try {
+    beginTimeclockTransaction($pdo, (int)$auth['user_id']);
+    $open = getOpenWorkEntry($pdo, (int)$auth['user_id']);
+    if (!$open) {
+        $marker = getTodayDayEndMarker($pdo, (int)$auth['user_id']);
+        if ($marker) {
+            $result = timeclockResultFromEntry($pdo, $marker);
+            $pdo->commit();
+            echo json_encode($result);
+            exit;
+        }
+        $pdo->rollBack();
+        http_response_code(422);
+        exit(json_encode(['error' => 'Not clocked in']));
+    }
     closeOpenEntry($pdo, $auth['user_id'], $lat, $lng, source: 'day_end');
     $result = openEntry($pdo, $auth['user_id'], null, 'done', 'day_end', $lat, $lng, $acc, source: 'day_end');
     $pdo->commit();

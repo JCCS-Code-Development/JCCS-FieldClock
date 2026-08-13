@@ -27,26 +27,6 @@ $body  = jsonBody();
 $jobId = isset($body['job_id']) && $body['job_id'] !== '' && $body['job_id'] !== null
     ? (int)$body['job_id'] : null;
 
-// Find the current open entry to preserve status
-$stmt = $pdo->prepare(
-    'SELECT id, status_label, cost_category
-     FROM time_entries
-     WHERE user_id = ? AND end_time IS NULL
-     ORDER BY start_time DESC LIMIT 1'
-);
-$stmt->execute([$auth['user_id']]);
-$open = $stmt->fetch();
-
-if (!$open) {
-    http_response_code(422);
-    exit(json_encode(['error' => 'Not clocked in']));
-}
-
-if ($open['status_label'] === 'done') {
-    http_response_code(422);
-    exit(json_encode(['error' => 'Day already ended']));
-}
-
 // Validate job assignment if a job_id was given
 if ($jobId) {
     $assigned = $pdo->prepare(
@@ -64,6 +44,21 @@ if ($jobId) {
     }
 }
 
+beginTimeclockTransaction($pdo, (int)$auth['user_id']);
+$open = getOpenWorkEntry($pdo, (int)$auth['user_id']);
+if (!$open) {
+    $pdo->rollBack();
+    http_response_code(422);
+    exit(json_encode(['error' => 'Not clocked in']));
+}
+
+if ((int)($open['job_id'] ?? 0) === (int)($jobId ?? 0)) {
+    $result = timeclockResultFromEntry($pdo, $open);
+    $pdo->commit();
+    echo json_encode($result);
+    exit;
+}
+
 closeOpenEntry($pdo, $auth['user_id'], null, null, source: 'switch_job');
 $result = openEntry(
     $pdo,
@@ -74,6 +69,7 @@ $result = openEntry(
     null, null, null,
     source: 'switch_job'
 );
+$pdo->commit();
 
 echo json_encode($result);
 exit;

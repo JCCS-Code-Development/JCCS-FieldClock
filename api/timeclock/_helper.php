@@ -29,9 +29,118 @@ function logTimeEntryHistory(
     ]);
 }
 
+// Serialize every state-changing clock action for one employee. A phone can
+// retry a request, a user can double-tap, and multiple API workers can handle
+// those requests at the same time. Locking the durable users row makes the
+// read/close/open sequence atomic across all PHP processes.
+function beginTimeclockTransaction(PDO $pdo, int $userId): void {
+    $pdo->beginTransaction();
+    $lock = $pdo->prepare('SELECT id FROM users WHERE id = ? FOR UPDATE');
+    $lock->execute([$userId]);
+    if (!$lock->fetch()) {
+        $pdo->rollBack();
+        throw new RuntimeException('User not found');
+    }
+}
+
+function getOpenWorkEntry(PDO $pdo, int $userId): array|false {
+    $stmt = $pdo->prepare(
+        "SELECT * FROM time_entries
+         WHERE user_id = ? AND end_time IS NULL AND cost_category != 'day_end'
+         ORDER BY start_time DESC, id DESC LIMIT 1"
+    );
+    $stmt->execute([$userId]);
+    return $stmt->fetch();
+}
+
+function getTodayDayEndMarker(PDO $pdo, int $userId): array|false {
+    $stmt = $pdo->prepare(
+        "SELECT * FROM time_entries
+         WHERE user_id = ? AND end_time IS NULL AND cost_category = 'day_end'
+           AND DATE(start_time) = CURRENT_DATE
+         ORDER BY start_time DESC, id DESC LIMIT 1"
+    );
+    $stmt->execute([$userId]);
+    return $stmt->fetch();
+}
+
+function timeclockResultFromEntry(PDO $pdo, array $entry): array {
+    $activeJob = null;
+    if (!empty($entry['job_id'])) {
+        $j = $pdo->prepare(
+            'SELECT id, name, client_name, address, clock_in_radius_meters, status, is_recurring_maintenance
+             FROM jobs WHERE id = ?'
+        );
+        $j->execute([(int)$entry['job_id']]);
+        $activeJob = $j->fetch() ?: null;
+    }
+
+    return [
+        'statusLabel'  => $entry['status_label'],
+        'dayStarted'   => true,
+        'currentEntry' => $entry,
+        'activeJob'    => $activeJob,
+    ];
+}
+
+function transitionOpenWorkEntry(
+    PDO $pdo,
+    int $userId,
+    string $statusLabel,
+    string $costCategory,
+    ?float $lat,
+    ?float $lng,
+    ?float $accuracy,
+    string $source
+): array {
+    beginTimeclockTransaction($pdo, $userId);
+    $open = getOpenWorkEntry($pdo, $userId);
+    if (!$open) {
+        $pdo->rollBack();
+        http_response_code(422);
+        exit(json_encode(['error' => 'Not clocked in']));
+    }
+
+    // Treat retries/double taps as a successful no-op.
+    if ($open['status_label'] === $statusLabel) {
+        $result = timeclockResultFromEntry($pdo, $open);
+        $pdo->commit();
+        return $result;
+    }
+
+    closeOpenEntry($pdo, $userId, $lat, $lng, source: $source);
+    $result = openEntry(
+        $pdo,
+        $userId,
+        !empty($open['job_id']) ? (int)$open['job_id'] : null,
+        $statusLabel,
+        $costCategory,
+        $lat,
+        $lng,
+        $accuracy,
+        null,
+        null,
+        $open['visit_category'] ?? null,
+        !empty($open['estimate_id']) ? (int)$open['estimate_id'] : null,
+        $open['estimate_subtype'] ?? null,
+        $open['work_order_number'] ?? null,
+        $open['engineer_name'] ?? null,
+        $open['visit_description'] ?? null,
+        source: $source
+    );
+    $pdo->commit();
+    return $result;
+}
+
 // Close the current open entry and return its id (or null if none)
 function closeOpenEntry(PDO $pdo, int $userId, ?float $lat, ?float $lng, string $source = 'self_service'): ?int {
-    $stmt = $pdo->prepare('SELECT * FROM time_entries WHERE user_id = ? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1');
+    // day_end rows are permanent status markers, not active paid work. Never
+    // close one when transitioning or ending a later shift.
+    $stmt = $pdo->prepare(
+        "SELECT * FROM time_entries
+         WHERE user_id = ? AND end_time IS NULL AND cost_category != 'day_end'
+         ORDER BY start_time DESC, id DESC LIMIT 1"
+    );
     $stmt->execute([$userId]);
     $open = $stmt->fetch();
     if (!$open) return null;
@@ -119,17 +228,5 @@ function openEntry(
 
     logTimeEntryHistory($pdo, (int)$newId, 'create', $userId, $source, null, $entry);
 
-    $activeJob = null;
-    if ($jobId) {
-        $j = $pdo->prepare('SELECT id, name, client_name, address, clock_in_radius_meters, status, is_recurring_maintenance FROM jobs WHERE id = ?');
-        $j->execute([$jobId]);
-        $activeJob = $j->fetch() ?: null;
-    }
-
-    return [
-        'statusLabel'  => $statusLabel,
-        'dayStarted'   => true,
-        'currentEntry' => $entry,
-        'activeJob'    => $activeJob,
-    ];
+    return timeclockResultFromEntry($pdo, $entry);
 }

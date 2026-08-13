@@ -10,10 +10,23 @@ date_default_timezone_set(FIELDCLOCK_TIMEZONE);
 function getPDO(): PDO {
     static $pdo = null;
     if ($pdo === null) {
+        // Integration tests run the real API against a disposable database.
+        // Environment overrides keep that database isolated without changing
+        // or copying the production-only config.php file.
+        $env = static function (string $name, string $fallback): string {
+            $value = getenv($name);
+            return $value === false ? $fallback : $value;
+        };
+
+        $host = $env('FIELDCLOCK_DB_HOST', DB_HOST);
+        $name = $env('FIELDCLOCK_DB_NAME', DB_NAME);
+        $user = $env('FIELDCLOCK_DB_USER', DB_USER);
+        $pass = $env('FIELDCLOCK_DB_PASS', DB_PASS);
+
         $pdo = new PDO(
-            'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
-            DB_USER,
-            DB_PASS,
+            'mysql:host=' . $host . ';dbname=' . $name . ';charset=utf8mb4',
+            $user,
+            $pass,
             [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
