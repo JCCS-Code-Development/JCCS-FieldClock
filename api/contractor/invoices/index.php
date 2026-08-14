@@ -12,10 +12,13 @@ $auth = requireAuth();
 requireAdmin($auth);
 $pdo  = getPDO();
 
-// ── GET: list invoices, optionally filtered by period ─────────────
+// ── GET: list invoices — by pay period (Payroll's Contractors tab) or by
+// job (per-project tracking on the Jobs page); either filter is optional
+// and they can combine ────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $ps = $_GET['period_start'] ?? null;
-    $pe = $_GET['period_end']   ?? null;
+    $ps    = $_GET['period_start'] ?? null;
+    $pe    = $_GET['period_end']   ?? null;
+    $jobId = !empty($_GET['job_id']) ? (int)$_GET['job_id'] : null;
     $sql = 'SELECT ci.*, u.name AS contractor_name, u.address AS contractor_address,
                    je.job_id AS estimate_job_id, je.estimate_number, je.description AS estimate_description,
                    j.name AS job_name
@@ -25,8 +28,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             LEFT JOIN jobs j ON j.id = je.job_id
             WHERE 1=1';
     $params = [];
-    if ($ps) { $sql .= ' AND ci.period_start >= ?'; $params[] = $ps; }
-    if ($pe) { $sql .= ' AND ci.period_end <= ?';   $params[] = $pe; }
+    if ($ps)    { $sql .= ' AND ci.period_start >= ?'; $params[] = $ps; }
+    if ($pe)    { $sql .= ' AND ci.period_end <= ?';   $params[] = $pe; }
+    if ($jobId) { $sql .= ' AND je.job_id = ?';        $params[] = $jobId; }
     $sql .= ' ORDER BY ci.created_at DESC';
 
     $s = $pdo->prepare($sql);

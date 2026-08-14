@@ -9,8 +9,17 @@ import Spinner from '../../components/ui/Spinner'
 import { listJobs, createJob, updateJob, deleteJob, assignEmployees } from '../../api/jobs'
 import { listEmployees } from '../../api/employees'
 import { listEstimates, createEstimate, updateEstimate } from '../../api/estimates'
+import { listInvoices, getDownloadUrl } from '../../api/contractor'
 import JobsMap from '../../components/admin/JobsMap'
 import { groupJobsByCompany } from '../../utils/jobs'
+import { formatCurrency, formatDate } from '../../utils/format'
+
+const INV_STATUS = {
+  submitted:    { label: 'Submitted',    color: 'bg-amber-100 text-amber-700' },
+  under_review: { label: 'Under Review', color: 'bg-blue-100 text-blue-700' },
+  check_ready:  { label: 'Check Ready',  color: 'bg-green-100 text-green-700' },
+  paid:         { label: 'Paid',         color: 'bg-gray-100 text-gray-600' },
+}
 
 const EMPTY = { name: '', client_name: '', company: '', address: '', latitude: '', longitude: '', clock_in_radius_meters: 300, status: 'active', notes: '', is_recurring_maintenance: false }
 
@@ -42,6 +51,11 @@ export default function AdminJobs() {
   const [savingEst, setSavingEst]     = useState(false)
   const [estError, setEstError]       = useState('')
 
+  // Contractor invoices/payments tracked against this job's estimates
+  // (shown only when editing an existing job)
+  const [contractorInvs, setContractorInvs]   = useState([])
+  const [loadingInvs, setLoadingInvs]         = useState(false)
+
   const load = () => {
     setLoading(true)
     Promise.all([listJobs(), listEmployees()])
@@ -57,12 +71,20 @@ export default function AdminJobs() {
       .finally(() => setLoadingEst(false))
   }
 
-  const openCreate = () => { setForm(EMPTY); setAssignedIds([]); setEstimates([]); setFormError(''); setModal('create') }
+  const loadContractorInvs = (jobId) => {
+    setLoadingInvs(true)
+    listInvoices({ job_id: jobId })
+      .then((d) => setContractorInvs(d.invoices ?? []))
+      .finally(() => setLoadingInvs(false))
+  }
+
+  const openCreate = () => { setForm(EMPTY); setAssignedIds([]); setEstimates([]); setContractorInvs([]); setFormError(''); setModal('create') }
   const openEdit = (job) => {
     setForm({ ...job })
     setAssignedIds(job.assigned_user_ids ?? [])
     setNewEstNumber(''); setNewEstDesc(''); setEstError(''); setFormError('')
     loadEstimates(job.id)
+    loadContractorInvs(job.id)
     setModal(job)
   }
 
@@ -409,6 +431,69 @@ export default function AdminJobs() {
                 <Button size="sm" loading={savingEst} onClick={handleAddEstimate}>+ Add</Button>
               </div>
               {estError && <p className="text-xs text-red-600 mt-1.5">{estError}</p>}
+            </div>
+          )}
+
+          {/* Contractor invoices/payments tracked against this job's estimates */}
+          {modal && modal !== 'create' && (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Contractor Invoices &amp; Payments</p>
+              {loadingInvs ? (
+                <div className="flex justify-center py-4"><Spinner size="sm" /></div>
+              ) : contractorInvs.length === 0 ? (
+                <p className="text-xs text-gray-400">No contractor invoices tied to this job's estimates yet.</p>
+              ) : (
+                <>
+                  {(() => {
+                    const totalInvoiced = contractorInvs.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0)
+                    const totalPaid     = contractorInvs.filter((i) => i.status === 'paid').reduce((s, i) => s + (parseFloat(i.amount) || 0), 0)
+                    return (
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        <div className="bg-gray-50 rounded-xl px-3 py-2 text-center">
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Invoiced</p>
+                          <p className="text-sm font-bold text-gray-900">{formatCurrency(totalInvoiced)}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl px-3 py-2 text-center">
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Paid</p>
+                          <p className="text-sm font-bold text-green-600">{formatCurrency(totalPaid)}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl px-3 py-2 text-center">
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Outstanding</p>
+                          <p className="text-sm font-bold text-amber-600">{formatCurrency(Math.max(totalInvoiced - totalPaid, 0))}</p>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                  <div className="flex flex-col gap-2 max-h-56 overflow-y-auto">
+                    {contractorInvs.map((inv) => {
+                      const meta = INV_STATUS[inv.status] ?? INV_STATUS.submitted
+                      return (
+                        <div key={inv.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-semibold text-gray-800">{inv.contractor_name}</span>
+                              <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold ${meta.color}`}>{meta.label}</span>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {inv.estimate_number && <>Est. #{inv.estimate_number} · </>}
+                              {inv.invoice_number && <>Inv. #{inv.invoice_number} · </>}
+                              {inv.period_start && formatDate(inv.period_start + 'T00:00:00')}
+                            </p>
+                          </div>
+                          <a href={getDownloadUrl(inv.id)} target="_blank" rel="noopener noreferrer"
+                            className="text-xs font-semibold text-brand-600 hover:text-brand-700 shrink-0">
+                            File
+                          </a>
+                          <span className="text-sm font-bold text-gray-900 shrink-0 w-20 text-right">
+                            {inv.amount ? formatCurrency(inv.amount) : <span className="text-gray-300">—</span>}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+              <p className="text-xs text-gray-400 mt-2">Uploaded and managed from Payroll → Contractors.</p>
             </div>
           )}
 
