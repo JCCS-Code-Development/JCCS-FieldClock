@@ -184,28 +184,31 @@ export default function AdminEmployees() {
   const mostRecent = (type) => docs.filter((d) => d.doc_type === type)[0] ?? null
   const docHistory = (type) => docs.filter((d) => d.doc_type === type)
 
+  // Explicit shared widths (rather than per-table auto-sizing) so the Admins/
+  // Employees/Contractors tables — each a separate <table> — line up with each
+  // other regardless of what content each section happens to contain.
   const columns = [
-    { key: 'name',      label: 'Name' },
-    { key: 'email',     label: 'Email' },
-    { key: 'phone',     label: 'Phone',  render: (v) => v || '—' },
+    { key: 'name',      label: 'Name',  className: 'w-[13%]' },
+    { key: 'email',     label: 'Email', className: 'w-[19%]' },
+    { key: 'phone',     label: 'Phone', className: 'w-[10%]', render: (v) => v || '—' },
     {
-      key: 'role', label: 'Role',
+      key: 'role', label: 'Role', className: 'w-[8%]',
       render: (v) => (
         <Badge variant={v === 'admin' ? 'active' : v === 'contractor' ? 'pending' : 'approved'}>
           {v}
         </Badge>
       ),
     },
-    { key: 'pay_type',  label: 'Type',   render: (v) => <span className="font-mono text-xs font-semibold">{v?.toUpperCase()}</span> },
+    { key: 'pay_type',  label: 'Type', className: 'w-[6%]',   render: (v) => <span className="font-mono text-xs font-semibold">{v?.toUpperCase()}</span> },
     {
-      key: 'pay_rate', label: 'Rate',
+      key: 'pay_rate', label: 'Rate', className: 'w-[7%]',
       render: (v, row) => v ? `${formatCurrency(v)}${row.pay_structure === 'salary' ? '/wk' : '/hr'}` : '—',
     },
-    { key: 'is_active', label: 'Status', render: (v) => <Badge variant={v ? 'approved' : 'rejected'}>{v ? 'Active' : 'Inactive'}</Badge> },
+    { key: 'is_active', label: 'Status', className: 'w-[7%]', render: (v) => <Badge variant={v ? 'approved' : 'rejected'}>{v ? 'Active' : 'Inactive'}</Badge> },
     {
       key: 'id', label: '',
       render: (_, row) => (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(row) }}>Edit</Button>
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openPwModal(row) }}>Reset Password</Button>
           {row.role === 'contractor' && (
@@ -220,10 +223,10 @@ export default function AdminEmployees() {
   ]
 
   const inactiveColumns = [
-    { key: 'name',  label: 'Name' },
-    { key: 'email', label: 'Email' },
+    { key: 'name',  label: 'Name',  className: 'w-[16%]' },
+    { key: 'email', label: 'Email', className: 'w-[24%]' },
     {
-      key: 'role', label: 'Role',
+      key: 'role', label: 'Role', className: 'w-[10%]',
       render: (v) => (
         <Badge variant={v === 'admin' ? 'active' : v === 'contractor' ? 'pending' : 'approved'}>
           {v}
@@ -231,13 +234,13 @@ export default function AdminEmployees() {
       ),
     },
     {
-      key: 'deactivated_at', label: 'Deactivated',
+      key: 'deactivated_at', label: 'Deactivated', className: 'w-[15%]',
       render: (v) => v ? format(parseISO(v), 'MMM d, yyyy') : '—',
     },
     {
       key: 'id', label: '',
       render: (_, row) => (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(row) }}>Edit</Button>
           <Button size="sm" onClick={(e) => { e.stopPropagation(); handleReactivate(row) }}>Reactivate</Button>
         </div>
@@ -270,7 +273,7 @@ export default function AdminEmployees() {
             {grouped.map(({ role, label, rows }) => (
               <div key={role}>
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">{label}</h3>
-                <DataTable columns={columns} data={rows} />
+                <DataTable columns={columns} data={rows} fixed />
               </div>
             ))}
             {inactive.length > 0 && (
@@ -278,7 +281,7 @@ export default function AdminEmployees() {
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">
                   Deactivated Employees
                 </h3>
-                <DataTable columns={inactiveColumns} data={inactive} />
+                <DataTable columns={inactiveColumns} data={inactive} fixed />
               </div>
             )}
           </div>
