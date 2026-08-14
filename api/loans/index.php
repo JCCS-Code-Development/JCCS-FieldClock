@@ -49,8 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
-    $sql = 'SELECT l.id, l.user_id, u.name AS user_name,
-                   l.amount, l.weekly_deduction, l.deduction_start_date,
+    $sql = 'SELECT l.id, l.user_id, u.name AS user_name, u.address AS user_address,
+                   l.amount, l.weekly_deduction, l.deduction_start_date, l.check_printed_at,
                    l.description, l.status, l.created_at,
                    COALESCE(SUM(lp.amount), 0) AS paid_total,
                    GREATEST(l.amount - COALESCE(SUM(lp.amount), 0), 0) AS remaining

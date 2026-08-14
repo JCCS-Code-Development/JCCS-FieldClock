@@ -17,6 +17,7 @@ const PayrollIcon    = ({ s = 'w-5 h-5' }) => <svg className={s} fill="none" vie
 const ChecksIcon     = ({ s = 'w-5 h-5' }) => <svg className={s} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="6" width="18" height="13" rx="2"/><path strokeLinecap="round" d="M3 10h18M7 14h3M14 14h3M7 17h2"/></svg>
 const LoansIcon      = ({ s = 'w-5 h-5' }) => <svg className={s} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-2.21 0-4 .9-4 2s1.79 2 4 2 4 .9 4 2-1.79 2-4 2m0-8v1m0 9v1M8 12H4m16 0h-4"/><circle cx="12" cy="12" r="9"/></svg>
 const VendorsIcon    = ({ s = 'w-5 h-5' }) => <svg className={s} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+const MiscChecksIcon = ({ s = 'w-5 h-5' }) => <svg className={s} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="6" width="18" height="13" rx="2"/><path strokeLinecap="round" strokeLinejoin="round" d="M8 15l2.5 2.5L16 12"/></svg>
 const DocumentsIcon  = ({ s = 'w-5 h-5' }) => <svg className={s} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
 const HRIcon         = ({ s = 'w-5 h-5' }) => <svg className={s} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"/></svg>
 const ReportsIcon    = ({ s = 'w-5 h-5' }) => <svg className={s} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M18 20V10M12 20V4M6 20v-6"/></svg>
@@ -58,6 +59,7 @@ export default function AdminLayout() {
     { to: '/admin/checks',     icon: <ChecksIcon />,    label: t('nav.checks') },
     { to: '/admin/loans',      icon: <LoansIcon />,     label: t('nav.loans') },
     { to: '/admin/vendors',    icon: <VendorsIcon />,   label: t('nav.vendors') },
+    { to: '/admin/misc-checks', icon: <MiscChecksIcon />, label: t('nav.miscChecks') },
     { to: '/admin/documents',  icon: <DocumentsIcon />, label: t('nav.documents') },
     { to: '/admin/hr',         icon: <HRIcon />,        label: t('nav.hrDocs') },
     { to: '/admin/reports',    icon: <ReportsIcon />,   label: t('nav.reports') },

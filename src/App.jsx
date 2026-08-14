@@ -22,6 +22,7 @@ import AdminTimesheets from './pages/admin/Timesheets'
 import AdminPayroll from './pages/admin/Payroll'
 import AdminLoans from './pages/admin/Loans'
 import AdminVendors from './pages/admin/Vendors'
+import AdminMiscChecks from './pages/admin/MiscChecks'
 import AdminDocuments from './pages/admin/AdminDocuments'
 import AdminHR from './pages/admin/HRDocuments'
 import AdminReports from './pages/admin/Reports'
@@ -63,6 +64,7 @@ export default function App() {
             <Route path="/admin/payroll" element={<AdminPayroll />} />
             <Route path="/admin/loans"      element={<AdminLoans />}      />
             <Route path="/admin/vendors"    element={<AdminVendors />}    />
+            <Route path="/admin/misc-checks" element={<AdminMiscChecks />} />
             <Route path="/admin/documents"  element={<AdminDocuments />}  />
             <Route path="/admin/hr"         element={<AdminHR />}         />
             <Route path="/admin/reports"    element={<AdminReports />}    />

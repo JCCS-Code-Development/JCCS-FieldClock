@@ -13,8 +13,8 @@ $pdo  = getPDO();
 
 function fetchLoan(PDO $pdo, int $id): array|false {
     $stmt = $pdo->prepare(
-        'SELECT l.id, l.user_id, u.name AS user_name,
-                l.amount, l.weekly_deduction, l.deduction_start_date,
+        'SELECT l.id, l.user_id, u.name AS user_name, u.address AS user_address,
+                l.amount, l.weekly_deduction, l.deduction_start_date, l.check_printed_at,
                 l.description, l.status, l.created_at,
                 COALESCE(SUM(lp.amount), 0) AS paid_total,
                 GREATEST(l.amount - COALESCE(SUM(lp.amount), 0), 0) AS remaining
@@ -89,6 +89,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             http_response_code(422); exit(json_encode(['error' => 'Invalid deduction start date']));
         }
         $sets[] = 'deduction_start_date = ?'; $params[] = $startAt;
+    }
+
+    // Marks the loan disbursement check as printed — set once on first print,
+    // left alone on any later reprint (never cleared back to null here).
+    if (!empty($body['mark_check_printed'])) {
+        $sets[] = 'check_printed_at = COALESCE(check_printed_at, NOW())';
     }
 
     if (!$sets) { http_response_code(422); exit(json_encode(['error' => 'Nothing to update'])); }

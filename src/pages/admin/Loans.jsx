@@ -3,6 +3,7 @@ import PageHeader from '../../components/admin/PageHeader'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
+import PrintLoanCheck from '../../components/admin/PrintLoanCheck'
 import { listLoans, getLoan, createLoan, updateLoan, deleteLoan, recordPayment, deletePayment, getLoanReceiptUrl } from '../../api/loans'
 import { listEmployees } from '../../api/employees'
 import { formatCurrency } from '../../utils/format'
@@ -108,6 +109,9 @@ export default function AdminLoans() {
   const [delLoan,    setDelLoan]    = useState(null)
   const [delPayment, setDelPayment] = useState(null)
   const [deleting,   setDeleting]   = useState(false)
+
+  // Print loan disbursement check
+  const [printLoan, setPrintLoan] = useState(null)
 
   const load = async () => {
     setLoading(true)
@@ -253,6 +257,15 @@ export default function AdminLoans() {
     load(); setDetail((s) => { const n = { ...s }; delete n[loan.id]; return n })
   }
 
+  // ── Print the loan disbursement check ──────────────────────────────
+  // Records check_printed_at the first time (harmless no-op on reprint —
+  // the backend only sets it if it isn't already set).
+  const openPrintCheck = async (loan) => {
+    setPrintLoan(loan)
+    try { await updateLoan({ id: loan.id, mark_check_printed: true }) } catch { /* printing still works even if this fails */ }
+    load()
+  }
+
   const totalOutstanding = loans.filter((l) => l.status === 'active')
     .reduce((s, l) => s + parseFloat(l.remaining ?? 0), 0)
 
@@ -331,6 +344,9 @@ export default function AdminLoans() {
                       {loan.weekly_deduction && (
                         <> · {formatCurrency(loan.weekly_deduction)}/wk from {format(new Date(loan.deduction_start_date + 'T12:00'), 'MMM d, yyyy')}</>
                       )}
+                      {loan.check_printed_at && (
+                        <> · <span className="text-green-600">✓ Check printed {format(new Date(loan.check_printed_at), 'MMM d')}</span></>
+                      )}
                     </p>
                     <ProgressBar paid={parseFloat(loan.paid_total)} total={parseFloat(loan.amount)} />
                   </div>
@@ -348,6 +364,9 @@ export default function AdminLoans() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <Button size="sm" variant="secondary" onClick={() => openPrintCheck(loan)}>
+                      {loan.check_printed_at ? 'Reprint Check' : 'Print Check'}
+                    </Button>
                     {!isPaidOff && (
                       <Button size="sm" onClick={() => openPayModal(loan)}>Record Payment</Button>
                     )}
@@ -741,6 +760,11 @@ export default function AdminLoans() {
           </div>
         </div>
       </Modal>
+
+      {/* ── Print loan disbursement check ──────────────────────────── */}
+      {printLoan && (
+        <PrintLoanCheck loan={printLoan} onClose={() => setPrintLoan(null)} />
+      )}
     </div>
   )
 }
