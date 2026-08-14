@@ -32,6 +32,7 @@ $visitDescription = !empty($body['visit_description']) ? trim((string)$body['vis
 
 $pdo = getPDO();
 requireHourly($auth, $pdo);
+beginTimeclockTransaction($pdo, (int)$auth['user_id']);
 
 // Verify job exists and is usable (active, or a pending-review location this
 // same employee registered) if provided
@@ -64,4 +65,5 @@ $result = openEntry(
     $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
     source: 'day_start'
 );
+$pdo->commit();
 echo json_encode($result);

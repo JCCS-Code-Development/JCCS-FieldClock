@@ -33,6 +33,7 @@ $visitDescription = !empty($body['visit_description']) ? trim((string)$body['vis
 
 $pdo = getPDO();
 requireHourly($auth, $pdo);
+beginTimeclockTransaction($pdo, (int)$auth['user_id']);
 
 $job = $pdo->prepare('SELECT * FROM jobs WHERE id = ?');
 $job->execute([$jobId]);
@@ -49,12 +50,35 @@ if ($lat !== null && $lng !== null && $job['latitude'] && $job['longitude']) {
     $withinRadius   = $distanceMeters <= $job['clock_in_radius_meters'];
 }
 
+$open = getOpenWorkEntry($pdo, (int)$auth['user_id']);
+if (!$open) {
+    $pdo->rollBack();
+    http_response_code(422);
+    exit(json_encode(['error' => 'Not currently traveling']));
+}
+if ($open['status_label'] === 'working' && (int)$open['job_id'] === $jobId) {
+    $result = timeclockResultFromEntry($pdo, $open);
+    $pdo->commit();
+    echo json_encode([
+        'timeclock'       => $result,
+        'within_radius'   => $withinRadius,
+        'distance_meters' => $distanceMeters !== null ? (int)round($distanceMeters) : null,
+    ]);
+    exit;
+}
+if ($open['status_label'] !== 'traveling' || (int)$open['job_id'] !== $jobId) {
+    $pdo->rollBack();
+    http_response_code(409);
+    exit(json_encode(['error' => 'Travel status does not match this job']));
+}
+
 closeOpenEntry($pdo, $auth['user_id'], $lat, $lng, source: 'mark_arrival');
 $result = openEntry(
     $pdo, $auth['user_id'], $jobId, 'working', 'direct_labor', $lat, $lng, $acc, $withinRadius, null,
     $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
     source: 'mark_arrival'
 );
+$pdo->commit();
 
 echo json_encode([
     'timeclock'       => $result,

@@ -14,7 +14,8 @@ $pdo  = getPDO();
 function fetchLoan(PDO $pdo, int $id): array|false {
     $stmt = $pdo->prepare(
         'SELECT l.id, l.user_id, u.name AS user_name,
-                l.amount, l.description, l.status, l.created_at,
+                l.amount, l.weekly_deduction, l.deduction_start_date,
+                l.description, l.status, l.created_at,
                 COALESCE(SUM(lp.amount), 0) AS paid_total,
                 GREATEST(l.amount - COALESCE(SUM(lp.amount), 0), 0) AS remaining
          FROM employee_loans l
@@ -40,7 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 
     $pstmt = $pdo->prepare(
-        'SELECT lp.id, lp.amount, lp.period_start, lp.period_end, lp.notes, lp.created_at,
+        'SELECT lp.id, lp.amount, lp.payment_method, lp.reference_number,
+                lp.receipt_file_path, lp.receipt_file_original_name,
+                lp.period_start, lp.period_end, lp.notes, lp.created_at,
                 u.name AS recorded_by_name
          FROM loan_payments lp
          JOIN users u ON u.id = lp.created_by
@@ -54,19 +57,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     exit;
 }
 
-// ── PUT: update status (admin only) ─────────────────────────────
+// ── PUT: update status and/or the deduction schedule (admin only) ─
 if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     requireAdmin($auth);
     $body = jsonBody();
     $id   = (int)($body['id'] ?? 0);
     if (!$id) { http_response_code(422); exit(json_encode(['error' => 'id required'])); }
 
-    $status = sanitizeString($body['status'] ?? '');
-    if (!in_array($status, ['active', 'paid_off'])) {
-        http_response_code(422); exit(json_encode(['error' => 'Invalid status']));
+    $sets = []; $params = [];
+
+    if (array_key_exists('status', $body)) {
+        $status = sanitizeString($body['status']);
+        if (!in_array($status, ['active', 'paid_off'])) {
+            http_response_code(422); exit(json_encode(['error' => 'Invalid status']));
+        }
+        $sets[] = 'status = ?'; $params[] = $status;
     }
 
-    $pdo->prepare('UPDATE employee_loans SET status = ? WHERE id = ?')->execute([$status, $id]);
+    if (array_key_exists('weekly_deduction', $body)) {
+        $weekly = (float)$body['weekly_deduction'];
+        if ($weekly <= 0) {
+            http_response_code(422); exit(json_encode(['error' => 'Weekly deduction amount must be greater than zero']));
+        }
+        $sets[] = 'weekly_deduction = ?'; $params[] = $weekly;
+    }
+
+    if (array_key_exists('deduction_start_date', $body)) {
+        $startAt = sanitizeString($body['deduction_start_date']);
+        $parsedStart = DateTimeImmutable::createFromFormat('!Y-m-d', $startAt);
+        if (!$parsedStart || $parsedStart->format('Y-m-d') !== $startAt) {
+            http_response_code(422); exit(json_encode(['error' => 'Invalid deduction start date']));
+        }
+        $sets[] = 'deduction_start_date = ?'; $params[] = $startAt;
+    }
+
+    if (!$sets) { http_response_code(422); exit(json_encode(['error' => 'Nothing to update'])); }
+
+    $params[] = $id;
+    $pdo->prepare('UPDATE employee_loans SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
     echo json_encode(['loan' => fetchLoan($pdo, $id)]);
     exit;
 }

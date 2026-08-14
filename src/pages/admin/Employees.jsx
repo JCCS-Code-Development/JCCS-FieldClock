@@ -7,14 +7,39 @@ import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import Spinner from '../../components/ui/Spinner'
 import { listEmployees, createEmployee, updateEmployee, deactivateEmployee, reactivateEmployee, resetEmployeePassword } from '../../api/employees'
+import { listSalaryHistory, createSalaryHistory, deleteSalaryHistory } from '../../api/salaryHistory'
 import { listDocuments, getDocumentUrl } from '../../api/documents'
 import { listJobs } from '../../api/jobs'
 import { groupJobsByCompany } from '../../utils/jobs'
 import { formatCurrency } from '../../utils/format'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, addDays, subDays } from 'date-fns'
+
+// Weeks run Monday–Sunday (matches Payroll.jsx). A rate change made mid-period
+// shouldn't retroactively apply to hours already worked this period, so the
+// default effective date for a newly logged change is the Monday after the
+// current week — mirrors the same rule api/employees/item.php applies when a
+// rate change is auto-logged from the main Edit form.
+function nextPayPeriodStart() {
+  const today = new Date()
+  const dow = today.getDay() === 0 ? 7 : today.getDay() // ISO: Mon=1 .. Sun=7
+  return format(addDays(today, 8 - dow), 'yyyy-MM-dd')
+}
+
+// Annotates newest-first history rows with each entry's effective range and
+// whether it's the currently-active rate or a not-yet-effective future one.
+function annotateSalaryHistory(history) {
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  let currentFound = false
+  return history.map((h, i) => {
+    const isUpcoming = h.effective_date > todayStr
+    const isCurrent = !isUpcoming && !currentFound
+    if (isCurrent) currentFound = true
+    return { ...h, isUpcoming, isCurrent, rangeEnd: i === 0 ? null : history[i - 1].effective_date }
+  })
+}
 
 const EMPTY = {
-  name: '', email: '', phone: '', role: 'employee',
+  name: '', email: '', phone: '', address: '', role: 'employee',
   pay_type: 'w2', pay_structure: 'hourly', pay_rate: '', default_job_id: '',
 }
 
@@ -62,6 +87,55 @@ export default function AdminEmployees() {
   const [docs,         setDocs]         = useState([])
   const [loadingDocs,  setLoadingDocs]  = useState(false)
 
+  // Salary history (inside the Edit Employee modal)
+  const [salaryHistory,  setSalaryHistory]  = useState([])
+  const [loadingSalary,  setLoadingSalary]  = useState(false)
+  const [showAddRate,    setShowAddRate]    = useState(false)
+  const [rateForm,       setRateForm]       = useState({ pay_rate: '', pay_structure: 'hourly', effective_date: '', note: '' })
+  const [rateSaving,     setRateSaving]     = useState(false)
+  const [rateError,      setRateError]      = useState('')
+
+  const loadSalaryHistory = (userId) =>
+    listSalaryHistory(userId).then((d) => setSalaryHistory(d.history ?? []))
+
+  useEffect(() => {
+    if (modal && modal !== 'create') {
+      setLoadingSalary(true)
+      loadSalaryHistory(modal.id).finally(() => setLoadingSalary(false))
+      setShowAddRate(false)
+      setRateError('')
+      setRateForm({ pay_rate: '', pay_structure: modal.pay_structure ?? 'hourly', effective_date: nextPayPeriodStart(), note: '' })
+    } else {
+      setSalaryHistory([])
+    }
+  }, [modal])
+
+  const handleAddRate = async () => {
+    const rate = parseFloat(rateForm.pay_rate)
+    if (!rateForm.pay_rate || isNaN(rate) || rate <= 0) { setRateError('Enter a rate greater than 0.'); return }
+    if (!rateForm.effective_date) { setRateError('Pick an effective date.'); return }
+    setRateSaving(true); setRateError('')
+    try {
+      await createSalaryHistory({
+        user_id: modal.id,
+        pay_rate: rate,
+        pay_structure: rateForm.pay_structure,
+        effective_date: rateForm.effective_date,
+        note: rateForm.note.trim() || undefined,
+      })
+      await loadSalaryHistory(modal.id)
+      setShowAddRate(false)
+    } catch (err) {
+      setRateError(err?.response?.data?.error ?? 'Could not save. Try again.')
+    } finally { setRateSaving(false) }
+  }
+
+  const handleDeleteRate = async (id) => {
+    if (!confirm('Delete this history entry?')) return
+    await deleteSalaryHistory(id)
+    loadSalaryHistory(modal.id)
+  }
+
   const load = () => {
     setLoading(true)
     Promise.all([listEmployees({ active: 1 }), listEmployees({ active: 0 }), listJobs({ status: 'active' })])
@@ -80,6 +154,7 @@ export default function AdminEmployees() {
       name:     emp.name     ?? '',
       email:    emp.email    ?? '',
       phone:    emp.phone    ?? '',
+      address:  emp.address  ?? '',
       role:     emp.role     ?? 'employee',
       pay_type:      emp.pay_type      ?? 'w2',
       pay_structure: emp.pay_structure ?? 'hourly',
@@ -100,7 +175,8 @@ export default function AdminEmployees() {
 
   const handleSave = async () => {
     if (!form.name.trim())  { setError('Name is required.'); return }
-    if (!form.email.trim()) { setError('Email is required so the employee can log in.'); return }
+    // Contractors don't log in, so unlike employees/admins their email isn't required.
+    if (form.role !== 'contractor' && !form.email.trim()) { setError('Email is required so the employee can log in.'); return }
     if (form.role !== 'contractor') {
       const rate = parseFloat(form.pay_rate)
       if (!form.pay_rate || isNaN(rate) || rate <= 0) {
@@ -111,8 +187,9 @@ export default function AdminEmployees() {
     setSaving(true); setError('')
     const payload = {
       name:          form.name.trim(),
-      email:         form.email.trim(),
+      email:         form.email.trim() || null,
       phone:         form.phone.trim() || null,
+      address:       form.address.trim() || null,
       role:          form.role,
       ...(form.role !== 'contractor' && {
         pay_type:      form.pay_type,
@@ -184,30 +261,35 @@ export default function AdminEmployees() {
   const mostRecent = (type) => docs.filter((d) => d.doc_type === type)[0] ?? null
   const docHistory = (type) => docs.filter((d) => d.doc_type === type)
 
+  // Explicit shared widths (rather than per-table auto-sizing) so the Admins/
+  // Employees/Contractors tables — each a separate <table> — line up with each
+  // other regardless of what content each section happens to contain.
   const columns = [
-    { key: 'name',      label: 'Name' },
-    { key: 'email',     label: 'Email' },
-    { key: 'phone',     label: 'Phone',  render: (v) => v || '—' },
+    { key: 'name',      label: 'Name',  className: 'w-[13%]' },
+    { key: 'email',     label: 'Email', className: 'w-[19%]' },
+    { key: 'phone',     label: 'Phone', className: 'w-[10%]', render: (v) => v || '—' },
     {
-      key: 'role', label: 'Role',
+      key: 'role', label: 'Role', className: 'w-[8%]',
       render: (v) => (
         <Badge variant={v === 'admin' ? 'active' : v === 'contractor' ? 'pending' : 'approved'}>
           {v}
         </Badge>
       ),
     },
-    { key: 'pay_type',  label: 'Type',   render: (v) => <span className="font-mono text-xs font-semibold">{v?.toUpperCase()}</span> },
+    { key: 'pay_type',  label: 'Type', className: 'w-[6%]',   render: (v) => <span className="font-mono text-xs font-semibold">{v?.toUpperCase()}</span> },
     {
-      key: 'pay_rate', label: 'Rate',
+      key: 'pay_rate', label: 'Rate', className: 'w-[7%]',
       render: (v, row) => v ? `${formatCurrency(v)}${row.pay_structure === 'salary' ? '/wk' : '/hr'}` : '—',
     },
-    { key: 'is_active', label: 'Status', render: (v) => <Badge variant={v ? 'approved' : 'rejected'}>{v ? 'Active' : 'Inactive'}</Badge> },
+    { key: 'is_active', label: 'Status', className: 'w-[7%]', render: (v) => <Badge variant={v ? 'approved' : 'rejected'}>{v ? 'Active' : 'Inactive'}</Badge> },
     {
       key: 'id', label: '',
       render: (_, row) => (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(row) }}>Edit</Button>
-          <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openPwModal(row) }}>Reset Password</Button>
+          {row.role !== 'contractor' && (
+            <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openPwModal(row) }}>Reset Password</Button>
+          )}
           {row.role === 'contractor' && (
             <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openDocs(row) }}>Documents</Button>
           )}
@@ -220,10 +302,10 @@ export default function AdminEmployees() {
   ]
 
   const inactiveColumns = [
-    { key: 'name',  label: 'Name' },
-    { key: 'email', label: 'Email' },
+    { key: 'name',  label: 'Name',  className: 'w-[16%]' },
+    { key: 'email', label: 'Email', className: 'w-[24%]' },
     {
-      key: 'role', label: 'Role',
+      key: 'role', label: 'Role', className: 'w-[10%]',
       render: (v) => (
         <Badge variant={v === 'admin' ? 'active' : v === 'contractor' ? 'pending' : 'approved'}>
           {v}
@@ -231,13 +313,13 @@ export default function AdminEmployees() {
       ),
     },
     {
-      key: 'deactivated_at', label: 'Deactivated',
+      key: 'deactivated_at', label: 'Deactivated', className: 'w-[15%]',
       render: (v) => v ? format(parseISO(v), 'MMM d, yyyy') : '—',
     },
     {
       key: 'id', label: '',
       render: (_, row) => (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(row) }}>Edit</Button>
           <Button size="sm" onClick={(e) => { e.stopPropagation(); handleReactivate(row) }}>Reactivate</Button>
         </div>
@@ -270,7 +352,7 @@ export default function AdminEmployees() {
             {grouped.map(({ role, label, rows }) => (
               <div key={role}>
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">{label}</h3>
-                <DataTable columns={columns} data={rows} />
+                <DataTable columns={columns} data={rows} fixed />
               </div>
             ))}
             {inactive.length > 0 && (
@@ -278,7 +360,7 @@ export default function AdminEmployees() {
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">
                   Deactivated Employees
                 </h3>
-                <DataTable columns={inactiveColumns} data={inactive} />
+                <DataTable columns={inactiveColumns} data={inactive} fixed />
               </div>
             )}
           </div>
@@ -290,9 +372,9 @@ export default function AdminEmployees() {
         <div className="flex flex-col gap-4">
           <Input label="Full Name *" value={form.name} onChange={set('name')} />
           <Input
-            label="Email Address *" type="email" inputMode="email"
+            label={form.role === 'contractor' ? 'Email Address' : 'Email Address *'} type="email" inputMode="email"
             value={form.email} onChange={set('email')}
-            helperText="Used to log in to the app"
+            helperText={form.role === 'contractor' ? 'Optional — contractors don’t log in' : 'Used to log in to the app'}
           />
           <Input
             label="Phone Number" type="tel" inputMode="tel"
@@ -313,9 +395,17 @@ export default function AdminEmployees() {
           </div>
 
           {form.role === 'contractor' ? (
-            <p className="text-xs text-gray-500 bg-blue-50 rounded-xl px-4 py-3">
-              Contractors log in to upload invoices and legal documents (W-9 and Worker's Compensation). Pay rates are handled per invoice.
-            </p>
+            <>
+              <p className="text-xs text-gray-500 bg-blue-50 rounded-xl px-4 py-3">
+                Contractors don't log in to the app — invoices, estimates, and checks are all managed here by an admin (Payroll → Contractors). Pay rates are handled per invoice, not as a fixed rate.
+              </p>
+              <Input
+                label="Mailing Address"
+                value={form.address} onChange={set('address')}
+                placeholder="Street, City, State ZIP"
+                helperText="Shown on printed checks"
+              />
+            </>
           ) : (
             <>
               <div>
@@ -380,6 +470,90 @@ export default function AdminEmployees() {
                 ))}
               </select>
               <p className="text-xs text-gray-400 mt-1">Auto-selected when this person clocks in — they can still change it</p>
+            </div>
+          )}
+
+          {modal && modal !== 'create' && form.role !== 'contractor' && (
+            <div className="border-t border-gray-100 pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700">Salary History</label>
+                <button type="button" onClick={() => setShowAddRate((s) => !s)}
+                  className="text-xs font-semibold text-brand-600 hover:text-brand-700">
+                  {showAddRate ? 'Cancel' : '+ Log Rate Change'}
+                </button>
+              </div>
+
+              {showAddRate && (
+                <div className="bg-gray-50 rounded-xl p-3 mb-3 flex flex-col gap-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      label={rateForm.pay_structure === 'salary' ? 'Weekly Salary' : 'Hourly Rate'}
+                      type="number" inputMode="decimal"
+                      value={rateForm.pay_rate}
+                      onChange={(e) => setRateForm((f) => ({ ...f, pay_rate: e.target.value }))}
+                      placeholder="0.00"
+                    />
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">Structure</label>
+                      <select
+                        className="w-full rounded-xl border border-gray-300 px-3 py-3 text-sm outline-none focus:border-brand-500"
+                        value={rateForm.pay_structure}
+                        onChange={(e) => setRateForm((f) => ({ ...f, pay_structure: e.target.value }))}
+                      >
+                        <option value="hourly">Hourly</option>
+                        <option value="salary">Salary</option>
+                      </select>
+                    </div>
+                  </div>
+                  <Input
+                    label="Effective Date" type="date"
+                    value={rateForm.effective_date}
+                    onChange={(e) => setRateForm((f) => ({ ...f, effective_date: e.target.value }))}
+                    helperText="Defaults to the start of next pay period — change it to backdate or apply immediately"
+                  />
+                  <Input
+                    label="Note (optional)"
+                    value={rateForm.note}
+                    onChange={(e) => setRateForm((f) => ({ ...f, note: e.target.value }))}
+                    placeholder="e.g. Annual raise"
+                  />
+                  {rateError && <p className="text-xs text-red-600">{rateError}</p>}
+                  <Button size="sm" loading={rateSaving} onClick={handleAddRate}>Save Entry</Button>
+                </div>
+              )}
+
+              {loadingSalary
+                ? <div className="flex justify-center py-4"><Spinner size="sm" /></div>
+                : salaryHistory.length === 0
+                  ? <p className="text-xs text-gray-400">No rate history recorded.</p>
+                  : (
+                    <div className="flex flex-col gap-1.5 max-h-52 overflow-y-auto">
+                      {annotateSalaryHistory(salaryHistory).map((h) => (
+                        <div key={h.id} className="flex items-start justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2 text-xs">
+                          <div className="min-w-0">
+                            <span className="font-semibold text-gray-900">
+                              {formatCurrency(h.pay_rate)}{h.pay_structure === 'salary' ? '/wk' : '/hr'}
+                            </span>
+                            {h.isUpcoming && (
+                              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">Upcoming</span>
+                            )}
+                            {h.isCurrent && (
+                              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">Current</span>
+                            )}
+                            <p className="text-gray-400 mt-0.5">
+                              {format(parseISO(h.effective_date), 'MMM d, yyyy')}
+                              {' – '}
+                              {h.rangeEnd ? format(subDays(parseISO(h.rangeEnd), 1), 'MMM d, yyyy') : 'Present'}
+                            </p>
+                            {h.note && <p className="text-gray-400 italic mt-0.5 truncate">{h.note}</p>}
+                          </div>
+                          <button type="button" onClick={() => handleDeleteRate(h.id)}
+                            className="text-gray-300 hover:text-red-500 shrink-0 px-1 text-sm leading-none">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )
+              }
             </div>
           )}
 

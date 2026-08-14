@@ -3,13 +3,19 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Dev-server API proxy target. Defaults to a local PHP server (see
+// `npm run dev:api` / README) so backend edits are visible without
+// deploying. Override with VITE_DEV_API_TARGET=https://fieldclock.jccs-services.com
+// to develop the frontend against live production data instead.
+const devApiTarget = process.env.VITE_DEV_API_TARGET || 'http://localhost:8787'
+
 export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://fieldclock.jccs-services.com',
+        target: devApiTarget,
         changeOrigin: true,
-        secure: true,
+        secure: false,
       },
     },
   },

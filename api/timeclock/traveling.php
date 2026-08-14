@@ -36,6 +36,16 @@ if (!$assigned->fetch()) {
     exit(json_encode(['error' => 'You are not assigned to this job']));
 }
 
+beginTimeclockTransaction($pdo, (int)$auth['user_id']);
+$open = getOpenWorkEntry($pdo, (int)$auth['user_id']);
+if ($open && $open['status_label'] === 'traveling' && (int)$open['job_id'] === $jobId) {
+    $result = timeclockResultFromEntry($pdo, $open);
+    $pdo->commit();
+    echo json_encode(['timeclock' => $result]);
+    exit;
+}
+
 closeOpenEntry($pdo, $auth['user_id'], $lat, $lng, source: 'traveling');
 $result = openEntry($pdo, $auth['user_id'], $jobId, 'traveling', 'travel', $lat, $lng, $acc, source: 'traveling');
+$pdo->commit();
 echo json_encode(['timeclock' => $result]);

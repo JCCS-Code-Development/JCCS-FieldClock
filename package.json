@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "php -S localhost:8787 -t .",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:clock-simulation": "node tests/integration/multi-user-clock.mjs"
   },
   "dependencies": {
     "axios": "^1.18.1",

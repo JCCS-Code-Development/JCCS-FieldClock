@@ -50,7 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 
     $sql = 'SELECT l.id, l.user_id, u.name AS user_name,
-                   l.amount, l.description, l.status, l.created_at,
+                   l.amount, l.weekly_deduction, l.deduction_start_date,
+                   l.description, l.status, l.created_at,
                    COALESCE(SUM(lp.amount), 0) AS paid_total,
                    GREATEST(l.amount - COALESCE(SUM(lp.amount), 0), 0) AS remaining
             FROM employee_loans l
@@ -82,20 +83,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireAdmin($auth);
     $body = jsonBody();
-    requireFields($body, ['user_id', 'amount']);
+    requireFields($body, ['user_id', 'amount', 'weekly_deduction', 'deduction_start_date']);
 
-    $amount = (float)$body['amount'];
+    $amount  = (float)$body['amount'];
+    $weekly  = (float)$body['weekly_deduction'];
+    $startAt = sanitizeString($body['deduction_start_date']);
+
     if ($amount <= 0) {
         http_response_code(422);
         exit(json_encode(['error' => 'Amount must be greater than zero']));
     }
+    if ($weekly <= 0) {
+        http_response_code(422);
+        exit(json_encode(['error' => 'Weekly deduction amount must be greater than zero']));
+    }
+    $parsedStart = DateTimeImmutable::createFromFormat('!Y-m-d', $startAt);
+    if (!$parsedStart || $parsedStart->format('Y-m-d') !== $startAt) {
+        http_response_code(422);
+        exit(json_encode(['error' => 'Invalid deduction start date']));
+    }
 
     $pdo->prepare(
-        'INSERT INTO employee_loans (user_id, amount, description, created_by)
-         VALUES (?, ?, ?, ?)'
+        'INSERT INTO employee_loans (user_id, amount, weekly_deduction, deduction_start_date, description, created_by)
+         VALUES (?, ?, ?, ?, ?, ?)'
     )->execute([
         (int)$body['user_id'],
         $amount,
+        $weekly,
+        $startAt,
         !empty($body['description']) ? sanitizeString($body['description']) : null,
         $auth['user_id'],
     ]);

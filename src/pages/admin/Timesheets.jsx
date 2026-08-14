@@ -9,6 +9,7 @@ import {
 } from '../../api/timeclock'
 import { getTimeOffRequests, reviewTimeOffRequest } from '../../api/timeoff'
 import { listEmployees } from '../../api/employees'
+import { listSalaryHistory } from '../../api/salaryHistory'
 import { listJobs } from '../../api/jobs'
 import { listEstimates } from '../../api/estimates'
 import { getDailyMileage } from '../../api/gps'
@@ -418,7 +419,11 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-mono text-gray-700">
                       {formatTime(entry.start_time)}{' → '}
-                      {entry.end_time ? formatTime(entry.end_time) : <span className="text-orange-500 not-font-mono">Active</span>}
+                      {entry.end_time
+                        ? formatTime(entry.end_time)
+                        : isDayEnd
+                          ? <span className="text-gray-400 not-font-mono">Day ended</span>
+                          : <span className="text-orange-500 not-font-mono">Active</span>}
                     </p>
                     {(loc || comment) && (
                       <p className="text-xs text-gray-400 truncate mt-0.5">{loc || comment}</p>
@@ -487,7 +492,9 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                       <td className="px-4 py-2.5 text-xs whitespace-nowrap">
                         {entry.end_time
                           ? <span className="text-gray-700 font-mono">{formatTime(entry.end_time)}</span>
-                          : <span className="text-orange-500 font-medium">Active</span>}
+                          : isDayEnd
+                            ? <span className="text-gray-400 font-medium">Day ended</span>
+                            : <span className="text-orange-500 font-medium">Active</span>}
                       </td>
                       <td className="px-4 py-2.5 text-xs font-semibold text-gray-700 whitespace-nowrap">{isDayEnd ? '—' : fmtDur(mins)}</td>
                       <td className="px-4 py-2.5 text-xs text-gray-400 max-w-[180px] truncate" title={comment}>
@@ -614,6 +621,7 @@ export default function AdminTimesheets() {
   const [deleteId,    setDeleteId]    = useState(null)
   const [deleting,    setDeleting]    = useState(false)
   const [weekMiles,   setWeekMiles]   = useState({})
+  const [salaryHistory, setSalaryHistory] = useState([])
   const [allJobs,     setAllJobs]     = useState([])
 
   useEffect(() => {
@@ -675,6 +683,25 @@ export default function AdminTimesheets() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmp, dateFrom, dateTo])
 
+  useEffect(() => {
+    if (!selectedEmp) { setSalaryHistory([]); return }
+    listSalaryHistory(selectedEmp.id).then(d => setSalaryHistory(d.history ?? [])).catch(() => setSalaryHistory([]))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmp?.id])
+
+  // Rate/structure actually in effect for the week being viewed, per
+  // salary_history — not necessarily selectedEmp.pay_rate, which may already
+  // show a rate scheduled for a later period (see api/payroll/_helper.php,
+  // the backend equivalent of this same lookup).
+  const periodPay = useMemo(() => {
+    const applicable = salaryHistory
+      .filter(h => h.effective_date <= dateFrom)
+      .sort((a, b) => b.effective_date.localeCompare(a.effective_date) || b.id - a.id)[0]
+    return applicable
+      ? { pay_rate: parseFloat(applicable.pay_rate), pay_structure: applicable.pay_structure }
+      : { pay_rate: parseFloat(selectedEmp?.pay_rate ?? 0), pay_structure: selectedEmp?.pay_structure ?? 'hourly' }
+  }, [salaryHistory, dateFrom, selectedEmp])
+
   const weekDays = useMemo(() => {
     const days = []
     let d = parseISO(dateFrom)
@@ -696,11 +723,11 @@ export default function AdminTimesheets() {
     return map
   }, [entries])
   const periodMins   = useMemo(() => totalMins(entries), [entries])
-  const isSalary     = selectedEmp?.pay_structure === 'salary'
+  const isSalary     = periodPay.pay_structure === 'salary'
   const grossEst     = selectedEmp
     ? isSalary
-      ? parseFloat(selectedEmp.pay_rate ?? 0).toFixed(2)
-      : ((periodMins / 60) * (selectedEmp.pay_rate ?? 0)).toFixed(2)
+      ? periodPay.pay_rate.toFixed(2)
+      : ((periodMins / 60) * periodPay.pay_rate).toFixed(2)
     : '0.00'
   const hasGas     = selectedEmp?.gas_weekly_allowance != null && parseFloat(selectedEmp.gas_weekly_allowance) > 0
   const totalWeekMiles = Object.values(weekMiles).reduce((s, m) => s + m, 0)
@@ -801,24 +828,24 @@ export default function AdminTimesheets() {
                 )}
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
+                <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Hours</p>
                   {isSalary
                     ? <p className="text-xs font-semibold text-brand-500 mt-1.5">Fixed</p>
                     : <p className="text-lg font-bold text-gray-900">{(periodMins / 60).toFixed(1)}h</p>
                   }
                 </div>
-                <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
+                <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Rate</p>
-                  <p className="text-base font-bold text-gray-900 leading-tight">${selectedEmp.pay_rate ?? 0}</p>
+                  <p className="text-base font-bold text-gray-900 leading-tight">${periodPay.pay_rate}</p>
                   <p className="text-[10px] text-gray-400">{isSalary ? 'per week' : 'per hour'}</p>
                 </div>
-                <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
+                <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">{isSalary ? 'Weekly Pay' : 'Gross Est.'}</p>
                   <p className="text-lg font-bold text-green-600">${grossEst}</p>
                 </div>
                 {totalWeekMiles > 0 && (
-                  <div className="bg-sky-50 rounded-xl px-3 py-2.5 text-center">
+                  <div className="bg-sky-50 rounded-xl px-3 py-2.5 flex flex-col items-center justify-center text-center">
                     <p className="text-[10px] text-sky-500 uppercase tracking-wide font-semibold mb-0.5">Miles</p>
                     <p className="text-lg font-bold text-sky-600">{totalWeekMiles.toFixed(1)} mi</p>
                   </div>
@@ -827,8 +854,8 @@ export default function AdminTimesheets() {
             </div>
 
             {/* Week navigator + tabs */}
-            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
-              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl overflow-hidden self-start">
+            <div className="flex flex-col items-center gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl overflow-hidden sm:self-start">
                 <button onClick={() => setWeekOffset(w => w - 1)}
                   className="px-3 py-2 text-gray-500 hover:bg-gray-50 transition-colors text-sm font-medium">‹</button>
                 <span className="px-3 py-2 text-sm font-semibold text-gray-900 min-w-[120px] text-center border-x border-gray-200">
@@ -840,20 +867,20 @@ export default function AdminTimesheets() {
               </div>
               <span className="text-xs text-gray-400">{dateFrom} – {dateTo}</span>
               <div className="sm:flex-1" />
-              <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+              <div className="grid grid-cols-3 w-full gap-1 bg-gray-100 rounded-xl p-1 sm:flex sm:w-auto sm:overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
                 <button onClick={() => setTab('log')}
-                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors ${tab === 'log' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors flex items-center justify-center gap-1.5 ${tab === 'log' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                   Time Log
                 </button>
                 <button onClick={() => setTab('changes')}
-                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${tab === 'changes' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors flex items-center justify-center gap-1.5 ${tab === 'changes' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                   Changes
                   {pendingCount > 0 && (
                     <span className="bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">{pendingCount}</span>
                   )}
                 </button>
                 <button onClick={() => setTab('timeoff')}
-                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${tab === 'timeoff' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors flex items-center justify-center gap-1.5 ${tab === 'timeoff' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                   Time Off
                   {timeOffReqs.filter(r => r.status === 'pending').length > 0 && (
                     <span className="bg-amber-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
@@ -871,7 +898,7 @@ export default function AdminTimesheets() {
                     <div className="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center text-2xl">💼</div>
                     <p className="text-sm font-semibold text-brand-600">Fixed Salary Employee</p>
                     <p className="text-xs text-gray-400 text-center max-w-xs">
-                      {selectedEmp.name} is on a fixed weekly salary of ${selectedEmp.pay_rate ?? 0}.<br />
+                      {selectedEmp.name} is on a fixed weekly salary of ${periodPay.pay_rate}.<br />
                       Hours are not tracked for salaried employees.
                     </p>
                   </div>

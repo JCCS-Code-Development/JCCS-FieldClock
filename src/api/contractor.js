@@ -6,6 +6,10 @@ const BASE = '/contractor/invoices'
 export const listInvoices = (params) =>
   client.get(`${BASE}/index.php`, { params }).then((r) => r.data)
 
+export const getInvoice = (id) =>
+  client.get(`${BASE}/item.php`, { params: { id } }).then((r) => r.data)
+
+// Admin uploads on the contractor's behalf — contractors don't log in.
 export const uploadInvoice = (formData) =>
   client.post(`${BASE}/index.php`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

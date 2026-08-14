@@ -22,25 +22,6 @@ $lng  = isset($body['lng']) ? (float)$body['lng'] : null;
 $acc  = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
 $pdo  = getPDO();
 requireHourly($auth, $pdo);
-
-// Inherit active job and visit classification from last entry
-$last = $pdo->prepare(
-    'SELECT job_id, estimate_id, visit_category, estimate_subtype, work_order_number, engineer_name, visit_description
-     FROM time_entries WHERE user_id = ? ORDER BY start_time DESC LIMIT 1'
-);
-$last->execute([$auth['user_id']]);
-$prev             = $last->fetch();
-$jobId            = $prev['job_id']            ?? null;
-$estimateId       = $prev['estimate_id']       ?? null;
-$visitCategory    = $prev['visit_category']    ?? null;
-$estimateSubtype  = $prev['estimate_subtype']  ?? null;
-$workOrderNumber  = $prev['work_order_number'] ?? null;
-$engineerName     = $prev['engineer_name']     ?? null;
-$visitDescription = $prev['visit_description'] ?? null;
-
-closeOpenEntry($pdo, $auth['user_id'], $lat, $lng, source: 'working');
-echo json_encode(openEntry(
-    $pdo, $auth['user_id'], $jobId, 'working', 'direct_labor', $lat, $lng, $acc, null, null,
-    $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
-    source: 'working'
+echo json_encode(transitionOpenWorkEntry(
+    $pdo, (int)$auth['user_id'], 'working', 'direct_labor', $lat, $lng, $acc, 'working'
 ));

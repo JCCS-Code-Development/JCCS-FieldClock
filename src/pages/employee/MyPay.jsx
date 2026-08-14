@@ -274,7 +274,7 @@ export default function MyPay() {
                     const gas      = (data.gas_total ?? 0) + gasAdj
                     const isSalary = data.pay_structure === 'salary'
                     const isW2     = data.pay_type === 'w2'
-                    const rate     = data.user?.pay_rate ?? 0
+                    const rate     = data.pay_rate ?? 0
                     const otRate   = data.user?.overtime_rate ?? 0
                     return (
                       <>

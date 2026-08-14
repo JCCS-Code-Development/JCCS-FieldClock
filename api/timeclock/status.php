@@ -24,7 +24,7 @@ $stmt = $pdo->prepare(
      FROM time_entries te
      LEFT JOIN jobs j ON j.id = te.job_id
      WHERE te.user_id = ? AND te.end_time IS NULL
-     ORDER BY te.start_time DESC LIMIT 1'
+     ORDER BY (te.cost_category = \'day_end\') ASC, te.start_time DESC, te.id DESC LIMIT 1'
 );
 $stmt->execute([$auth['user_id']]);
 $entry = $stmt->fetch() ?: null;

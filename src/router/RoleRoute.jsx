@@ -2,7 +2,6 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
 function roleFallback(role) {
-  if (role === 'contractor') return '/contractor/invoices'
   if (role === 'admin') return '/admin'
   return '/'
 }

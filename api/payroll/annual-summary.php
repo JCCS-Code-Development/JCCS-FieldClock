@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
 require_once __DIR__ . '/../middleware/auth.php';
+require_once __DIR__ . '/_helper.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(405); exit; }
 $auth = requireAuth(); requireAdmin($auth);
@@ -87,26 +88,34 @@ foreach ($userMap as $uid => $u) {
     // Skip users with no activity or financial records this year
     if (empty($weeks) && empty($ud['adj_gas']) && empty($ud['adj_bonus']) && empty($ud['loans'])) continue;
 
-    $isSalary = ($u['pay_structure'] ?? 'hourly') === 'salary';
-    $qtrs     = [];
+    $qtrs = [];
 
     foreach ($weeks as $wk => $wData) {
         $q   = $wData['quarter'];
         $hrs = $wData['minutes'] / 60;
 
+        // $wk is YEARWEEK(..., 3) — ISO year + week, e.g. "202633". Resolve
+        // to that week's Monday so the rate lookup reflects whatever was
+        // actually in effect THAT week, not necessarily today's live rate.
+        $isoYear  = substr($wk, 0, 4);
+        $isoWeek  = substr($wk, 4, 2);
+        $weekStart = (new DateTimeImmutable("{$isoYear}-W{$isoWeek}-1"))->format('Y-m-d');
+        $periodPay = payRateForPeriod($pdo, $uid, $weekStart, $u['pay_rate'], $u['pay_structure']);
+        $isSalary  = $periodPay['pay_structure'] === 'salary';
+
         if ($isSalary) {
-            $weekBase = (float)$u['pay_rate'];
+            $weekBase = $periodPay['pay_rate'];
             $regHrs   = $hrs;
             $otHrs    = 0;
         } elseif ($u['pay_type'] === 'w2') {
             // No overtime multiplier at this company — every hour is paid at the same rate.
             $regHrs   = min($hrs, 40);
             $otHrs    = max(0, $hrs - 40);
-            $weekBase = $hrs * (float)$u['pay_rate'];
+            $weekBase = $hrs * $periodPay['pay_rate'];
         } else {
             $regHrs   = $hrs;
             $otHrs    = 0;
-            $weekBase = $hrs * (float)$u['pay_rate'];
+            $weekBase = $hrs * $periodPay['pay_rate'];
         }
 
         $qtrs[$q]['hours']     = ($qtrs[$q]['hours']     ?? 0) + $hrs;
