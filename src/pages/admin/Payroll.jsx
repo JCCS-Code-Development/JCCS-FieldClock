@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import PageHeader from '../../components/admin/PageHeader'
 import PrintChecks from '../../components/admin/PrintChecks'
+import PrintContractorCheck from '../../components/admin/PrintContractorCheck'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
+import Input from '../../components/ui/Input'
 import { getSummary, getBreakdown, listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment, listFlatRatePayments, createFlatRatePayment, updateFlatRatePayment, deleteFlatRatePayment } from '../../api/payroll'
 import { listEmployees } from '../../api/employees'
-import { listInvoices, updateInvoiceStatus, getDownloadUrl } from '../../api/contractor'
+import { listInvoices, getInvoice, uploadInvoice, updateInvoiceStatus, getDownloadUrl } from '../../api/contractor'
+import { listJobs } from '../../api/jobs'
+import { listEstimates } from '../../api/estimates'
 import { getPeriodLoanTotals } from '../../api/loans'
 import { listPaychecks, createPaycheck, updatePaycheck, deletePaycheck, markAllAvailable } from '../../api/paychecks'
 import PayPieChart from '../../components/ui/PayPieChart'
@@ -88,8 +92,25 @@ export default function AdminPayroll() {
   const [statusModal,    setStatusModal]    = useState(null)
   const [statusValue,    setStatusValue]    = useState('')
   const [statusNote,     setStatusNote]     = useState('')
+  const [statusEstimate, setStatusEstimate] = useState('')
+  const [statusInvNum,   setStatusInvNum]   = useState('')
+  const [statusAmount,   setStatusAmount]   = useState('')
+  const [statusEstimates, setStatusEstimates] = useState([]) // estimates for statusModal's job
   const [statusSaving,   setStatusSaving]   = useState(false)
   const [statusError,    setStatusError]    = useState('')
+
+  // Upload invoice (admin, on behalf of a contractor)
+  const [jobs,          setJobs]          = useState([])
+  const [invModal,      setInvModal]      = useState(false)
+  const [invForm,       setInvForm]       = useState({ user_id: '', job_id: '', estimate_id: '', invoice_number: '', amount: '', file: null })
+  const [invEstimates,  setInvEstimates]  = useState([]) // estimates for invForm's job
+  const [invSaving,     setInvSaving]     = useState(false)
+  const [invError,      setInvError]      = useState('')
+  const invFileRef = useRef(null)
+
+  // Print contractor check(s)
+  const [printInvoices, setPrintInvoices] = useState(null) // array of full invoice detail | null
+  const [printLoading,  setPrintLoading]  = useState(false)
 
   // Gas review
   const [gasModal,     setGasModal]     = useState(false)
@@ -319,20 +340,96 @@ export default function AdminPayroll() {
     }
   }
 
-  // ── Contractor invoice status ────────────────────────────────────
-  const openStatusModal = (inv) => {
-    setStatusModal(inv); setStatusValue(inv.status); setStatusNote(inv.admin_note ?? ''); setStatusError('')
+  // ── Contractor invoice status / estimate assignment ───────────────
+  const openStatusModal = async (inv) => {
+    setStatusModal(inv)
+    setStatusValue(inv.status)
+    setStatusNote(inv.admin_note ?? '')
+    setStatusEstimate(inv.estimate_id ? String(inv.estimate_id) : '')
+    setStatusInvNum(inv.invoice_number ?? '')
+    setStatusAmount(inv.amount != null ? String(parseFloat(inv.amount)) : '')
+    setStatusError('')
+    if (inv.estimate_job_id) {
+      const d = await listEstimates({ job_id: inv.estimate_job_id })
+      setStatusEstimates(d.estimates ?? [])
+    } else {
+      setStatusEstimates([])
+    }
   }
 
   const handleSaveStatus = async () => {
     setStatusSaving(true); setStatusError('')
     try {
-      await updateInvoiceStatus({ id: statusModal.id, status: statusValue, admin_note: statusNote })
+      await updateInvoiceStatus({
+        id: statusModal.id,
+        status: statusValue,
+        admin_note: statusNote,
+        estimate_id: statusEstimate || null,
+        invoice_number: statusInvNum.trim() || null,
+        amount: statusAmount !== '' ? parseFloat(statusAmount) : null,
+      })
       setStatusModal(null); loadContractorInvoices()
     } catch (err) {
       setStatusError(err?.response?.data?.error ?? 'Could not update. Try again.')
     }
     setStatusSaving(false)
+  }
+
+  // ── Upload invoice (admin, on behalf of a contractor) ──────────────
+  const openInvoiceModal = async () => {
+    setInvForm({ user_id: '', job_id: '', estimate_id: '', invoice_number: '', amount: '', file: null })
+    setInvEstimates([])
+    setInvError('')
+    if (invFileRef.current) invFileRef.current.value = ''
+    if (!jobs.length) {
+      try {
+        const d = await listJobs({ status: 'active' })
+        setJobs(d.jobs ?? [])
+      } catch { /* picker just stays empty; job/estimate assignment is optional */ }
+    }
+    setInvModal(true)
+  }
+
+  const handleInvoiceJobChange = async (jobId) => {
+    setInvForm((f) => ({ ...f, job_id: jobId, estimate_id: '' }))
+    if (!jobId) { setInvEstimates([]); return }
+    const d = await listEstimates({ job_id: jobId })
+    setInvEstimates(d.estimates ?? [])
+  }
+
+  const handleUploadInvoice = async () => {
+    if (!invForm.user_id) { setInvError('Select a contractor.'); return }
+    if (!invForm.file)    { setInvError('Attach a picture or PDF of the invoice.'); return }
+    setInvSaving(true); setInvError('')
+    try {
+      const form = new FormData()
+      form.append('user_id', invForm.user_id)
+      form.append('period_start', p.start)
+      form.append('period_end', p.end)
+      if (invForm.estimate_id)          form.append('estimate_id', invForm.estimate_id)
+      if (invForm.invoice_number.trim()) form.append('invoice_number', invForm.invoice_number.trim())
+      if (invForm.amount)               form.append('amount', invForm.amount)
+      form.append('file', invForm.file)
+
+      await uploadInvoice(form)
+      setInvModal(false)
+      loadContractorInvoices()
+    } catch (err) {
+      setInvError(err?.response?.data?.error ?? 'Could not upload. Try again.')
+    }
+    setInvSaving(false)
+  }
+
+  // ── Print contractor check(s) ───────────────────────────────────────
+  const printContractorChecks = async (invs) => {
+    setPrintLoading(true)
+    try {
+      const full = await Promise.all(invs.map((inv) => getInvoice(inv.id).then((d) => d.invoice)))
+      setPrintInvoices(full)
+    } catch {
+      alert('Could not load invoice details for printing.')
+    }
+    setPrintLoading(false)
   }
 
   // ── Gas review ───────────────────────────────────────────────────
@@ -362,6 +459,7 @@ export default function AdminPayroll() {
   const filtered  = summary.filter((e) => e.pay_type === tab)
   const adjTotal  = adjustments.reduce((s, a) => s + parseFloat(a.amount ?? 0), 0)
   const pendingInvCount = contractorInvs.filter((i) => i.status === 'submitted').length
+  const checkReadyInvs  = contractorInvs.filter((i) => i.status === 'check_ready' && i.amount && parseFloat(i.amount) > 0)
 
   // Per-employee breakdown from adjustments list
   const gasByUser   = {}
@@ -756,16 +854,25 @@ export default function AdminPayroll() {
       {/* ── Contractors tab content ────────────────────────────────── */}
       {tab === 'contractors' && (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 gap-3 flex-wrap">
             <div>
               <h3 className="font-semibold text-gray-900">Contractor Invoices</h3>
               <p className="text-xs text-gray-400 mt-0.5">{p.label}</p>
             </div>
-            {pendingInvCount > 0 && (
-              <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2.5 py-1 rounded-full">
-                {pendingInvCount} pending review
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {pendingInvCount > 0 && (
+                <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2.5 py-1 rounded-full">
+                  {pendingInvCount} pending review
+                </span>
+              )}
+              {checkReadyInvs.length > 0 && (
+                <Button size="sm" variant="secondary" loading={printLoading}
+                  onClick={() => printContractorChecks(checkReadyInvs)}>
+                  Print All Check-Ready ({checkReadyInvs.length})
+                </Button>
+              )}
+              <Button size="sm" onClick={openInvoiceModal}>+ Upload Invoice</Button>
+            </div>
           </div>
 
           {loadingInvs ? (
@@ -778,9 +885,11 @@ export default function AdminPayroll() {
                 <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                   <th className="text-left px-5 py-3">Contractor</th>
                   <th className="text-left px-4 py-3">Invoice File</th>
+                  <th className="text-left px-4 py-3">Paying Toward</th>
+                  <th className="text-left px-4 py-3">Invoice #</th>
                   <th className="text-right px-4 py-3">Amount</th>
                   <th className="text-left px-4 py-3">Status</th>
-                  <th className="px-5 py-3 w-36" />
+                  <th className="px-5 py-3 w-52" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -795,6 +904,12 @@ export default function AdminPayroll() {
                           {inv.file_original_name}
                         </a>
                       </td>
+                      <td className="px-4 py-3 text-xs text-gray-600 max-w-[160px] truncate">
+                        {inv.estimate_number
+                          ? <>Est. #{inv.estimate_number}{inv.job_name && <span className="text-gray-400"> — {inv.job_name}</span>}</>
+                          : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600">{inv.invoice_number || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-right text-gray-700">
                         {inv.amount ? formatCurrency(inv.amount) : <span className="text-gray-300">—</span>}
                       </td>
@@ -804,9 +919,15 @@ export default function AdminPayroll() {
                         </span>
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <Button size="sm" variant="secondary" onClick={() => openStatusModal(inv)}>
-                          Update Status
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="secondary" loading={printLoading} disabled={!inv.amount || parseFloat(inv.amount) <= 0}
+                            onClick={() => printContractorChecks([inv])}>
+                            Print Check
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => openStatusModal(inv)}>
+                            Update
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -976,15 +1097,12 @@ export default function AdminPayroll() {
         </form>
       </Modal>
 
-      {/* Contractor invoice status */}
+      {/* Contractor invoice status / estimate assignment */}
       <Modal isOpen={!!statusModal} onClose={() => setStatusModal(null)}
         title={`Update Invoice — ${statusModal?.contractor_name ?? ''}`}>
         <div className="flex flex-col gap-4">
           <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm">
             <p className="text-gray-500">File: <span className="font-medium text-gray-800">{statusModal?.file_original_name}</span></p>
-            {statusModal?.amount && (
-              <p className="text-gray-500 mt-0.5">Amount: <span className="font-medium text-gray-800">{formatCurrency(statusModal.amount)}</span></p>
-            )}
           </div>
 
           <div>
@@ -1001,18 +1119,59 @@ export default function AdminPayroll() {
                     statusValue === opt.value ? opt.style + ' border-current' : 'border-gray-200 text-gray-500 hover:border-gray-300'
                   }`}>
                   {opt.label}
-                  {opt.value === 'check_ready' && (
-                    <span className="block text-xs font-normal opacity-70 mt-0.5">Sends push notification</span>
-                  )}
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Note to contractor (optional)</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Amount</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
+              <input type="number" min="0" step="0.01" value={statusAmount}
+                onChange={(e) => setStatusAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full rounded-xl border border-gray-300 pl-7 pr-4 py-2.5 text-sm outline-none focus:border-brand-500" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Job</label>
+              <select
+                value={statusModal?.estimate_job_id ?? ''}
+                onChange={(e) => {
+                  const jobId = e.target.value
+                  setStatusModal((m) => ({ ...m, estimate_job_id: jobId ? Number(jobId) : null }))
+                  setStatusEstimate('')
+                  if (jobId) listEstimates({ job_id: jobId }).then((d) => setStatusEstimates(d.estimates ?? []))
+                  else setStatusEstimates([])
+                }}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
+                <option value="">— None —</option>
+                {jobs.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Estimate</label>
+              <select
+                value={statusEstimate}
+                onChange={(e) => setStatusEstimate(e.target.value)}
+                disabled={!statusEstimates.length}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 disabled:opacity-50 disabled:bg-gray-50">
+                <option value="">— None —</option>
+                {statusEstimates.map((es) => <option key={es.id} value={es.id}>#{es.estimate_number}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <Input label="Invoice Number (if applicable)" value={statusInvNum}
+            onChange={(e) => setStatusInvNum(e.target.value)} placeholder="e.g. 1042" />
+
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Internal note (optional)</label>
             <input type="text" value={statusNote} onChange={(e) => setStatusNote(e.target.value)}
-              placeholder="e.g. Check ready at office, ask for Maria"
+              placeholder="e.g. Waiting on updated invoice with itemized hours"
               className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500" />
           </div>
 
@@ -1020,6 +1179,76 @@ export default function AdminPayroll() {
           <div className="flex gap-3 pt-1">
             <Button variant="secondary" fullWidth onClick={() => setStatusModal(null)}>Cancel</Button>
             <Button fullWidth loading={statusSaving} onClick={handleSaveStatus}>Save</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Upload contractor invoice (admin, on behalf of a contractor) */}
+      <Modal isOpen={invModal} onClose={() => setInvModal(false)} title="Upload Contractor Invoice">
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Contractor</label>
+            <select value={invForm.user_id} onChange={(e) => setInvForm((f) => ({ ...f, user_id: e.target.value }))}
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
+              <option value="">— Select contractor —</option>
+              {employees.filter((e) => e.role === 'contractor' && e.is_active).map((e) => (
+                <option key={e.id} value={e.id}>{e.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Job (optional)</label>
+              <select value={invForm.job_id} onChange={(e) => handleInvoiceJobChange(e.target.value)}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
+                <option value="">— None —</option>
+                {jobs.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Estimate</label>
+              <select value={invForm.estimate_id} onChange={(e) => setInvForm((f) => ({ ...f, estimate_id: e.target.value }))}
+                disabled={!invEstimates.length}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 disabled:opacity-50 disabled:bg-gray-50">
+                <option value="">— None —</option>
+                {invEstimates.map((es) => <option key={es.id} value={es.id}>#{es.estimate_number}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <Input label="Invoice Number (if applicable)" value={invForm.invoice_number}
+            onChange={(e) => setInvForm((f) => ({ ...f, invoice_number: e.target.value }))} placeholder="e.g. 1042" />
+
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Amount (optional)</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
+              <input type="number" min="0" step="0.01" value={invForm.amount}
+                onChange={(e) => setInvForm((f) => ({ ...f, amount: e.target.value }))}
+                placeholder="0.00"
+                className="w-full rounded-xl border border-gray-300 pl-7 pr-4 py-2.5 text-sm outline-none focus:border-brand-500" />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+              Invoice File <span className="text-red-500">*</span>
+            </label>
+            <input
+              ref={invFileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              onChange={(e) => setInvForm((f) => ({ ...f, file: e.target.files?.[0] ?? null }))}
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:text-xs file:font-semibold"
+            />
+            <p className="text-xs text-gray-400 mt-1">A picture or PDF of the contractor's invoice/receipt.</p>
+          </div>
+
+          {invError && <p className="text-sm text-red-600">{invError}</p>}
+          <div className="flex gap-3 pt-1">
+            <Button variant="secondary" fullWidth onClick={() => setInvModal(false)}>Cancel</Button>
+            <Button fullWidth loading={invSaving} onClick={handleUploadInvoice}>Upload</Button>
           </div>
         </div>
       </Modal>
@@ -1062,6 +1291,13 @@ export default function AdminPayroll() {
           bonusByUser={{}}
           loanDeductions={{}}
           onClose={() => setFrPrintOpen(false)}
+        />
+      )}
+
+      {printInvoices && (
+        <PrintContractorCheck
+          invoices={printInvoices}
+          onClose={() => setPrintInvoices(null)}
         />
       )}
 
