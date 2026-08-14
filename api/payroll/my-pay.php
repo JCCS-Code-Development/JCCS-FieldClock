@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
 require_once __DIR__ . '/../middleware/auth.php';
+require_once __DIR__ . '/_helper.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(405); exit; }
 $auth = requireAuth();
@@ -46,9 +47,13 @@ $totalPending  = $pendingMinutes / 60;
 // Number of weeks in the requested period (used for salaried employees who don't clock in)
 $weeksInPeriod = max(1, (int) round((strtotime($end) - strtotime($start) + 86400) / (7 * 86400)));
 
-$rate     = (float)($u['pay_rate'] ?? 0);
+// The rate actually in effect for THIS period, per salary_history — not
+// necessarily u['pay_rate'], which may already show a rate scheduled for a
+// later period.
+$periodPay = payRateForPeriod($pdo, $uid, $start, $u['pay_rate'], $u['pay_structure']);
+$rate     = $periodPay['pay_rate'];
 $regHours = 0; $otHours = 0;
-$isSalary = ($u['pay_structure'] ?? 'hourly') === 'salary';
+$isSalary = $periodPay['pay_structure'] === 'salary';
 
 if ($isSalary) {
     // Fixed weekly salary — pay_rate is the weekly amount regardless of hours
@@ -102,5 +107,6 @@ echo json_encode([
     'category_hours'    => array_map(fn($h) => round($h, 2), $categoryHours),
     'weeks_worked'      => $weeksWorked,
     'today_hours'       => round($todayMinutes / 60, 2),
-    'pay_structure'     => $u['pay_structure'] ?? 'hourly',
+    'pay_rate'          => $periodPay['pay_rate'],
+    'pay_structure'     => $periodPay['pay_structure'],
 ]);

@@ -9,6 +9,7 @@ import {
 } from '../../api/timeclock'
 import { getTimeOffRequests, reviewTimeOffRequest } from '../../api/timeoff'
 import { listEmployees } from '../../api/employees'
+import { listSalaryHistory } from '../../api/salaryHistory'
 import { listJobs } from '../../api/jobs'
 import { listEstimates } from '../../api/estimates'
 import { getDailyMileage } from '../../api/gps'
@@ -620,6 +621,7 @@ export default function AdminTimesheets() {
   const [deleteId,    setDeleteId]    = useState(null)
   const [deleting,    setDeleting]    = useState(false)
   const [weekMiles,   setWeekMiles]   = useState({})
+  const [salaryHistory, setSalaryHistory] = useState([])
   const [allJobs,     setAllJobs]     = useState([])
 
   useEffect(() => {
@@ -681,6 +683,25 @@ export default function AdminTimesheets() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmp, dateFrom, dateTo])
 
+  useEffect(() => {
+    if (!selectedEmp) { setSalaryHistory([]); return }
+    listSalaryHistory(selectedEmp.id).then(d => setSalaryHistory(d.history ?? [])).catch(() => setSalaryHistory([]))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmp?.id])
+
+  // Rate/structure actually in effect for the week being viewed, per
+  // salary_history — not necessarily selectedEmp.pay_rate, which may already
+  // show a rate scheduled for a later period (see api/payroll/_helper.php,
+  // the backend equivalent of this same lookup).
+  const periodPay = useMemo(() => {
+    const applicable = salaryHistory
+      .filter(h => h.effective_date <= dateFrom)
+      .sort((a, b) => b.effective_date.localeCompare(a.effective_date) || b.id - a.id)[0]
+    return applicable
+      ? { pay_rate: parseFloat(applicable.pay_rate), pay_structure: applicable.pay_structure }
+      : { pay_rate: parseFloat(selectedEmp?.pay_rate ?? 0), pay_structure: selectedEmp?.pay_structure ?? 'hourly' }
+  }, [salaryHistory, dateFrom, selectedEmp])
+
   const weekDays = useMemo(() => {
     const days = []
     let d = parseISO(dateFrom)
@@ -702,11 +723,11 @@ export default function AdminTimesheets() {
     return map
   }, [entries])
   const periodMins   = useMemo(() => totalMins(entries), [entries])
-  const isSalary     = selectedEmp?.pay_structure === 'salary'
+  const isSalary     = periodPay.pay_structure === 'salary'
   const grossEst     = selectedEmp
     ? isSalary
-      ? parseFloat(selectedEmp.pay_rate ?? 0).toFixed(2)
-      : ((periodMins / 60) * (selectedEmp.pay_rate ?? 0)).toFixed(2)
+      ? periodPay.pay_rate.toFixed(2)
+      : ((periodMins / 60) * periodPay.pay_rate).toFixed(2)
     : '0.00'
   const hasGas     = selectedEmp?.gas_weekly_allowance != null && parseFloat(selectedEmp.gas_weekly_allowance) > 0
   const totalWeekMiles = Object.values(weekMiles).reduce((s, m) => s + m, 0)
@@ -816,7 +837,7 @@ export default function AdminTimesheets() {
                 </div>
                 <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Rate</p>
-                  <p className="text-base font-bold text-gray-900 leading-tight">${selectedEmp.pay_rate ?? 0}</p>
+                  <p className="text-base font-bold text-gray-900 leading-tight">${periodPay.pay_rate}</p>
                   <p className="text-[10px] text-gray-400">{isSalary ? 'per week' : 'per hour'}</p>
                 </div>
                 <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex flex-col items-center justify-center text-center">
@@ -877,7 +898,7 @@ export default function AdminTimesheets() {
                     <div className="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center text-2xl">💼</div>
                     <p className="text-sm font-semibold text-brand-600">Fixed Salary Employee</p>
                     <p className="text-xs text-gray-400 text-center max-w-xs">
-                      {selectedEmp.name} is on a fixed weekly salary of ${selectedEmp.pay_rate ?? 0}.<br />
+                      {selectedEmp.name} is on a fixed weekly salary of ${periodPay.pay_rate}.<br />
                       Hours are not tracked for salaried employees.
                     </p>
                   </div>
