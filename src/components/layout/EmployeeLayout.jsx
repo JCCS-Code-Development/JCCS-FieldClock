@@ -71,8 +71,10 @@ export default function EmployeeLayout() {
       {/* ── Desktop sidebar ──────────────────────────────── */}
       <aside className="hidden lg:flex flex-col w-60 bg-brand-900 text-white shrink-0 fixed top-0 bottom-0 left-0 z-20">
         <div className="px-5 py-5 border-b border-brand-700/60">
-          <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-12 w-auto"
-            style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
+          <button onClick={() => navigate('/')} aria-label={t('nav.dashboard')} className="block">
+            <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-12 w-auto"
+              style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
+          </button>
           <p className="text-brand-400 text-xs font-bold mt-2 tracking-widest uppercase">{t('nav.fieldclock')}</p>
         </div>
         <div className="px-5 py-2.5 border-b border-brand-700/40">
@@ -110,9 +112,11 @@ export default function EmployeeLayout() {
 
         {/* Mobile top bar — fixed so it never moves on iOS overscroll */}
         <header className="lg:hidden bg-brand-900 text-white flex items-center justify-between px-4 py-3 fixed top-0 inset-x-0 z-30">
-          {/* Left: logo */}
-          <img src="/jccs-logo.jpg" alt="JCCS" className="h-7 w-auto"
-            style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
+          {/* Left: logo — tap to return to dashboard from anywhere */}
+          <button onClick={() => navigate('/')} aria-label={t('nav.dashboard')}>
+            <img src="/jccs-logo.jpg" alt="JCCS" className="h-7 w-auto"
+              style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
+          </button>
 
           {/* Right: status + clock + avatar */}
           <div className="flex items-center gap-3">

@@ -77,8 +77,10 @@ export default function AdminLayout() {
       {/* ── Desktop sidebar ──────────────────────────────── */}
       <aside className="hidden lg:flex flex-col w-60 bg-brand-900 text-white shrink-0 fixed top-0 bottom-0 left-0 z-20">
         <div className="px-5 py-5 border-b border-brand-700/60 flex flex-col items-center text-center">
-          <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-12 w-auto"
-            style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
+          <button onClick={() => navigate('/admin')} aria-label={t('nav.dashboard')}>
+            <img src="/jccs-logo.jpg" alt="JCCS Services" className="h-12 w-auto"
+              style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
+          </button>
           <p className="text-brand-400 text-xs font-bold mt-2 tracking-widest uppercase">{t('nav.fieldclock')}</p>
         </div>
         <div className="px-5 py-2.5 border-b border-brand-700/40">
@@ -105,8 +107,11 @@ export default function AdminLayout() {
 
         {/* Mobile top bar — fixed so it never moves on iOS overscroll */}
         <header className="lg:hidden bg-brand-900 text-white flex items-center justify-between px-4 py-3 fixed top-0 inset-x-0 z-30">
-          <img src="/jccs-logo.jpg" alt="JCCS" className="h-7 w-auto"
-            style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
+          {/* Logo — tap to return to dashboard from anywhere */}
+          <button onClick={() => navigate('/admin')} aria-label={t('nav.dashboard')}>
+            <img src="/jccs-logo.jpg" alt="JCCS" className="h-7 w-auto"
+              style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
+          </button>
           <div className="flex items-center gap-3">
             <LiveClock className="text-white/60 text-xs" />
             <button onClick={() => setProfileOpen(true)}
