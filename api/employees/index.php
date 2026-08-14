@@ -23,7 +23,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'GET') {
     $active = isset($_GET['active']) ? (int)$_GET['active'] : 1;
     $stmt   = $pdo->prepare(
-        'SELECT u.id, u.name, u.email, u.phone, u.role, u.pay_type, u.pay_rate, u.pay_structure, u.overtime_rate,
+        'SELECT u.id, u.name, u.email, u.phone, u.address, u.role, u.pay_type, u.pay_rate, u.pay_structure, u.overtime_rate,
                 u.gas_weekly_allowance, u.is_active, u.deactivated_at, u.default_job_id, j.name as default_job_name
          FROM users u
          LEFT JOIN jobs j ON j.id = u.default_job_id
@@ -35,24 +35,34 @@ if ($method === 'GET') {
 
 } elseif ($method === 'POST') {
     $body = jsonBody();
-    requireFields($body, ['name', 'email', 'role']);
+    requireFields($body, ['name', 'role']);
 
-    $name  = trim(sanitizeString($body['name']));
-    $email = trim(sanitizeString($body['email']));
-    $phone = isset($body['phone']) && $body['phone'] !== '' ? sanitizeString($body['phone']) : null;
-    $role  = sanitizeString($body['role']);
+    $name    = trim(sanitizeString($body['name']));
+    $email   = isset($body['email'])   && $body['email']   !== '' ? trim(sanitizeString($body['email']))   : null;
+    $phone   = isset($body['phone'])   && $body['phone']   !== '' ? sanitizeString($body['phone'])   : null;
+    $address = isset($body['address']) && $body['address'] !== '' ? sanitizeString($body['address']) : null;
+    $role    = sanitizeString($body['role']);
 
     if (!in_array($role, ['employee', 'admin', 'contractor'])) {
         http_response_code(422);
         exit(json_encode(['error' => 'Invalid role.']));
     }
 
-    // Check for duplicate email
-    $dup = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
-    $dup->execute([$email]);
-    if ($dup->fetch()) {
+    // Employees/admins log in, so they need an email; contractors don't use
+    // the app at all, so theirs is optional (contact info only).
+    if ($role !== 'contractor' && !$email) {
         http_response_code(422);
-        exit(json_encode(['error' => 'An account with this email already exists.']));
+        exit(json_encode(['error' => 'Email is required so this person can log in.']));
+    }
+
+    // Check for duplicate email
+    if ($email) {
+        $dup = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+        $dup->execute([$email]);
+        if ($dup->fetch()) {
+            http_response_code(422);
+            exit(json_encode(['error' => 'An account with this email already exists.']));
+        }
     }
 
     // Check for duplicate phone
@@ -74,9 +84,9 @@ if ($method === 'GET') {
     }
 
     $stmt = $pdo->prepare(
-        'INSERT INTO users (name, email, phone, role, pay_type, pay_rate, pay_structure, is_active) VALUES (?,?,?,?,?,?,?,1)'
+        'INSERT INTO users (name, email, phone, address, role, pay_type, pay_rate, pay_structure, is_active) VALUES (?,?,?,?,?,?,?,?,1)'
     );
-    $stmt->execute([$name, $email, $phone, $role, $payType, $payRate, $payStructure]);
+    $stmt->execute([$name, $email, $phone, $address, $role, $payType, $payRate, $payStructure]);
     $newId = (int)$pdo->lastInsertId();
 
     // Starting rate, not a mid-stream change — effective immediately (today),

@@ -39,7 +39,7 @@ function annotateSalaryHistory(history) {
 }
 
 const EMPTY = {
-  name: '', email: '', phone: '', role: 'employee',
+  name: '', email: '', phone: '', address: '', role: 'employee',
   pay_type: 'w2', pay_structure: 'hourly', pay_rate: '', default_job_id: '',
 }
 
@@ -154,6 +154,7 @@ export default function AdminEmployees() {
       name:     emp.name     ?? '',
       email:    emp.email    ?? '',
       phone:    emp.phone    ?? '',
+      address:  emp.address  ?? '',
       role:     emp.role     ?? 'employee',
       pay_type:      emp.pay_type      ?? 'w2',
       pay_structure: emp.pay_structure ?? 'hourly',
@@ -174,7 +175,8 @@ export default function AdminEmployees() {
 
   const handleSave = async () => {
     if (!form.name.trim())  { setError('Name is required.'); return }
-    if (!form.email.trim()) { setError('Email is required so the employee can log in.'); return }
+    // Contractors don't log in, so unlike employees/admins their email isn't required.
+    if (form.role !== 'contractor' && !form.email.trim()) { setError('Email is required so the employee can log in.'); return }
     if (form.role !== 'contractor') {
       const rate = parseFloat(form.pay_rate)
       if (!form.pay_rate || isNaN(rate) || rate <= 0) {
@@ -185,8 +187,9 @@ export default function AdminEmployees() {
     setSaving(true); setError('')
     const payload = {
       name:          form.name.trim(),
-      email:         form.email.trim(),
+      email:         form.email.trim() || null,
       phone:         form.phone.trim() || null,
+      address:       form.address.trim() || null,
       role:          form.role,
       ...(form.role !== 'contractor' && {
         pay_type:      form.pay_type,
@@ -284,7 +287,9 @@ export default function AdminEmployees() {
       render: (_, row) => (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(row) }}>Edit</Button>
-          <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openPwModal(row) }}>Reset Password</Button>
+          {row.role !== 'contractor' && (
+            <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openPwModal(row) }}>Reset Password</Button>
+          )}
           {row.role === 'contractor' && (
             <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openDocs(row) }}>Documents</Button>
           )}
@@ -367,9 +372,9 @@ export default function AdminEmployees() {
         <div className="flex flex-col gap-4">
           <Input label="Full Name *" value={form.name} onChange={set('name')} />
           <Input
-            label="Email Address *" type="email" inputMode="email"
+            label={form.role === 'contractor' ? 'Email Address' : 'Email Address *'} type="email" inputMode="email"
             value={form.email} onChange={set('email')}
-            helperText="Used to log in to the app"
+            helperText={form.role === 'contractor' ? 'Optional — contractors don’t log in' : 'Used to log in to the app'}
           />
           <Input
             label="Phone Number" type="tel" inputMode="tel"
@@ -390,9 +395,17 @@ export default function AdminEmployees() {
           </div>
 
           {form.role === 'contractor' ? (
-            <p className="text-xs text-gray-500 bg-blue-50 rounded-xl px-4 py-3">
-              Contractors log in to upload invoices and legal documents (W-9 and Worker's Compensation). Pay rates are handled per invoice.
-            </p>
+            <>
+              <p className="text-xs text-gray-500 bg-blue-50 rounded-xl px-4 py-3">
+                Contractors don't log in to the app — invoices, estimates, and checks are all managed here by an admin (Payroll → Contractors). Pay rates are handled per invoice, not as a fixed rate.
+              </p>
+              <Input
+                label="Mailing Address"
+                value={form.address} onChange={set('address')}
+                placeholder="Street, City, State ZIP"
+                helperText="Shown on printed checks"
+              />
+            </>
           ) : (
             <>
               <div>

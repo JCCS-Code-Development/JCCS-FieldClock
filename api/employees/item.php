@@ -37,7 +37,7 @@ if (!$check->fetch()) {
 
 if ($method === 'GET') {
     $stmt = $pdo->prepare(
-        'SELECT u.id, u.name, u.email, u.phone, u.role, u.pay_type, u.pay_rate, u.pay_structure, u.overtime_rate,
+        'SELECT u.id, u.name, u.email, u.phone, u.address, u.role, u.pay_type, u.pay_rate, u.pay_structure, u.overtime_rate,
                 u.gas_weekly_allowance, u.is_active, u.deactivated_at, u.default_job_id, j.name as default_job_name
          FROM users u
          LEFT JOIN jobs j ON j.id = u.default_job_id
@@ -53,7 +53,7 @@ if ($method === 'GET') {
     $before->execute([$id]);
     $beforeRow = $before->fetch();
 
-    $allowed = ['name', 'email', 'phone', 'role', 'pay_type', 'pay_rate', 'pay_structure', 'overtime_rate', 'gas_weekly_allowance', 'is_active', 'default_job_id'];
+    $allowed = ['name', 'email', 'phone', 'address', 'role', 'pay_type', 'pay_rate', 'pay_structure', 'overtime_rate', 'gas_weekly_allowance', 'is_active', 'default_job_id'];
     $sets = []; $params = [];
 
     foreach ($allowed as $f) {
@@ -63,7 +63,11 @@ if ($method === 'GET') {
             $params[] = ($body[$f] === null || $body[$f] === '') ? null : (float)$body[$f];
         } elseif ($f === 'default_job_id') {
             $params[] = ($body[$f] === null || $body[$f] === '') ? null : (int)$body[$f];
-        } elseif ($f === 'phone') {
+        } elseif (in_array($f, ['phone', 'email', 'address'])) {
+            // Empty/null clears the field to NULL rather than storing '' — email
+            // and phone are UNIQUE columns, so multiple blank '' rows (e.g.
+            // several contractors with no email on file) would otherwise collide;
+            // NULL never collides with itself under a UNIQUE constraint.
             $params[] = ($body[$f] === null || $body[$f] === '') ? null : sanitizeString((string)$body[$f]);
         } elseif ($f === 'is_active') {
             $isActive = !empty($body[$f]) ? 1 : 0;
@@ -78,8 +82,8 @@ if ($method === 'GET') {
         $sets[] = "$f = ?";
     }
 
-    // Check duplicate email if being changed
-    if (array_key_exists('email', $body)) {
+    // Check duplicate email if being changed to a non-empty value
+    if (array_key_exists('email', $body) && $body['email'] !== '' && $body['email'] !== null) {
         $dupEmail = $pdo->prepare('SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1');
         $dupEmail->execute([sanitizeString($body['email']), $id]);
         if ($dupEmail->fetch()) {
