@@ -41,7 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 
     $pstmt = $pdo->prepare(
-        'SELECT lp.id, lp.amount, lp.period_start, lp.period_end, lp.notes, lp.created_at,
+        'SELECT lp.id, lp.amount, lp.payment_method, lp.reference_number,
+                lp.receipt_file_path, lp.receipt_file_original_name,
+                lp.period_start, lp.period_end, lp.notes, lp.created_at,
                 u.name AS recorded_by_name
          FROM loan_payments lp
          JOIN users u ON u.id = lp.created_by

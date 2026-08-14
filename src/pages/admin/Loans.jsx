@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import PageHeader from '../../components/admin/PageHeader'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
-import { listLoans, getLoan, createLoan, updateLoan, deleteLoan, recordPayment, deletePayment } from '../../api/loans'
+import { listLoans, getLoan, createLoan, updateLoan, deleteLoan, recordPayment, deletePayment, getLoanReceiptUrl } from '../../api/loans'
 import { listEmployees } from '../../api/employees'
 import { formatCurrency } from '../../utils/format'
 import { format, startOfWeek, endOfWeek, subWeeks, addDays } from 'date-fns'
@@ -25,6 +25,13 @@ function nextPayPeriodStart() {
   const today = new Date()
   const dow = today.getDay() === 0 ? 7 : today.getDay() // ISO: Mon=1 .. Sun=7
   return format(addDays(today, 8 - dow), 'yyyy-MM-dd')
+}
+
+const PAYMENT_METHOD_LABELS = { cash: 'Cash', check: 'Check', transfer: 'Transfer' }
+const PAYMENT_METHOD_COLORS = {
+  cash:     'bg-gray-100 text-gray-600',
+  check:    'bg-blue-100 text-blue-700',
+  transfer: 'bg-purple-100 text-purple-700',
 }
 
 // Projected payoff, assuming the full weekly_deduction is actually deducted
@@ -86,12 +93,16 @@ export default function AdminLoans() {
   const [scheduleError,   setScheduleError]   = useState('')
 
   // Record payment modal
-  const [payModal,  setPayModal]  = useState(null)   // loan row
-  const [payPeriod, setPayPeriod] = useState(0)
-  const [payAmount, setPayAmount] = useState('0.00')
-  const [payNotes,  setPayNotes]  = useState('')
-  const [paySaving, setPaySaving] = useState(false)
-  const [payError,  setPayError]  = useState('')
+  const [payModal,   setPayModal]   = useState(null)   // loan row
+  const [payPeriod,  setPayPeriod]  = useState(0)
+  const [payAmount,  setPayAmount]  = useState('0.00')
+  const [payMethod,  setPayMethod]  = useState('transfer')
+  const [payRef,     setPayRef]     = useState('')
+  const [payReceipt, setPayReceipt] = useState(null)   // File | null
+  const [payNotes,   setPayNotes]   = useState('')
+  const [paySaving,  setPaySaving]  = useState(false)
+  const [payError,   setPayError]   = useState('')
+  const receiptInputRef = useRef(null)
 
   // Delete confirm
   const [delLoan,    setDelLoan]    = useState(null)
@@ -182,21 +193,29 @@ export default function AdminLoans() {
     // Defaults to 0, not the remaining balance — the exact amount deducted
     // each paycheck is still entered manually per period.
     setPayAmount('0.00')
-    setPayPeriod(0); setPayNotes(''); setPayError('')
+    setPayPeriod(0); setPayMethod('transfer'); setPayRef(''); setPayReceipt(null); setPayNotes(''); setPayError('')
+    if (receiptInputRef.current) receiptInputRef.current.value = ''
   }
 
   const handleRecordPayment = async () => {
     if (!payAmount || parseFloat(payAmount) <= 0) { setPayError('Enter a valid amount.'); return }
+    if ((payMethod === 'check' || payMethod === 'transfer') && !payReceipt) {
+      setPayError('Attach a receipt image for check or transfer payments.'); return
+    }
     setPaySaving(true); setPayError('')
     const p = periods[payPeriod]
     try {
-      await recordPayment({
-        loan_id:      payModal.id,
-        amount:       parseFloat(payAmount),
-        period_start: p.start,
-        period_end:   p.end,
-        notes:        payNotes.trim() || null,
-      })
+      const form = new FormData()
+      form.append('loan_id', payModal.id)
+      form.append('amount', payAmount)
+      form.append('payment_method', payMethod)
+      if (payRef.trim()) form.append('reference_number', payRef.trim())
+      if (payReceipt) form.append('receipt', payReceipt)
+      form.append('period_start', p.start)
+      form.append('period_end', p.end)
+      if (payNotes.trim()) form.append('notes', payNotes.trim())
+
+      await recordPayment(form)
       setPayModal(null)
       await refreshDetail(payModal.id)
     } catch (err) {
@@ -394,13 +413,31 @@ export default function AdminLoans() {
                           {loanDetail.payments.map((pmt) => (
                             <div key={pmt.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2.5 group">
                               <div>
-                                <span className="text-sm font-semibold text-green-700">{formatCurrency(pmt.amount)}</span>
-                                {pmt.period_start && (
-                                  <span className="text-xs text-gray-500 ml-2">
-                                    Week of {format(new Date(pmt.period_start + 'T00:00:00'), 'MMM d, yyyy')}
-                                  </span>
-                                )}
-                                {pmt.notes && <span className="text-xs text-gray-400 ml-2">· {pmt.notes}</span>}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-semibold text-green-700">{formatCurrency(pmt.amount)}</span>
+                                  {pmt.payment_method && (
+                                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${PAYMENT_METHOD_COLORS[pmt.payment_method]}`}>
+                                      {PAYMENT_METHOD_LABELS[pmt.payment_method]}
+                                    </span>
+                                  )}
+                                  {pmt.reference_number && (
+                                    <span className="text-xs text-gray-500">#{pmt.reference_number}</span>
+                                  )}
+                                  {pmt.receipt_file_path && (
+                                    <a href={getLoanReceiptUrl(pmt.id)} target="_blank" rel="noopener noreferrer"
+                                      className="text-xs font-semibold text-brand-600 hover:text-brand-700">
+                                      View Receipt
+                                    </a>
+                                  )}
+                                </div>
+                                <div>
+                                  {pmt.period_start && (
+                                    <span className="text-xs text-gray-500">
+                                      Week of {format(new Date(pmt.period_start + 'T00:00:00'), 'MMM d, yyyy')}
+                                    </span>
+                                  )}
+                                  {pmt.notes && <span className="text-xs text-gray-400 ml-2">· {pmt.notes}</span>}
+                                </div>
                               </div>
                               <div className="flex items-center gap-3">
                                 <span className="text-xs text-gray-400">by {pmt.recorded_by_name}</span>
@@ -567,6 +604,59 @@ export default function AdminLoans() {
               />
             </div>
           </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Payment Method</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'cash',     label: 'Cash' },
+                { value: 'check',    label: 'Check' },
+                { value: 'transfer', label: 'Transfer' },
+              ].map((opt) => (
+                <button key={opt.value} type="button"
+                  onClick={() => setPayMethod(opt.value)}
+                  className={`px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-colors ${
+                    payMethod === opt.value
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {(payMethod === 'check' || payMethod === 'transfer') && (
+            <>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+                  {payMethod === 'check' ? 'Check Number' : 'Transfer / Confirmation Number'} (if applicable)
+                </label>
+                <input
+                  type="text"
+                  value={payRef}
+                  onChange={(e) => setPayRef(e.target.value)}
+                  placeholder={payMethod === 'check' ? 'e.g. 1042' : 'e.g. Zelle confirmation ID'}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+                  Receipt Image <span className="text-red-500">*</span>
+                </label>
+                <input
+                  ref={receiptInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  onChange={(e) => setPayReceipt(e.target.files?.[0] ?? null)}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:text-xs file:font-semibold"
+                />
+                <p className="text-xs text-gray-400 mt-1">Photo or screenshot of the {payMethod === 'check' ? 'check' : 'transfer'} confirmation.</p>
+              </div>
+            </>
+          )}
 
           <div>
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Notes (optional)</label>
