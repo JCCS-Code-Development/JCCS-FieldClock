@@ -34,6 +34,14 @@ if (!$user) {
     exit(json_encode(['error' => 'No account found. Contact your administrator.']));
 }
 
+// Contractors don't use the app — invoices, estimates, and checks are all
+// managed for them by admins. Block at the earliest point rather than
+// leaving them with a login that goes nowhere.
+if ($user['role'] === 'contractor') {
+    http_response_code(403);
+    exit(json_encode(['error' => 'This account does not have access to the app. Contact your administrator.']));
+}
+
 // First-time login: no password set yet — prompt to create one
 if (!$user['password_hash']) {
     echo json_encode(['setup_required' => true, 'user_id' => $user['id']]);

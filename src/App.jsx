@@ -5,7 +5,6 @@ import ProtectedRoute from './router/ProtectedRoute'
 import RoleRoute from './router/RoleRoute'
 import EmployeeLayout from './components/layout/EmployeeLayout'
 import AdminLayout from './components/layout/AdminLayout'
-import ContractorLayout from './components/layout/ContractorLayout'
 
 import PhoneLogin from './pages/auth/PhoneLogin'
 import SetupPassword from './pages/auth/SetupPassword'
@@ -28,14 +27,10 @@ import AdminHR from './pages/admin/HRDocuments'
 import AdminReports from './pages/admin/Reports'
 import CheckRegistry from './pages/admin/CheckRegistry'
 
-import InvoicePortal from './pages/contractor/InvoicePortal'
-import LegalDocuments from './pages/contractor/LegalDocuments'
-
 function RoleRedirect() {
   const user = useAuthStore((s) => s.user)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   if (!isAuthenticated) return <Navigate to="/login" replace />
-  if (user?.role === 'contractor') return <Navigate to="/contractor/invoices" replace />
   if (user?.role === 'admin') return <Navigate to="/admin" replace />
   return <Navigate to="/" replace />
 }
@@ -55,14 +50,6 @@ export default function App() {
             <Route path="/jobs" element={<JobList />} />
             <Route path="/my-pay" element={<MyPay />} />
             <Route path="/my-docs" element={<MyDocuments />} />
-          </Route>
-        </Route>
-
-        {/* Contractor routes */}
-        <Route element={<RoleRoute allowedRoles={['contractor']} />}>
-          <Route element={<ContractorLayout />}>
-            <Route path="/contractor/invoices"  element={<InvoicePortal />} />
-            <Route path="/contractor/documents" element={<LegalDocuments />} />
           </Route>
         </Route>
 

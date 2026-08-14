@@ -41,12 +41,10 @@ registerRoute(
 const PUSH_CONFIGS = {
   en: {
     paycheck:        { body: 'Your paycheck is available. Tap to view.',        tag: 'paycheck',        url: '/my-pay' },
-    check_ready:     { body: 'Your check is ready for this week. Tap to view.', tag: 'check-ready',     url: '/contractor/invoices' },
     travel_reminder: { body: "Still traveling? Tap to confirm you've arrived.",  tag: 'travel-reminder', url: '/' },
   },
   es: {
     paycheck:        { body: 'Tu cheque de pago está disponible. Toca para ver.',        tag: 'paycheck',        url: '/my-pay' },
-    check_ready:     { body: 'Tu cheque está listo esta semana. Toca para ver.',          tag: 'check-ready',     url: '/contractor/invoices' },
     travel_reminder: { body: '¿Sigues en camino? Toca para confirmar tu llegada.',        tag: 'travel-reminder', url: '/' },
   },
 }
@@ -57,7 +55,7 @@ self.addEventListener('push', (event) => {
 
   const lang  = PUSH_CONFIGS[data.lang] ? data.lang : 'en'
   const table = PUSH_CONFIGS[lang]
-  const cfg   = (data.type && table[data.type]) ? table[data.type] : table.check_ready
+  const cfg   = (data.type && table[data.type]) ? table[data.type] : table.paycheck
 
   event.waitUntil(
     self.registration.showNotification('JCCS FieldClock', {
