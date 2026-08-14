@@ -14,8 +14,32 @@ $pdo    = getPDO();
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    $jobId = isset($_GET['job_id']) ? (int)$_GET['job_id'] : 0;
-    if (!$jobId) { http_response_code(422); exit(json_encode(['error' => 'job_id is required'])); }
+    $jobId          = isset($_GET['job_id']) ? (int)$_GET['job_id'] : 0;
+    $estimateNumber = isset($_GET['estimate_number']) ? trim($_GET['estimate_number']) : '';
+
+    if (!$jobId && $estimateNumber === '') {
+        http_response_code(422);
+        exit(json_encode(['error' => 'job_id or estimate_number is required']));
+    }
+
+    if ($estimateNumber !== '') {
+        // Free-typed estimate # lookup (contractor invoice entry) — exact
+        // match, case-insensitive, across any job. Not scoped to a job_id
+        // since the whole point is finding which job it belongs to.
+        $stmt = $pdo->prepare(
+            'SELECT je.id, je.job_id, je.estimate_number, je.description, je.is_active, je.created_at,
+                    j.name AS job_name
+             FROM job_estimates je
+             JOIN jobs j ON j.id = je.job_id
+             WHERE LOWER(je.estimate_number) = LOWER(?) AND je.is_active = 1
+             ORDER BY je.created_at DESC
+             LIMIT 1'
+        );
+        $stmt->execute([$estimateNumber]);
+        $match = $stmt->fetch();
+        echo json_encode(['estimate' => $match ?: null]);
+        exit;
+    }
 
     $active = isset($_GET['active']) ? (int)$_GET['active'] : 1;
     $stmt   = $pdo->prepare(

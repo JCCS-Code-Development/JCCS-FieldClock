@@ -6,6 +6,8 @@ require_once __DIR__ . '/../../config/jwt.php';
 require_once __DIR__ . '/../../middleware/auth.php';
 require_once __DIR__ . '/../../middleware/validate.php';
 
+require_once __DIR__ . '/_helper.php';
+
 $auth = requireAuth();
 $pdo  = getPDO();
 
@@ -16,16 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $id = (int)($_GET['id'] ?? 0);
     if (!$id) { http_response_code(422); exit(json_encode(['error' => 'id required'])); }
 
-    $stmt = $pdo->prepare(
-        'SELECT ci.*, u.name AS contractor_name, u.address AS contractor_address,
-                je.job_id AS estimate_job_id, je.estimate_number, je.description AS estimate_description,
-                j.name AS job_name, j.client_name AS job_client_name
-         FROM contractor_invoices ci
-         JOIN users u ON u.id = ci.user_id
-         LEFT JOIN job_estimates je ON je.id = ci.estimate_id
-         LEFT JOIN jobs j ON j.id = je.job_id
-         WHERE ci.id = ?'
-    );
+    $stmt = $pdo->prepare(INVOICE_SELECT . ' WHERE ci.id = ?');
     $stmt->execute([$id]);
     $invoice = $stmt->fetch();
     if (!$invoice) { http_response_code(404); exit(json_encode(['error' => 'Not found'])); }
@@ -59,9 +52,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $sets[] = 'admin_note = ?';
         $params[] = !empty($body['admin_note']) ? sanitizeString($body['admin_note']) : null;
     }
-    if (array_key_exists('estimate_id', $body)) {
-        $sets[] = 'estimate_id = ?';
-        $params[] = !empty($body['estimate_id']) ? (int)$body['estimate_id'] : null;
+    if (array_key_exists('estimate_number', $body)) {
+        $estimateNumber = !empty($body['estimate_number']) ? sanitizeString($body['estimate_number']) : null;
+        $sets[] = 'estimate_number = ?'; $params[] = $estimateNumber;
+        $sets[] = 'estimate_id = ?';     $params[] = resolveEstimateId($pdo, $estimateNumber);
+    }
+    if (array_key_exists('job_location', $body)) {
+        $sets[] = 'job_location = ?';
+        $params[] = !empty($body['job_location']) ? sanitizeString($body['job_location']) : null;
     }
     if (array_key_exists('invoice_number', $body)) {
         $sets[] = 'invoice_number = ?';
@@ -77,16 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     $params[] = $id;
     $pdo->prepare('UPDATE contractor_invoices SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
 
-    $row = $pdo->prepare(
-        'SELECT ci.*, u.name AS contractor_name, u.address AS contractor_address,
-                je.job_id AS estimate_job_id, je.estimate_number, je.description AS estimate_description,
-                j.name AS job_name, j.client_name AS job_client_name
-         FROM contractor_invoices ci
-         JOIN users u ON u.id = ci.user_id
-         LEFT JOIN job_estimates je ON je.id = ci.estimate_id
-         LEFT JOIN jobs j ON j.id = je.job_id
-         WHERE ci.id = ?'
-    );
+    $row = $pdo->prepare(INVOICE_SELECT . ' WHERE ci.id = ?');
     $row->execute([$id]);
     $invoice = $row->fetch();
 

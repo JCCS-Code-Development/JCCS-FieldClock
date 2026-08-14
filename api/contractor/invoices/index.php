@@ -6,6 +6,8 @@ require_once __DIR__ . '/../../config/jwt.php';
 require_once __DIR__ . '/../../middleware/auth.php';
 require_once __DIR__ . '/../../middleware/validate.php';
 
+require_once __DIR__ . '/_helper.php';
+
 // Contractors don't log in to the app — every invoice here is uploaded and
 // managed by an admin on a contractor's behalf.
 $auth = requireAuth();
@@ -19,14 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $ps    = $_GET['period_start'] ?? null;
     $pe    = $_GET['period_end']   ?? null;
     $jobId = !empty($_GET['job_id']) ? (int)$_GET['job_id'] : null;
-    $sql = 'SELECT ci.*, u.name AS contractor_name, u.address AS contractor_address,
-                   je.job_id AS estimate_job_id, je.estimate_number, je.description AS estimate_description,
-                   j.name AS job_name
-            FROM contractor_invoices ci
-            JOIN users u ON u.id = ci.user_id
-            LEFT JOIN job_estimates je ON je.id = ci.estimate_id
-            LEFT JOIN jobs j ON j.id = je.job_id
-            WHERE 1=1';
+    $sql = INVOICE_SELECT . ' WHERE 1=1';
     $params = [];
     if ($ps)    { $sql .= ' AND ci.period_start >= ?'; $params[] = $ps; }
     if ($pe)    { $sql .= ' AND ci.period_end <= ?';   $params[] = $pe; }
@@ -91,31 +86,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit(json_encode(['error' => 'Failed to save file']));
     }
 
-    $filePath      = 'uploads/invoices/' . $userId . '/' . $filename;
-    $origName      = sanitizeString($file['name']);
-    $amount        = !empty($_POST['amount'])         ? (float)$_POST['amount']              : null;
-    $periodStart   = sanitizeString($_POST['period_start'] ?? '');
-    $periodEnd     = sanitizeString($_POST['period_end']   ?? '');
-    $estimateId    = !empty($_POST['estimate_id'])    ? (int)$_POST['estimate_id']            : null;
-    $invoiceNumber = !empty($_POST['invoice_number'])  ? sanitizeString($_POST['invoice_number']) : null;
+    $filePath       = 'uploads/invoices/' . $userId . '/' . $filename;
+    $origName       = sanitizeString($file['name']);
+    $amount         = !empty($_POST['amount'])         ? (float)$_POST['amount']              : null;
+    $periodStart    = sanitizeString($_POST['period_start'] ?? '');
+    $periodEnd      = sanitizeString($_POST['period_end']   ?? '');
+    $invoiceNumber  = !empty($_POST['invoice_number'])  ? sanitizeString($_POST['invoice_number']) : null;
+    $estimateNumber = !empty($_POST['estimate_number']) ? sanitizeString($_POST['estimate_number']) : null;
+    $jobLocation    = !empty($_POST['job_location'])    ? sanitizeString($_POST['job_location'])    : null;
+    $estimateId     = resolveEstimateId($pdo, $estimateNumber);
 
     $pdo->prepare(
         'INSERT INTO contractor_invoices
-           (user_id, estimate_id, invoice_number, period_start, period_end, file_path, file_original_name, file_type, amount, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, \'submitted\')'
-    )->execute([$userId, $estimateId, $invoiceNumber, $periodStart, $periodEnd, $filePath, $origName, $fileType, $amount]);
+           (user_id, estimate_id, estimate_number, job_location, invoice_number, period_start, period_end,
+            file_path, file_original_name, file_type, amount, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'submitted\')'
+    )->execute([
+        $userId, $estimateId, $estimateNumber, $jobLocation, $invoiceNumber, $periodStart, $periodEnd,
+        $filePath, $origName, $fileType, $amount,
+    ]);
 
     $id  = (int)$pdo->lastInsertId();
-    $row = $pdo->prepare(
-        'SELECT ci.*, u.name AS contractor_name, u.address AS contractor_address,
-                je.job_id AS estimate_job_id, je.estimate_number, je.description AS estimate_description,
-                j.name AS job_name
-         FROM contractor_invoices ci
-         JOIN users u ON u.id = ci.user_id
-         LEFT JOIN job_estimates je ON je.id = ci.estimate_id
-         LEFT JOIN jobs j ON j.id = je.job_id
-         WHERE ci.id = ?'
-    );
+    $row = $pdo->prepare(INVOICE_SELECT . ' WHERE ci.id = ?');
     $row->execute([$id]);
     echo json_encode(['invoice' => $row->fetch()]);
     exit;

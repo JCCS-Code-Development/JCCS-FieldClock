@@ -15,9 +15,11 @@ function ContractorEarningsStatement({ inv, checkDate }) {
       return `${format(new Date(inv.period_start + 'T12:00'), 'MM/dd/yy')} – ${format(new Date(inv.period_end + 'T12:00'), 'MM/dd/yy')}`
     } catch { return inv.period_start && inv.period_end ? `${inv.period_start} – ${inv.period_end}` : '—' }
   })()
-  const estimateLabel = inv.estimate_number
-    ? `Estimate #${inv.estimate_number}${inv.job_name ? ' — ' + inv.job_name : ''}`
-    : (inv.job_name || 'No estimate on file')
+  const estimateNum = inv.resolved_estimate_number ?? inv.estimate_number
+  const jobRef       = inv.job_name ?? inv.job_location
+  const estimateLabel = estimateNum
+    ? `Estimate #${estimateNum}${jobRef ? ' — ' + jobRef : ''}`
+    : (jobRef || 'No estimate on file')
 
   return (
     <div style={{ fontFamily: ES.font, display: 'flex', flexDirection: 'column', gap: '5pt', height: '100%', justifyContent: 'center' }}>

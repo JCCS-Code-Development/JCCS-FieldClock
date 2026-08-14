@@ -9,7 +9,6 @@ import Input from '../../components/ui/Input'
 import { getSummary, getBreakdown, listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment, listFlatRatePayments, createFlatRatePayment, updateFlatRatePayment, deleteFlatRatePayment } from '../../api/payroll'
 import { listEmployees } from '../../api/employees'
 import { listInvoices, getInvoice, uploadInvoice, updateInvoiceStatus, getDownloadUrl } from '../../api/contractor'
-import { listJobs } from '../../api/jobs'
 import { listEstimates } from '../../api/estimates'
 import { getPeriodLoanTotals } from '../../api/loans'
 import { listPaychecks, createPaycheck, updatePaycheck, deletePaycheck, markAllAvailable } from '../../api/paychecks'
@@ -92,18 +91,16 @@ export default function AdminPayroll() {
   const [statusModal,    setStatusModal]    = useState(null)
   const [statusValue,    setStatusValue]    = useState('')
   const [statusNote,     setStatusNote]     = useState('')
-  const [statusEstimate, setStatusEstimate] = useState('')
+  const [statusEstimateNumber, setStatusEstimateNumber] = useState('')
+  const [statusJobLocation,    setStatusJobLocation]    = useState('')
   const [statusInvNum,   setStatusInvNum]   = useState('')
   const [statusAmount,   setStatusAmount]   = useState('')
-  const [statusEstimates, setStatusEstimates] = useState([]) // estimates for statusModal's job
   const [statusSaving,   setStatusSaving]   = useState(false)
   const [statusError,    setStatusError]    = useState('')
 
   // Upload invoice (admin, on behalf of a contractor)
-  const [jobs,          setJobs]          = useState([])
   const [invModal,      setInvModal]      = useState(false)
-  const [invForm,       setInvForm]       = useState({ user_id: '', job_id: '', estimate_id: '', invoice_number: '', amount: '', file: null })
-  const [invEstimates,  setInvEstimates]  = useState([]) // estimates for invForm's job
+  const [invForm,       setInvForm]       = useState({ user_id: '', estimate_number: '', job_location: '', invoice_number: '', amount: '', file: null })
   const [invSaving,     setInvSaving]     = useState(false)
   const [invError,      setInvError]      = useState('')
   const invFileRef = useRef(null)
@@ -341,20 +338,27 @@ export default function AdminPayroll() {
   }
 
   // ── Contractor invoice status / estimate assignment ───────────────
-  const openStatusModal = async (inv) => {
+  const openStatusModal = (inv) => {
     setStatusModal(inv)
     setStatusValue(inv.status)
     setStatusNote(inv.admin_note ?? '')
-    setStatusEstimate(inv.estimate_id ? String(inv.estimate_id) : '')
+    setStatusEstimateNumber(inv.resolved_estimate_number ?? inv.estimate_number ?? '')
+    setStatusJobLocation(inv.job_name ?? inv.job_location ?? '')
     setStatusInvNum(inv.invoice_number ?? '')
     setStatusAmount(inv.amount != null ? String(parseFloat(inv.amount)) : '')
     setStatusError('')
-    if (inv.estimate_job_id) {
-      const d = await listEstimates({ job_id: inv.estimate_job_id })
-      setStatusEstimates(d.estimates ?? [])
-    } else {
-      setStatusEstimates([])
-    }
+  }
+
+  // Looks up the typed estimate # against existing estimates on blur — if it
+  // matches an existing one, autofills the job/location field (still
+  // editable) so the invoice links up with that project's tracking.
+  const handleEstimateNumberBlur = async (estimateNumber, setJobLocation) => {
+    const trimmed = estimateNumber.trim()
+    if (!trimmed) return
+    try {
+      const d = await listEstimates({ estimate_number: trimmed })
+      if (d.estimate) setJobLocation(d.estimate.job_name)
+    } catch { /* no match, or lookup failed — leave job/location as typed */ }
   }
 
   const handleSaveStatus = async () => {
@@ -364,7 +368,8 @@ export default function AdminPayroll() {
         id: statusModal.id,
         status: statusValue,
         admin_note: statusNote,
-        estimate_id: statusEstimate || null,
+        estimate_number: statusEstimateNumber.trim() || null,
+        job_location: statusJobLocation.trim() || null,
         invoice_number: statusInvNum.trim() || null,
         amount: statusAmount !== '' ? parseFloat(statusAmount) : null,
       })
@@ -376,25 +381,11 @@ export default function AdminPayroll() {
   }
 
   // ── Upload invoice (admin, on behalf of a contractor) ──────────────
-  const openInvoiceModal = async () => {
-    setInvForm({ user_id: '', job_id: '', estimate_id: '', invoice_number: '', amount: '', file: null })
-    setInvEstimates([])
+  const openInvoiceModal = () => {
+    setInvForm({ user_id: '', estimate_number: '', job_location: '', invoice_number: '', amount: '', file: null })
     setInvError('')
     if (invFileRef.current) invFileRef.current.value = ''
-    if (!jobs.length) {
-      try {
-        const d = await listJobs({ status: 'active' })
-        setJobs(d.jobs ?? [])
-      } catch { /* picker just stays empty; job/estimate assignment is optional */ }
-    }
     setInvModal(true)
-  }
-
-  const handleInvoiceJobChange = async (jobId) => {
-    setInvForm((f) => ({ ...f, job_id: jobId, estimate_id: '' }))
-    if (!jobId) { setInvEstimates([]); return }
-    const d = await listEstimates({ job_id: jobId })
-    setInvEstimates(d.estimates ?? [])
   }
 
   const handleUploadInvoice = async () => {
@@ -406,7 +397,8 @@ export default function AdminPayroll() {
       form.append('user_id', invForm.user_id)
       form.append('period_start', p.start)
       form.append('period_end', p.end)
-      if (invForm.estimate_id)          form.append('estimate_id', invForm.estimate_id)
+      if (invForm.estimate_number.trim()) form.append('estimate_number', invForm.estimate_number.trim())
+      if (invForm.job_location.trim())    form.append('job_location', invForm.job_location.trim())
       if (invForm.invoice_number.trim()) form.append('invoice_number', invForm.invoice_number.trim())
       if (invForm.amount)               form.append('amount', invForm.amount)
       form.append('file', invForm.file)
@@ -905,9 +897,13 @@ export default function AdminPayroll() {
                         </a>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600 max-w-[160px] truncate">
-                        {inv.estimate_number
-                          ? <>Est. #{inv.estimate_number}{inv.job_name && <span className="text-gray-400"> — {inv.job_name}</span>}</>
-                          : <span className="text-gray-300">—</span>}
+                        {(() => {
+                          const estNum = inv.resolved_estimate_number ?? inv.estimate_number
+                          const jobRef = inv.job_name ?? inv.job_location
+                          return estNum
+                            ? <>Est. #{estNum}{jobRef && <span className="text-gray-400"> — {jobRef}</span>}</>
+                            : <span className="text-gray-300">—</span>
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600">{inv.invoice_number || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-right text-gray-700">
@@ -1136,33 +1132,13 @@ export default function AdminPayroll() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Job</label>
-              <select
-                value={statusModal?.estimate_job_id ?? ''}
-                onChange={(e) => {
-                  const jobId = e.target.value
-                  setStatusModal((m) => ({ ...m, estimate_job_id: jobId ? Number(jobId) : null }))
-                  setStatusEstimate('')
-                  if (jobId) listEstimates({ job_id: jobId }).then((d) => setStatusEstimates(d.estimates ?? []))
-                  else setStatusEstimates([])
-                }}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
-                <option value="">— None —</option>
-                {jobs.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Estimate</label>
-              <select
-                value={statusEstimate}
-                onChange={(e) => setStatusEstimate(e.target.value)}
-                disabled={!statusEstimates.length}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 disabled:opacity-50 disabled:bg-gray-50">
-                <option value="">— None —</option>
-                {statusEstimates.map((es) => <option key={es.id} value={es.id}>#{es.estimate_number}</option>)}
-              </select>
-            </div>
+            <Input label="Estimate #" value={statusEstimateNumber}
+              onChange={(e) => setStatusEstimateNumber(e.target.value)}
+              onBlur={(e) => handleEstimateNumberBlur(e.target.value, setStatusJobLocation)}
+              placeholder="e.g. 4021" />
+            <Input label="Job / Location" value={statusJobLocation}
+              onChange={(e) => setStatusJobLocation(e.target.value)}
+              placeholder="e.g. Main St. remodel" />
           </div>
 
           <Input label="Invoice Number (if applicable)" value={statusInvNum}
@@ -1198,23 +1174,13 @@ export default function AdminPayroll() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Job (optional)</label>
-              <select value={invForm.job_id} onChange={(e) => handleInvoiceJobChange(e.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
-                <option value="">— None —</option>
-                {jobs.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Estimate</label>
-              <select value={invForm.estimate_id} onChange={(e) => setInvForm((f) => ({ ...f, estimate_id: e.target.value }))}
-                disabled={!invEstimates.length}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 disabled:opacity-50 disabled:bg-gray-50">
-                <option value="">— None —</option>
-                {invEstimates.map((es) => <option key={es.id} value={es.id}>#{es.estimate_number}</option>)}
-              </select>
-            </div>
+            <Input label="Estimate # (optional)" value={invForm.estimate_number}
+              onChange={(e) => setInvForm((f) => ({ ...f, estimate_number: e.target.value }))}
+              onBlur={(e) => handleEstimateNumberBlur(e.target.value, (loc) => setInvForm((f) => ({ ...f, job_location: loc })))}
+              placeholder="e.g. 4021" />
+            <Input label="Job / Location (optional)" value={invForm.job_location}
+              onChange={(e) => setInvForm((f) => ({ ...f, job_location: e.target.value }))}
+              placeholder="e.g. Main St. remodel" />
           </div>
 
           <Input label="Invoice Number (if applicable)" value={invForm.invoice_number}

@@ -475,7 +475,7 @@ export default function AdminJobs() {
                               <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold ${meta.color}`}>{meta.label}</span>
                             </div>
                             <p className="text-xs text-gray-400 mt-0.5">
-                              {inv.estimate_number && <>Est. #{inv.estimate_number} · </>}
+                              {(inv.resolved_estimate_number ?? inv.estimate_number) && <>Est. #{inv.resolved_estimate_number ?? inv.estimate_number} · </>}
                               {inv.invoice_number && <>Inv. #{inv.invoice_number} · </>}
                               {inv.period_start && formatDate(inv.period_start + 'T00:00:00')}
                             </p>
