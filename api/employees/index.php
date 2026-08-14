@@ -77,7 +77,19 @@ if ($method === 'GET') {
         'INSERT INTO users (name, email, phone, role, pay_type, pay_rate, pay_structure, is_active) VALUES (?,?,?,?,?,?,?,1)'
     );
     $stmt->execute([$name, $email, $phone, $role, $payType, $payRate, $payStructure]);
-    echo json_encode(['id' => (int)$pdo->lastInsertId(), 'message' => 'Employee created']);
+    $newId = (int)$pdo->lastInsertId();
+
+    // Starting rate, not a mid-stream change — effective immediately (today),
+    // unlike the "next pay period" default used when an existing employee's
+    // rate is changed later (see api/employees/item.php).
+    if ($payRate !== null && $payRate > 0) {
+        $pdo->prepare(
+            'INSERT INTO salary_history (user_id, pay_rate, pay_structure, effective_date, created_by)
+             VALUES (?, ?, ?, CURDATE(), ?)'
+        )->execute([$newId, $payRate, $payStructure, $auth['user_id']]);
+    }
+
+    echo json_encode(['id' => $newId, 'message' => 'Employee created']);
 
 } else {
     http_response_code(405);

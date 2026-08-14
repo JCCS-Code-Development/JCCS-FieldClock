@@ -47,6 +47,12 @@ if ($method === 'GET') {
     echo json_encode($stmt->fetch());
 
 } elseif ($method === 'PUT') {
+    // Current rate/structure — needed to detect an actual change below, since
+    // the request may only include one of the two fields.
+    $before = $pdo->prepare('SELECT pay_rate, pay_structure FROM users WHERE id = ?');
+    $before->execute([$id]);
+    $beforeRow = $before->fetch();
+
     $allowed = ['name', 'email', 'phone', 'role', 'pay_type', 'pay_rate', 'pay_structure', 'overtime_rate', 'gas_weekly_allowance', 'is_active', 'default_job_id'];
     $sets = []; $params = [];
 
@@ -99,6 +105,31 @@ if ($method === 'GET') {
 
     $params[] = $id;
     $pdo->prepare('UPDATE users SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
+
+    // Auto-log to salary_history when the rate or structure actually changed.
+    // Effective the start of the NEXT Mon–Sun pay period, not the one already
+    // in progress — a change made mid-period shouldn't retroactively apply to
+    // hours already worked this period. (Backdating/future-dating beyond that
+    // default is done manually via POST /salary-history.)
+    $newRate = array_key_exists('pay_rate', $body)
+        ? (($body['pay_rate'] === null || $body['pay_rate'] === '') ? null : (float)$body['pay_rate'])
+        : $beforeRow['pay_rate'];
+    $newStruct = array_key_exists('pay_structure', $body) ? sanitizeString((string)$body['pay_structure']) : $beforeRow['pay_structure'];
+    $rateChanged = $beforeRow
+        && $newRate !== null
+        && (round((float)$newRate, 2) !== round((float)$beforeRow['pay_rate'], 2) || $newStruct !== $beforeRow['pay_structure']);
+
+    if ($rateChanged) {
+        $today = new DateTimeImmutable('today', new DateTimeZone(FIELDCLOCK_TIMEZONE));
+        $dow   = (int)$today->format('N'); // 1 (Mon) .. 7 (Sun)
+        $nextPeriodStart = $today->modify('+' . (8 - $dow) . ' days')->format('Y-m-d');
+
+        $pdo->prepare(
+            'INSERT INTO salary_history (user_id, pay_rate, pay_structure, effective_date, created_by)
+             VALUES (?, ?, ?, ?, ?)'
+        )->execute([$id, $newRate, $newStruct, $nextPeriodStart, $auth['user_id']]);
+    }
+
     echo json_encode(['message' => 'Updated']);
 
 } elseif ($method === 'DELETE') {
