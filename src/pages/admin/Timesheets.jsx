@@ -418,7 +418,11 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-mono text-gray-700">
                       {formatTime(entry.start_time)}{' → '}
-                      {entry.end_time ? formatTime(entry.end_time) : <span className="text-orange-500 not-font-mono">Active</span>}
+                      {entry.end_time
+                        ? formatTime(entry.end_time)
+                        : isDayEnd
+                          ? <span className="text-gray-400 not-font-mono">Day ended</span>
+                          : <span className="text-orange-500 not-font-mono">Active</span>}
                     </p>
                     {(loc || comment) && (
                       <p className="text-xs text-gray-400 truncate mt-0.5">{loc || comment}</p>
@@ -487,7 +491,9 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                       <td className="px-4 py-2.5 text-xs whitespace-nowrap">
                         {entry.end_time
                           ? <span className="text-gray-700 font-mono">{formatTime(entry.end_time)}</span>
-                          : <span className="text-orange-500 font-medium">Active</span>}
+                          : isDayEnd
+                            ? <span className="text-gray-400 font-medium">Day ended</span>
+                            : <span className="text-orange-500 font-medium">Active</span>}
                       </td>
                       <td className="px-4 py-2.5 text-xs font-semibold text-gray-700 whitespace-nowrap">{isDayEnd ? '—' : fmtDur(mins)}</td>
                       <td className="px-4 py-2.5 text-xs text-gray-400 max-w-[180px] truncate" title={comment}>
@@ -801,24 +807,24 @@ export default function AdminTimesheets() {
                 )}
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
+                <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Hours</p>
                   {isSalary
                     ? <p className="text-xs font-semibold text-brand-500 mt-1.5">Fixed</p>
                     : <p className="text-lg font-bold text-gray-900">{(periodMins / 60).toFixed(1)}h</p>
                   }
                 </div>
-                <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
+                <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Rate</p>
                   <p className="text-base font-bold text-gray-900 leading-tight">${selectedEmp.pay_rate ?? 0}</p>
                   <p className="text-[10px] text-gray-400">{isSalary ? 'per week' : 'per hour'}</p>
                 </div>
-                <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
+                <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">{isSalary ? 'Weekly Pay' : 'Gross Est.'}</p>
                   <p className="text-lg font-bold text-green-600">${grossEst}</p>
                 </div>
                 {totalWeekMiles > 0 && (
-                  <div className="bg-sky-50 rounded-xl px-3 py-2.5 text-center">
+                  <div className="bg-sky-50 rounded-xl px-3 py-2.5 flex flex-col items-center justify-center text-center">
                     <p className="text-[10px] text-sky-500 uppercase tracking-wide font-semibold mb-0.5">Miles</p>
                     <p className="text-lg font-bold text-sky-600">{totalWeekMiles.toFixed(1)} mi</p>
                   </div>
@@ -827,8 +833,8 @@ export default function AdminTimesheets() {
             </div>
 
             {/* Week navigator + tabs */}
-            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
-              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl overflow-hidden self-start">
+            <div className="flex flex-col items-center gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl overflow-hidden sm:self-start">
                 <button onClick={() => setWeekOffset(w => w - 1)}
                   className="px-3 py-2 text-gray-500 hover:bg-gray-50 transition-colors text-sm font-medium">‹</button>
                 <span className="px-3 py-2 text-sm font-semibold text-gray-900 min-w-[120px] text-center border-x border-gray-200">
@@ -840,20 +846,20 @@ export default function AdminTimesheets() {
               </div>
               <span className="text-xs text-gray-400">{dateFrom} – {dateTo}</span>
               <div className="sm:flex-1" />
-              <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+              <div className="grid grid-cols-3 w-full gap-1 bg-gray-100 rounded-xl p-1 sm:flex sm:w-auto sm:overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
                 <button onClick={() => setTab('log')}
-                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors ${tab === 'log' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors flex items-center justify-center gap-1.5 ${tab === 'log' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                   Time Log
                 </button>
                 <button onClick={() => setTab('changes')}
-                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${tab === 'changes' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors flex items-center justify-center gap-1.5 ${tab === 'changes' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                   Changes
                   {pendingCount > 0 && (
                     <span className="bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">{pendingCount}</span>
                   )}
                 </button>
                 <button onClick={() => setTab('timeoff')}
-                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${tab === 'timeoff' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors flex items-center justify-center gap-1.5 ${tab === 'timeoff' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                   Time Off
                   {timeOffReqs.filter(r => r.status === 'pending').length > 0 && (
                     <span className="bg-amber-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
