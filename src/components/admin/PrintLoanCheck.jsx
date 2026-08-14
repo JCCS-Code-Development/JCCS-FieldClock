@@ -4,54 +4,59 @@ import { formatCurrency } from '../../utils/format'
 import { format } from 'date-fns'
 import { amountToWords, CHECK_CON, SEC, CutLine, ES, esH, esC, SectionOverlays, printStylesheet } from './checkPrintKit'
 
-const TYPE_LABELS = { supplier: 'Supplier', provider: 'Provider' }
-
-// ── Vendor/provider pay stub — same table/typography as every other check
-// type in the app, with the fields this one needs: vendor/provider name +
-// type + address, the memo/purpose it's for, and the period label if one
-// was given ──────────────────────────────────────────────────────────────
-function VendorEarningsStatement({ ck, checkDate }) {
-  const amount = parseFloat(ck.amount)
+// ── Loan disbursement pay stub — same table/typography as every other check
+// type in the app. This is the check that hands the employee the loan
+// principal, not a deduction/repayment record ──────────────────────────
+function LoanEarningsStatement({ loan, checkDate }) {
+  const amount = parseFloat(loan.amount)
 
   return (
     <div style={{ fontFamily: ES.font, display: 'flex', flexDirection: 'column', gap: '5pt', height: '100%', justifyContent: 'center' }}>
 
-      {/* Vendor / provider info table */}
+      {/* Employee info table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
         <thead>
           <tr>
-            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>Vendor</th>
-            <th style={{ ...esH({ width: '16%' }) }}>Type</th>
+            <th style={{ ...esH({ textAlign: 'left', width: '54%' }) }}>Employee</th>
             <th style={{ ...esH({ width: '16%' }) }}>Pay Date</th>
-            <th style={{ ...esH({ width: '30%' }) }}>Period</th>
+            <th style={{ ...esH({ width: '30%' }) }}>Loan Issued</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td style={{ ...esC({ textAlign: 'left', verticalAlign: 'top', padding: '5pt 6pt' }) }}>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: '9pt', color: ES.accent }}>{ck.vendor_name}</p>
-              <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>{ck.vendor_address || 'Vendor'}</p>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: '9pt', color: ES.accent }}>{loan.user_name}</p>
+              <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>{loan.user_address || 'Employee'}</p>
             </td>
-            <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{TYPE_LABELS[ck.vendor_type] ?? ck.vendor_type}</td>
             <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{checkDate}</td>
-            <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{ck.period_label || '—'}</td>
+            <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{format(new Date(loan.created_at), 'MM/dd/yy')}</td>
           </tr>
         </tbody>
       </table>
 
-      {/* Memo + amount table */}
+      {/* Purpose + amount table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
         <thead>
           <tr>
-            <th style={{ ...esH({ textAlign: 'left', paddingLeft: '6pt', width: '70%' }) }}>Memo / Purpose</th>
+            <th style={{ ...esH({ textAlign: 'left', paddingLeft: '6pt', width: '70%' }) }}>Loan Disbursement</th>
             <th style={{ ...esH({ textAlign: 'right', paddingRight: '6pt', width: '30%' }) }}>Amount</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt', fontWeight: 500 }) }}>{ck.memo || '—'}</td>
+            <td style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt', fontWeight: 500 }) }}>{loan.description || 'Employee loan'}</td>
             <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 600 }) }}>{formatCurrency(amount)}</td>
           </tr>
+          {loan.weekly_deduction && (
+            <tr style={{ background: '#fdf9ee' }}>
+              <td style={{ ...esC({ paddingLeft: '6pt', color: '#666', fontSize: '7.5pt' }) }}>
+                Repaid at {formatCurrency(loan.weekly_deduction)}/wk starting {(() => {
+                  try { return format(new Date(loan.deduction_start_date + 'T12:00'), 'MM/dd/yy') } catch { return loan.deduction_start_date }
+                })()}
+              </td>
+              <td style={esC()}>&nbsp;</td>
+            </tr>
+          )}
         </tbody>
         <tfoot>
           <tr style={{ background: ES.footerBg, borderTop: `1pt solid ${ES.border}` }}>
@@ -64,10 +69,10 @@ function VendorEarningsStatement({ ck, checkDate }) {
   )
 }
 
-// ── Vendor check page — same CHECK_CON positions/SEC breakpoints/CutLine/
+// ── Loan check page — same CHECK_CON positions/SEC breakpoints/CutLine/
 // section-overlay treatment as every other printed check in the app ──────
-function VendorCheckPage({ ck, today }) {
-  const amount = parseFloat(ck.amount)
+function LoanCheckPage({ loan, today }) {
+  const amount = parseFloat(loan.amount)
 
   return (
     <div className="check-page" style={{
@@ -75,9 +80,9 @@ function VendorCheckPage({ ck, today }) {
       background: '#fff', boxShadow: '0 6px 32px rgba(0,0,0,0.18)',
       flexShrink: 0,
     }}>
-      <SectionOverlays middleLabel="Vendor Copy" bottomLabel="Company Copy" />
+      <SectionOverlays middleLabel="Employee Copy" bottomLabel="Company Copy" />
 
-      <CutLine topIn={SEC.check}   label="Detach — Vendor Copy" />
+      <CutLine topIn={SEC.check}   label="Detach — Employee Copy" />
       <CutLine topIn={SEC.stub}    label="Detach — Company Copy" />
       <CutLine topIn={SEC.barcode} label="Trim" />
 
@@ -96,7 +101,7 @@ function VendorCheckPage({ ck, today }) {
         position: 'absolute', top: CHECK_CON.payTo.top, left: CHECK_CON.payTo.left, width: CHECK_CON.payTo.w,
         fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif',
         fontWeight: 600, color: '#000', overflow: 'hidden', whiteSpace: 'nowrap',
-      }}>{ck.vendor_name}</div>
+      }}>{loan.user_name}</div>
 
       <div style={{
         position: 'absolute', top: CHECK_CON.words.top, left: CHECK_CON.words.left, width: CHECK_CON.words.w,
@@ -104,23 +109,23 @@ function VendorCheckPage({ ck, today }) {
         overflow: 'hidden', whiteSpace: 'nowrap',
       }}>{amountToWords(amount)}</div>
 
-      {/* Memo — vendor name, envelope-window line 1 */}
+      {/* Memo — employee name, envelope-window line 1 */}
       <div style={{
         position: 'absolute', top: CHECK_CON.memo.top, left: CHECK_CON.memo.left, width: CHECK_CON.memo.w,
         fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
         overflow: 'hidden', whiteSpace: 'nowrap',
-      }}>{ck.vendor_name}</div>
+      }}>{loan.user_name}</div>
 
       {/* Address — envelope-window line 2 */}
-      {ck.vendor_address && (
+      {loan.user_address && (
         <div style={{
           position: 'absolute', top: CHECK_CON.address.top, left: CHECK_CON.address.left, width: CHECK_CON.address.w,
           fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
           overflow: 'hidden', whiteSpace: 'nowrap',
-        }}>{ck.vendor_address}</div>
+        }}>{loan.user_address}</div>
       )}
 
-      {/* ══ VENDOR COPY (section 2 — middle) ══ */}
+      {/* ══ EMPLOYEE COPY (section 2 — middle) ══ */}
       <div style={{
         position: 'absolute',
         top: `${SEC.check + 0.35}in`,
@@ -128,7 +133,7 @@ function VendorCheckPage({ ck, today }) {
         left: '0.75in', right: '0.75in',
         overflow: 'hidden',
       }}>
-        <VendorEarningsStatement ck={ck} checkDate={today} />
+        <LoanEarningsStatement loan={loan} checkDate={today} />
       </div>
 
       {/* ══ COMPANY COPY (section 3 — bottom) ══ */}
@@ -139,42 +144,31 @@ function VendorCheckPage({ ck, today }) {
         left: '0.75in', right: '0.75in',
         overflow: 'hidden',
       }}>
-        <VendorEarningsStatement ck={ck} checkDate={today} />
+        <LoanEarningsStatement loan={loan} checkDate={today} />
       </div>
     </div>
   )
 }
 
-export default function PrintVendorCheck({ checks, onClose }) {
+export default function PrintLoanCheck({ loan, onClose }) {
   useEffect(() => {
     const style = document.createElement('style')
-    style.id = 'print-vendor-css'
-    style.textContent = printStylesheet('print-vendor-root')
+    style.id = 'print-loan-css'
+    style.textContent = printStylesheet('print-loan-root')
     document.head.appendChild(style)
-    return () => document.getElementById('print-vendor-css')?.remove()
+    return () => document.getElementById('print-loan-css')?.remove()
   }, [])
 
-  // Default check date to the Friday of the following week, same rule used
-  // everywhere else — pulled from the first check's own date if it has one.
-  const defaultFriday = (() => {
-    try {
-      const first = checks[0]?.check_date
-      const base = new Date((first ?? format(new Date(), 'yyyy-MM-dd')) + 'T12:00')
-      const dow = base.getDay()
-      return dow === 5 ? base : new Date(base.getTime() + ((5 - dow + 7) % 7 || 7) * 86400000)
-    } catch { return new Date() }
-  })()
-  const [checkDateISO, setCheckDateISO] = useState(format(defaultFriday, 'yyyy-MM-dd'))
+  const [checkDateISO, setCheckDateISO] = useState(format(new Date(), 'yyyy-MM-dd'))
   const today = (() => { try { return format(new Date(checkDateISO + 'T12:00'), 'MM/dd/yyyy') } catch { return checkDateISO } })()
 
-  const missingAmount = checks.some(ck => !ck.amount || parseFloat(ck.amount) <= 0)
+  const missingAmount = !loan.amount || parseFloat(loan.amount) <= 0
 
-  // Portal directly to <body> — the print stylesheet hides everything via
-  // `body > *:not(#print-vendor-root)`, which only works if this root is
-  // actually a direct child of body rather than nested wherever Vendors.jsx
-  // happens to render it (same reason every other check print portals).
+  // Portal directly to <body> — see PrintContractorCheck for why this has to
+  // be an actual direct child of body for the print stylesheet's hide-rule
+  // to work.
   return createPortal(
-    <div id="print-vendor-root"
+    <div id="print-loan-root"
       style={{ position: 'fixed', inset: 0, background: '#d1d5db', zIndex: 9999, overflowY: 'auto' }}>
 
       {/* ── Toolbar ─────────────────────────────────────────────── */}
@@ -185,10 +179,8 @@ export default function PrintVendorCheck({ checks, onClose }) {
         padding: '12px 24px', gap: 16, flexWrap: 'wrap',
       }}>
         <div>
-          <p style={{ fontWeight: 600, fontSize: '14px', margin: 0 }}>Print Vendor Checks</p>
-          <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0' }}>
-            {checks.length} check{checks.length !== 1 ? 's' : ''}&ensp;·&ensp;Load check stock before printing
-          </p>
+          <p style={{ fontWeight: 600, fontSize: '14px', margin: 0 }}>Print Loan Check — {loan.user_name}</p>
+          <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0' }}>Load check stock before printing</p>
         </div>
 
         {/* Editable check date */}
@@ -215,14 +207,12 @@ export default function PrintVendorCheck({ checks, onClose }) {
           }}>
             ← Back
           </button>
-          <button onClick={() => window.print()} disabled={checks.length === 0} style={{
+          <button onClick={() => window.print()} style={{
             padding: '8px 20px', borderRadius: 8,
-            background: checks.length === 0 ? '#374151' : '#6366f1',
-            color: checks.length === 0 ? '#6b7280' : '#fff',
-            border: 'none', cursor: checks.length === 0 ? 'not-allowed' : 'pointer',
-            fontWeight: 600, fontSize: 13,
+            background: '#6366f1', color: '#fff',
+            border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13,
           }}>
-            Print All ({checks.length})
+            Print Check
           </button>
         </div>
       </div>
@@ -230,22 +220,19 @@ export default function PrintVendorCheck({ checks, onClose }) {
       {/* ── Instruction bar ─────────────────────────────────────── */}
       {missingAmount && (
         <div className="no-print" style={{ background: '#fee2e2', borderBottom: '1px solid #fecaca', padding: '7px 24px', fontSize: '11.5px', color: '#991b1b' }}>
-          One or more selected checks has no amount set — add it before printing, or the check will show $0.00.
+          This loan has no amount set — the check will show $0.00.
         </div>
       )}
       <div className="no-print" style={{
         background: '#fef3c7', borderBottom: '1px solid #fde68a',
         padding: '7px 24px', fontSize: '11.5px', color: '#92400e',
       }}>
-        <strong>Sections:</strong> Check stock (top) · Vendor copy (middle) · Company copy (bottom)
+        <strong>Sections:</strong> Check stock (top) · Employee copy (middle) · Company copy (bottom)
       </div>
 
-      {/* ── Check pages ──────────────────────────────────────────── */}
+      {/* ── Check page ───────────────────────────────────────────── */}
       <div style={{ padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 44, alignItems: 'center' }}>
-        {checks.length === 0 && (
-          <p style={{ color: '#6b7280', padding: '80px 0', fontSize: 14 }}>No checks selected.</p>
-        )}
-        {checks.map(ck => <VendorCheckPage key={ck.id} ck={ck} today={today} />)}
+        <LoanCheckPage loan={loan} today={today} />
       </div>
     </div>,
     document.body
