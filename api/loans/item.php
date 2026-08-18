@@ -13,7 +13,7 @@ $pdo  = getPDO();
 
 function fetchLoan(PDO $pdo, int $id): array|false {
     $stmt = $pdo->prepare(
-        'SELECT l.id, l.user_id, u.name AS user_name, u.address AS user_address,
+        'SELECT l.id, l.user_id, u.name AS user_name, u.address AS user_address, u.pay_type,
                 l.amount, l.weekly_deduction, l.deduction_start_date, l.check_printed_at,
                 l.description, l.status, l.created_at,
                 COALESCE(SUM(lp.amount), 0) AS paid_total,
