@@ -15,21 +15,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         : $auth['user_id'];
 
     if ($auth['role'] === 'admin' && !isset($_GET['user_id'])) {
-        // Return all employees with their agreement statuses for HR overview
+        // Return every employee/admin (active or not — a termination doesn't
+        // erase their signing history) with their agreement statuses for the
+        // HR overview. Contractors are excluded: they've never had an app
+        // login and have no path to sign any of these forms, so listing them
+        // would just be a wall of permanently-pending rows.
         $users = $pdo->query(
-            "SELECT u.id, u.name, u.pay_type, u.pay_structure,
+            "SELECT u.id, u.name, u.pay_type, u.pay_structure, u.is_active,
                     ea.agreement_type, ea.signed_at
              FROM users u
              LEFT JOIN employee_agreements ea ON ea.user_id = u.id
-             WHERE u.is_active = 1 AND u.role != 'contractor'
-             ORDER BY u.name, ea.agreement_type"
+             WHERE u.role != 'contractor'
+             ORDER BY u.is_active DESC, u.name, ea.agreement_type"
         )->fetchAll();
 
         $byUser = [];
         foreach ($users as $row) {
             $uid = $row['id'];
             if (!isset($byUser[$uid])) {
-                $byUser[$uid] = ['user_id' => $uid, 'name' => $row['name'], 'pay_type' => $row['pay_type'], 'agreements' => []];
+                $byUser[$uid] = [
+                    'user_id'   => $uid,
+                    'name'      => $row['name'],
+                    'pay_type'  => $row['pay_type'],
+                    'is_active' => (bool)$row['is_active'],
+                    'agreements' => [],
+                ];
             }
             if ($row['agreement_type']) {
                 $byUser[$uid]['agreements'][$row['agreement_type']] = $row['signed_at'] ?? null;
