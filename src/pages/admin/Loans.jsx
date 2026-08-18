@@ -28,11 +28,12 @@ function nextPayPeriodStart() {
   return format(addDays(today, 8 - dow), 'yyyy-MM-dd')
 }
 
-const PAYMENT_METHOD_LABELS = { cash: 'Cash', check: 'Check', transfer: 'Transfer' }
+const PAYMENT_METHOD_LABELS = { cash: 'Cash', check: 'Check', transfer: 'Transfer', payroll_deduction: 'Payroll Deduction' }
 const PAYMENT_METHOD_COLORS = {
-  cash:     'bg-gray-100 text-gray-600',
-  check:    'bg-blue-100 text-blue-700',
-  transfer: 'bg-purple-100 text-purple-700',
+  cash:              'bg-gray-100 text-gray-600',
+  check:             'bg-blue-100 text-blue-700',
+  transfer:          'bg-purple-100 text-purple-700',
+  payroll_deduction: 'bg-green-100 text-green-700',
 }
 
 // Projected payoff, assuming the full weekly_deduction is actually deducted
@@ -192,12 +193,22 @@ export default function AdminLoans() {
   }
 
   // ── Record payment ───────────────────────────────────────────────
+  // W-2 base pay runs through ADP, outside this app — there's no check to
+  // deduct from, so a loan payment has to be a real cash/check/transfer
+  // event, and needs proof. 1099 checks are calculated and printed here, so
+  // their loan repayment is withheld directly from the check's net pay (see
+  // Payroll.jsx's use of getPeriodLoanTotals) — recording it is bookkeeping
+  // for an amount that's already been deducted, not a separate payment to
+  // document.
+  const isW2Loan = (loan) => loan?.pay_type === 'w2'
+
   const openPayModal = (loan) => {
     setPayModal(loan)
     // Defaults to 0, not the remaining balance — the exact amount deducted
     // each paycheck is still entered manually per period.
     setPayAmount('0.00')
-    setPayPeriod(0); setPayMethod('transfer'); setPayRef(''); setPayReceipt(null); setPayNotes(''); setPayError('')
+    setPayPeriod(0); setPayMethod(isW2Loan(loan) ? 'transfer' : 'payroll_deduction')
+    setPayRef(''); setPayReceipt(null); setPayNotes(''); setPayError('')
     if (receiptInputRef.current) receiptInputRef.current.value = ''
   }
 
@@ -624,57 +635,65 @@ export default function AdminLoans() {
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Payment Method</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { value: 'cash',     label: 'Cash' },
-                { value: 'check',    label: 'Check' },
-                { value: 'transfer', label: 'Transfer' },
-              ].map((opt) => (
-                <button key={opt.value} type="button"
-                  onClick={() => setPayMethod(opt.value)}
-                  className={`px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-colors ${
-                    payMethod === opt.value
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {(payMethod === 'check' || payMethod === 'transfer') && (
+          {isW2Loan(payModal) ? (
             <>
               <div>
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
-                  {payMethod === 'check' ? 'Check Number' : 'Transfer / Confirmation Number'} (if applicable)
-                </label>
-                <input
-                  type="text"
-                  value={payRef}
-                  onChange={(e) => setPayRef(e.target.value)}
-                  placeholder={payMethod === 'check' ? 'e.g. 1042' : 'e.g. Zelle confirmation ID'}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
-                />
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Payment Method</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'cash',     label: 'Cash' },
+                    { value: 'check',    label: 'Check' },
+                    { value: 'transfer', label: 'Transfer' },
+                  ].map((opt) => (
+                    <button key={opt.value} type="button"
+                      onClick={() => setPayMethod(opt.value)}
+                      className={`px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-colors ${
+                        payMethod === opt.value
+                          ? 'border-brand-500 bg-brand-50 text-brand-700'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
-                  Receipt Image <span className="text-red-500">*</span>
-                </label>
-                <input
-                  ref={receiptInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,application/pdf"
-                  onChange={(e) => setPayReceipt(e.target.files?.[0] ?? null)}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:text-xs file:font-semibold"
-                />
-                <p className="text-xs text-gray-400 mt-1">Photo or screenshot of the {payMethod === 'check' ? 'check' : 'transfer'} confirmation.</p>
-              </div>
+              {(payMethod === 'check' || payMethod === 'transfer') && (
+                <>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+                      {payMethod === 'check' ? 'Check Number' : 'Transfer / Confirmation Number'} (if applicable)
+                    </label>
+                    <input
+                      type="text"
+                      value={payRef}
+                      onChange={(e) => setPayRef(e.target.value)}
+                      placeholder={payMethod === 'check' ? 'e.g. 1042' : 'e.g. Zelle confirmation ID'}
+                      className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+                      Receipt Image <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      ref={receiptInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      onChange={(e) => setPayReceipt(e.target.files?.[0] ?? null)}
+                      className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:text-xs file:font-semibold"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Photo or screenshot of the {payMethod === 'check' ? 'check' : 'transfer'} confirmation.</p>
+                  </div>
+                </>
+              )}
             </>
+          ) : (
+            <p className="text-xs text-gray-500 bg-gray-50 rounded-xl px-3 py-2.5">
+              Deducted directly from their next 1099 check — no separate payment method or receipt needed.
+            </p>
           )}
 
           <div>

@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
-    $sql = 'SELECT l.id, l.user_id, u.name AS user_name, u.address AS user_address,
+    $sql = 'SELECT l.id, l.user_id, u.name AS user_name, u.address AS user_address, u.pay_type,
                    l.amount, l.weekly_deduction, l.deduction_start_date, l.check_printed_at,
                    l.description, l.status, l.created_at,
                    COALESCE(SUM(lp.amount), 0) AS paid_total,
@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $id  = (int)$pdo->lastInsertId();
     $row = $pdo->prepare(
-        'SELECT l.*, u.name AS user_name,
+        'SELECT l.*, u.name AS user_name, u.pay_type,
                 0 AS paid_total, l.amount AS remaining
          FROM employee_loans l JOIN users u ON u.id = l.user_id WHERE l.id = ?'
     );

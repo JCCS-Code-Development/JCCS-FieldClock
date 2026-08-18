@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         http_response_code(422);
         exit(json_encode(['error' => 'Amount must be greater than zero']));
     }
-    if (!in_array($method, ['cash', 'check', 'transfer'], true)) {
+    if (!in_array($method, ['cash', 'check', 'transfer', 'payroll_deduction'], true)) {
         http_response_code(422);
         exit(json_encode(['error' => 'Invalid payment method']));
     }

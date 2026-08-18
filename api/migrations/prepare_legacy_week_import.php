@@ -6,14 +6,24 @@
 //   php api/migrations/prepare_legacy_week_import.php \
 //     --input="$HOME/Downloads/time_logs.csv" \
 //     --map="$HOME/Downloads/employee_crosscheck.csv" \
-//     --start=2026-07-27 --end=2026-08-02
+//     --start=2026-07-27 --end=2026-08-02 \
+//     --exclude="Julianna Camila Calle,Juliana Restrepo"
+//
+// --exclude: comma-separated FieldClock employee names (must match
+// fieldclock_name in the crosscheck map exactly) to leave out of this
+// week's import entirely — for anyone who's already started clocking in
+// via the real FieldClock app, where importing their old-app hours too
+// would double-count. The generated SQL's overlap safety check (SIGNAL
+// 'Import stopped: existing FieldClock time overlaps this legacy week')
+// is what surfaces these; re-run with --exclude once you've identified
+// who via the diagnostic query in the error-handling notes.
 
 if (php_sapi_name() !== 'cli') {
     http_response_code(403);
     exit('This script must be run from the command line.');
 }
 
-$options = getopt('', ['input:', 'map:', 'start:', 'end:', 'output-dir::', 'max-hours::', 'no-gps']);
+$options = getopt('', ['input:', 'map:', 'start:', 'end:', 'output-dir::', 'max-hours::', 'no-gps', 'exclude::']);
 $home = getenv('HOME') ?: dirname(__DIR__, 3);
 $inputPath = $options['input'] ?? ($home . '/Downloads/time_logs.csv');
 $mapPath = $options['map'] ?? ($home . '/Downloads/employee_crosscheck.csv');
@@ -22,6 +32,7 @@ $startDate = $options['start'] ?? null;
 $endDate = $options['end'] ?? null;
 $maxHours = isset($options['max-hours']) ? (float)$options['max-hours'] : 24.0;
 $noGps = array_key_exists('no-gps', $options);
+$excludeNames = array_filter(array_map('trim', explode(',', $options['exclude'] ?? '')));
 
 if (!$startDate || !$endDate) {
     fwrite(STDERR, "--start=YYYY-MM-DD and --end=YYYY-MM-DD are required.\n");
@@ -211,6 +222,14 @@ try {
                 $exceptions[] = [
                     $legacyUserId, $legacyNames[$legacyUserId] ?? '', '', $in['id'], $log['id'],
                     $in['event_time'], $log['event_time'], 'NO CONFIRMED FIELDCLOCK EMPLOYEE',
+                ];
+                continue;
+            }
+
+            if (in_array($targetName, $excludeNames, true)) {
+                $exceptions[] = [
+                    $legacyUserId, $legacyNames[$legacyUserId] ?? '', $targetName, $in['id'], $log['id'],
+                    $in['event_time'], $log['event_time'], 'EXCLUDED BY REQUEST — already has real FieldClock activity this week',
                 ];
                 continue;
             }
@@ -538,6 +557,9 @@ try {
     $longCount = count(array_filter($staged, fn(array $s): bool => $s['warning'] !== ''));
     echo "Prepared week $startDate through $endDate\n";
     echo 'GPS data: ' . ($noGps ? 'excluded (NULL in review + SQL)' : 'included') . "\n";
+    if ($excludeNames) {
+        echo 'Excluded from this run (already have real FieldClock activity): ' . implode(', ', $excludeNames) . "\n";
+    }
     echo 'Importable shifts: ' . count($staged) . "\n";
     echo 'FieldClock rounded hours: ' . number_format($totalMinutes / 60, 2) . "\n";
     echo "Long overnight shifts retained for review: $longCount\n";
