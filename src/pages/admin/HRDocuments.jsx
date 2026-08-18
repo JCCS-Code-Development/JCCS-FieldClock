@@ -4,6 +4,7 @@ import PageHeader from '../../components/admin/PageHeader'
 import Spinner from '../../components/ui/Spinner'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
+import Badge from '../../components/ui/Badge'
 import { listAgreements, getAgreement, resetAgreement } from '../../api/agreements'
 
 const ALL_TYPES = [
@@ -78,7 +79,7 @@ export default function HRDocuments() {
     <div className="w-full">
       <PageHeader
         title="HR Compliance"
-        subtitle="Track employee agreement and document signing status"
+        subtitle="Track agreement and document signing status for every employee, past and present"
       />
 
       {loading ? (
@@ -99,9 +100,12 @@ export default function HRDocuments() {
               {employees.map((emp) => {
                 const { done, total } = complianceCount(emp)
                 return (
-                  <tr key={emp.user_id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={emp.user_id} className={`border-b border-gray-100 hover:bg-gray-50 ${emp.is_active ? '' : 'opacity-60'}`}>
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-gray-900">{emp.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-gray-900">{emp.name}</p>
+                        {!emp.is_active && <Badge variant="rejected">Inactive</Badge>}
+                      </div>
                       <p className="text-xs text-gray-400">{emp.pay_type?.toUpperCase()}</p>
                     </td>
                     <td className="px-3 py-3">
@@ -141,7 +145,7 @@ export default function HRDocuments() {
               {employees.length === 0 && (
                 <tr>
                   <td colSpan={ALL_TYPES.length + 2} className="text-center text-gray-400 py-12">
-                    No active employees found.
+                    No employees found.
                   </td>
                 </tr>
               )}
