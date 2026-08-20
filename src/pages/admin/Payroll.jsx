@@ -187,7 +187,13 @@ export default function AdminPayroll() {
 
   useEffect(() => {
     loadPaychecks()
-    listEmployees({ role: 'employee', active: 1 }).then((d) => setEmployees(d.employees ?? [])).catch(() => {})
+    // /employees/index.php has no server-side role filter, so this holds
+    // every active user (admins, employees, and contractors) — callers
+    // filter by role themselves at each picker's render site, since
+    // different pickers here need different subsets (e.g. the contractor
+    // invoice picker further down needs contractors; the paycheck/flat-rate
+    // pickers don't).
+    listEmployees({ active: 1 }).then((d) => setEmployees(d.employees ?? [])).catch(() => {})
   }, [])
 
   const handleCreatePaycheck = async (e) => {
@@ -1338,7 +1344,7 @@ export default function AdminPayroll() {
             <select value={pcForm.user_id} onChange={(e) => setPcForm((f) => ({ ...f, user_id: e.target.value }))}
               className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
               <option value="">— Select employee —</option>
-              {employees.map((e) => <option key={e.id} value={e.id}>{e.name} ({e.pay_type?.toUpperCase()})</option>)}
+              {employees.filter((e) => e.role !== 'contractor').map((e) => <option key={e.id} value={e.id}>{e.name} ({e.pay_type?.toUpperCase()})</option>)}
             </select>
           </div>
           <div>
