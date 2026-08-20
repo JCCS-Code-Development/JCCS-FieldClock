@@ -468,6 +468,12 @@ export default function AdminPayroll() {
     else bonusByUser[uid] = (bonusByUser[uid] ?? 0) + parseFloat(a.amount ?? 0)
   })
 
+  // ADP report — hourly W-2 employees only (salaried W-2 don't have
+  // meaningful regular/OT hours to hand off, and ADP already has their
+  // fixed salary on file). Plain decimal hours, not the "Xh Ym" display
+  // used elsewhere on this page — ADP needs a real number.
+  const adpRows = summary.filter((e) => e.pay_type === 'w2' && e.pay_structure === 'hourly')
+
   // W-2 employees with gas/bonus appear in the 1099 tab as additional check entries
   const w2ExtraRows = tab === '1099'
     ? summary
@@ -718,6 +724,54 @@ export default function AdminPayroll() {
                 </table>
               </div>
 
+            </div>
+          )}
+
+          {/* ADP Report — hourly W-2 employees, decimal hours */}
+          {tab === 'w2' && (
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mt-4">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-900">ADP Report</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Hourly W-2 employees · {p.label} · decimal hours</p>
+              </div>
+              {loading ? (
+                <div className="flex justify-center py-10"><Spinner /></div>
+              ) : adpRows.length === 0 ? (
+                <p className="text-center py-12 text-sm text-gray-400">No hourly W-2 employees this period.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        <th className="text-left px-5 py-3">Employee</th>
+                        <th className="text-right px-4 py-3">Regular Hours</th>
+                        <th className="text-right px-4 py-3">OT Hours</th>
+                        <th className="text-right px-5 py-3">Total Hours</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adpRows.map((emp) => (
+                        <tr key={emp.user_id} className="border-b border-gray-50">
+                          <td className="px-5 py-3 font-medium text-gray-900">{emp.name}</td>
+                          <td className="px-4 py-3 text-right text-gray-700">{(emp.regular_hours ?? 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-gray-700">{(emp.overtime_hours ?? 0).toFixed(2)}</td>
+                          <td className="px-5 py-3 text-right font-semibold text-gray-900">
+                            {((emp.regular_hours ?? 0) + (emp.overtime_hours ?? 0)).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-gray-50 font-semibold text-sm">
+                        <td className="px-5 py-3 text-gray-700">Totals</td>
+                        <td className="px-4 py-3 text-right">{adpRows.reduce((s, e) => s + (e.regular_hours ?? 0), 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right">{adpRows.reduce((s, e) => s + (e.overtime_hours ?? 0), 0).toFixed(2)}</td>
+                        <td className="px-5 py-3 text-right text-brand-500">
+                          {adpRows.reduce((s, e) => s + (e.regular_hours ?? 0) + (e.overtime_hours ?? 0), 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
