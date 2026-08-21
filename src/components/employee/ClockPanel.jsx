@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -159,6 +159,25 @@ export default function ClockPanel({ showHeader = true }) {
 
   const [loading, setLoading]               = useState(false)
   const [activityOpen, setActivityOpen]     = useState(false)
+  const rootRef         = useRef(null)
+  const activityCardRef = useRef(null)
+
+  // Expanding "Today's Activity" scrolls it comfortably into view; collapsing
+  // it scrolls back up to the main clock view instead of leaving the user
+  // stranded mid-page next to a now-empty card.
+  const toggleActivity = () => {
+    setActivityOpen((wasOpen) => {
+      const next = !wasOpen
+      requestAnimationFrame(() => {
+        if (next) {
+          activityCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        } else {
+          rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      })
+      return next
+    })
+  }
   const [jobs, setJobs]                     = useState([])
   const [selectedJobId, setSelectedJobId]   = useState('')
   const [locationLabel, setLocationLabel]   = useState(null)
@@ -412,7 +431,7 @@ export default function ClockPanel({ showHeader = true }) {
   const selectedJobObj = jobs.find((j) => String(j.id) === String(selectedJobId))
 
   return (
-    <div className="flex flex-col gap-3.5 lg:grid lg:grid-cols-2 lg:gap-6 w-full">
+    <div ref={rootRef} className="flex flex-col gap-3.5 lg:grid lg:grid-cols-2 lg:gap-6 w-full scroll-mt-4">
 
       {/* ── CLOCK SECTION — full width on mobile, left col on desktop ── */}
       <div className="flex flex-col items-center gap-4 lg:gap-8 lg:py-2">
@@ -609,8 +628,8 @@ export default function ClockPanel({ showHeader = true }) {
           const visible = todayEntries.filter((e) => e.cost_category !== 'day_end')
           const lastEntry = visible[visible.length - 1] ?? null
           return (
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-              <button onClick={() => setActivityOpen(v => !v)}
+            <div ref={activityCardRef} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm scroll-mt-16 scroll-mb-36">
+              <button onClick={toggleActivity}
                 className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left active:bg-gray-50 transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-9 h-9 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
