@@ -75,11 +75,17 @@ if ($method === 'GET') {
         }
     }
 
-    $payType      = $role === 'contractor' ? null : sanitizeString($body['pay_type'] ?? 'w2');
-    $payRate      = $role === 'contractor' ? null : (float)($body['pay_rate'] ?? 0);
-    $payStructure = $role === 'contractor' ? null : sanitizeString($body['pay_structure'] ?? 'hourly');
+    // users.pay_type/pay_rate/pay_structure are all NOT NULL at the DB level
+    // (matches their column defaults below) — contractors don't use these
+    // fields anywhere in the app (every consumer filters role != 'contractor'
+    // first), but the columns themselves can't actually hold NULL, so a
+    // contractor row just gets the same defaults a fresh w2/hourly/$0 row
+    // would.
+    $payType      = $role === 'contractor' ? 'w2'     : sanitizeString($body['pay_type'] ?? 'w2');
+    $payRate      = $role === 'contractor' ? 0.00     : (float)($body['pay_rate'] ?? 0);
+    $payStructure = $role === 'contractor' ? 'hourly' : sanitizeString($body['pay_structure'] ?? 'hourly');
 
-    if ($payStructure !== null && !in_array($payStructure, ['hourly', 'salary'])) {
+    if (!in_array($payStructure, ['hourly', 'salary'])) {
         $payStructure = 'hourly';
     }
 

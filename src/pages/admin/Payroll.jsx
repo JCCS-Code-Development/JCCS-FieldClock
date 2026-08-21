@@ -7,7 +7,7 @@ import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
 import Input from '../../components/ui/Input'
 import { getSummary, getBreakdown, listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment, listFlatRatePayments, createFlatRatePayment, updateFlatRatePayment, deleteFlatRatePayment } from '../../api/payroll'
-import { listEmployees } from '../../api/employees'
+import { listEmployees, createEmployee } from '../../api/employees'
 import { listInvoices, getInvoice, uploadInvoice, updateInvoiceStatus, getDownloadUrl } from '../../api/contractor'
 import { listEstimates } from '../../api/estimates'
 import { getPeriodLoanTotals } from '../../api/loans'
@@ -104,6 +104,14 @@ export default function AdminPayroll() {
   const [invSaving,     setInvSaving]     = useState(false)
   const [invError,      setInvError]      = useState('')
   const invFileRef = useRef(null)
+
+  // Contractor combobox (Upload Invoice modal) — type-to-filter registered
+  // contractors, or register a brand new one inline without leaving the modal
+  const [invContractorQuery, setInvContractorQuery] = useState('')
+  const [invContractorOpen,  setInvContractorOpen]  = useState(false)
+  const [quickAddContractor, setQuickAddContractor] = useState(null) // { name, address } | null
+  const [qacSaving,          setQacSaving]           = useState(false)
+  const [qacError,           setQacError]            = useState('')
 
   // Print contractor check(s)
   const [printInvoices, setPrintInvoices] = useState(null) // array of full invoice detail | null
@@ -389,9 +397,37 @@ export default function AdminPayroll() {
   // ── Upload invoice (admin, on behalf of a contractor) ──────────────
   const openInvoiceModal = () => {
     setInvForm({ user_id: '', estimate_number: '', job_location: '', invoice_number: '', amount: '', file: null })
+    setInvContractorQuery(''); setInvContractorOpen(false)
     setInvError('')
     if (invFileRef.current) invFileRef.current.value = ''
     setInvModal(true)
+  }
+
+  const contractorMatches = invContractorQuery.trim()
+    ? employees.filter((e) =>
+        e.role === 'contractor' && e.is_active &&
+        e.name.toLowerCase().includes(invContractorQuery.trim().toLowerCase())
+      )
+    : []
+
+  const handleQuickAddContractor = async () => {
+    const name = quickAddContractor.name.trim()
+    if (!name) { setQacError('Enter a name.'); return }
+    setQacSaving(true); setQacError('')
+    try {
+      const { id } = await createEmployee({
+        name,
+        role: 'contractor',
+        address: quickAddContractor.address.trim() || undefined,
+      })
+      setEmployees((prev) => [...prev, { id, name, role: 'contractor', is_active: true, pay_type: null }])
+      setInvForm((f) => ({ ...f, user_id: String(id) }))
+      setInvContractorQuery(name)
+      setQuickAddContractor(null)
+    } catch (err) {
+      setQacError(err?.response?.data?.error ?? 'Could not register. Try again.')
+    }
+    setQacSaving(false)
   }
 
   const handleUploadInvoice = async () => {
@@ -1222,15 +1258,52 @@ export default function AdminPayroll() {
       {/* Upload contractor invoice (admin, on behalf of a contractor) */}
       <Modal isOpen={invModal} onClose={() => setInvModal(false)} title="Upload Contractor Invoice">
         <div className="flex flex-col gap-4">
-          <div>
+          <div className="relative">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Contractor</label>
-            <select value={invForm.user_id} onChange={(e) => setInvForm((f) => ({ ...f, user_id: e.target.value }))}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
-              <option value="">— Select contractor —</option>
-              {employees.filter((e) => e.role === 'contractor' && e.is_active).map((e) => (
-                <option key={e.id} value={e.id}>{e.name}</option>
-              ))}
-            </select>
+            <input
+              type="text"
+              value={invContractorQuery}
+              onChange={(e) => {
+                setInvContractorQuery(e.target.value)
+                setInvForm((f) => ({ ...f, user_id: '' })) // typing invalidates whatever was picked before
+                setInvContractorOpen(true)
+              }}
+              onFocus={() => setInvContractorOpen(true)}
+              onBlur={() => setTimeout(() => setInvContractorOpen(false), 150)} // let a suggestion's onMouseDown land first
+              placeholder="Start typing a contractor's name…"
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+            />
+            {invForm.user_id && (
+              <p className="text-xs text-green-600 mt-1">✓ {invContractorQuery} selected</p>
+            )}
+            {invContractorOpen && invContractorQuery.trim() && !invForm.user_id && (
+              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                {contractorMatches.length > 0 ? (
+                  contractorMatches.map((c) => (
+                    <button key={c.id} type="button"
+                      onMouseDown={() => {
+                        setInvForm((f) => ({ ...f, user_id: String(c.id) }))
+                        setInvContractorQuery(c.name)
+                        setInvContractorOpen(false)
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      {c.name}
+                    </button>
+                  ))
+                ) : (
+                  <button type="button"
+                    onMouseDown={() => {
+                      setQuickAddContractor({ name: invContractorQuery.trim(), address: '' })
+                      setInvContractorOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-brand-600 font-semibold hover:bg-brand-50"
+                  >
+                    + Register "{invContractorQuery.trim()}" as a new contractor
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1275,6 +1348,26 @@ export default function AdminPayroll() {
           <div className="flex gap-3 pt-1">
             <Button variant="secondary" fullWidth onClick={() => setInvModal(false)}>Cancel</Button>
             <Button fullWidth loading={invSaving} onClick={handleUploadInvoice}>Upload</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Register new contractor — quick add from inside Upload Invoice */}
+      <Modal isOpen={!!quickAddContractor} onClose={() => setQuickAddContractor(null)} title="Register New Contractor">
+        <div className="flex flex-col gap-4">
+          <Input label="Name *" value={quickAddContractor?.name ?? ''}
+            onChange={(e) => setQuickAddContractor((f) => ({ ...f, name: e.target.value }))}
+            placeholder="Company or individual name" />
+          <Input label="Address (optional)" value={quickAddContractor?.address ?? ''}
+            onChange={(e) => setQuickAddContractor((f) => ({ ...f, address: e.target.value }))}
+            placeholder="Street, City, State — shown on printed checks" />
+          <p className="text-xs text-gray-400 -mt-2">
+            More details (phone, email, tax ID) can be added later from Employees.
+          </p>
+          {qacError && <p className="text-sm text-red-600">{qacError}</p>}
+          <div className="flex gap-3 pt-1">
+            <Button variant="secondary" fullWidth onClick={() => setQuickAddContractor(null)}>Cancel</Button>
+            <Button fullWidth loading={qacSaving} onClick={handleQuickAddContractor}>Register &amp; Select</Button>
           </div>
         </div>
       </Modal>
