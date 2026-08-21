@@ -161,13 +161,13 @@
       "processing": "En Proceso",
       "available": "Disponible — Listo para Recoger",
       "pickedUp": "Recogido",
+      "voided": "Anulado — se emitirá un nuevo cheque",
       "title": "Estado de Pago",
       "none": "Aún no hay registros de pago.",
       "history": "Pagos Anteriores",
       "notificationsOn": "Notificaciones activas — toca para desactivar",
       "enableNotifications": "Activar notificaciones de pago"
-    },
-    "todayMiles": "Millas de Hoy"
+    }
   },
   "timeoff": {
     "title": "Tiempo Libre",

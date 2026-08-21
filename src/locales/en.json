@@ -161,13 +161,13 @@
       "processing": "Processing",
       "available": "Available — Ready for Pickup",
       "pickedUp": "Picked Up",
+      "voided": "Voided — a new check will be issued",
       "title": "Paycheck Status",
       "none": "No paycheck records yet.",
       "history": "Previous Paychecks",
       "notificationsOn": "Notifications on — tap to turn off",
       "enableNotifications": "Enable notifications for paycheck updates"
-    },
-    "todayMiles": "Today's Miles"
+    }
   },
   "timeoff": {
     "title": "Time Off",

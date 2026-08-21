@@ -7,7 +7,7 @@ import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
 import Input from '../../components/ui/Input'
 import { getSummary, getBreakdown, listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment, listFlatRatePayments, createFlatRatePayment, updateFlatRatePayment, deleteFlatRatePayment } from '../../api/payroll'
-import { listEmployees } from '../../api/employees'
+import { listEmployees, createEmployee } from '../../api/employees'
 import { listInvoices, getInvoice, uploadInvoice, updateInvoiceStatus, getDownloadUrl } from '../../api/contractor'
 import { listEstimates } from '../../api/estimates'
 import { getPeriodLoanTotals } from '../../api/loans'
@@ -105,6 +105,14 @@ export default function AdminPayroll() {
   const [invError,      setInvError]      = useState('')
   const invFileRef = useRef(null)
 
+  // Contractor combobox (Upload Invoice modal) — type-to-filter registered
+  // contractors, or register a brand new one inline without leaving the modal
+  const [invContractorQuery, setInvContractorQuery] = useState('')
+  const [invContractorOpen,  setInvContractorOpen]  = useState(false)
+  const [quickAddContractor, setQuickAddContractor] = useState(null) // { name, address } | null
+  const [qacSaving,          setQacSaving]           = useState(false)
+  const [qacError,           setQacError]            = useState('')
+
   // Print contractor check(s)
   const [printInvoices, setPrintInvoices] = useState(null) // array of full invoice detail | null
   const [printLoading,  setPrintLoading]  = useState(false)
@@ -187,7 +195,13 @@ export default function AdminPayroll() {
 
   useEffect(() => {
     loadPaychecks()
-    listEmployees({ role: 'employee', active: 1 }).then((d) => setEmployees(d.employees ?? [])).catch(() => {})
+    // /employees/index.php has no server-side role filter, so this holds
+    // every active user (admins, employees, and contractors) — callers
+    // filter by role themselves at each picker's render site, since
+    // different pickers here need different subsets (e.g. the contractor
+    // invoice picker further down needs contractors; the paycheck/flat-rate
+    // pickers don't).
+    listEmployees({ active: 1 }).then((d) => setEmployees(d.employees ?? [])).catch(() => {})
   }, [])
 
   const handleCreatePaycheck = async (e) => {
@@ -383,9 +397,37 @@ export default function AdminPayroll() {
   // ── Upload invoice (admin, on behalf of a contractor) ──────────────
   const openInvoiceModal = () => {
     setInvForm({ user_id: '', estimate_number: '', job_location: '', invoice_number: '', amount: '', file: null })
+    setInvContractorQuery(''); setInvContractorOpen(false)
     setInvError('')
     if (invFileRef.current) invFileRef.current.value = ''
     setInvModal(true)
+  }
+
+  const contractorMatches = invContractorQuery.trim()
+    ? employees.filter((e) =>
+        e.role === 'contractor' && e.is_active &&
+        e.name.toLowerCase().includes(invContractorQuery.trim().toLowerCase())
+      )
+    : []
+
+  const handleQuickAddContractor = async () => {
+    const name = quickAddContractor.name.trim()
+    if (!name) { setQacError('Enter a name.'); return }
+    setQacSaving(true); setQacError('')
+    try {
+      const { id } = await createEmployee({
+        name,
+        role: 'contractor',
+        address: quickAddContractor.address.trim() || undefined,
+      })
+      setEmployees((prev) => [...prev, { id, name, role: 'contractor', is_active: true, pay_type: null }])
+      setInvForm((f) => ({ ...f, user_id: String(id) }))
+      setInvContractorQuery(name)
+      setQuickAddContractor(null)
+    } catch (err) {
+      setQacError(err?.response?.data?.error ?? 'Could not register. Try again.')
+    }
+    setQacSaving(false)
   }
 
   const handleUploadInvoice = async () => {
@@ -461,6 +503,12 @@ export default function AdminPayroll() {
     if (a.type === 'gas_allowance') gasByUser[uid] = (gasByUser[uid] ?? 0) + parseFloat(a.amount ?? 0)
     else bonusByUser[uid] = (bonusByUser[uid] ?? 0) + parseFloat(a.amount ?? 0)
   })
+
+  // ADP report — hourly W-2 employees only (salaried W-2 don't have
+  // meaningful regular/OT hours to hand off, and ADP already has their
+  // fixed salary on file). Plain decimal hours, not the "Xh Ym" display
+  // used elsewhere on this page — ADP needs a real number.
+  const adpRows = summary.filter((e) => e.pay_type === 'w2' && e.pay_structure === 'hourly')
 
   // W-2 employees with gas/bonus appear in the 1099 tab as additional check entries
   const w2ExtraRows = tab === '1099'
@@ -712,6 +760,54 @@ export default function AdminPayroll() {
                 </table>
               </div>
 
+            </div>
+          )}
+
+          {/* ADP Report — hourly W-2 employees, decimal hours */}
+          {tab === 'w2' && (
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mt-4">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-900">ADP Report</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Hourly W-2 employees · {p.label} · decimal hours</p>
+              </div>
+              {loading ? (
+                <div className="flex justify-center py-10"><Spinner /></div>
+              ) : adpRows.length === 0 ? (
+                <p className="text-center py-12 text-sm text-gray-400">No hourly W-2 employees this period.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        <th className="text-left px-5 py-3">Employee</th>
+                        <th className="text-right px-4 py-3">Regular Hours</th>
+                        <th className="text-right px-4 py-3">OT Hours</th>
+                        <th className="text-right px-5 py-3">Total Hours</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adpRows.map((emp) => (
+                        <tr key={emp.user_id} className="border-b border-gray-50">
+                          <td className="px-5 py-3 font-medium text-gray-900">{emp.name}</td>
+                          <td className="px-4 py-3 text-right text-gray-700">{(emp.regular_hours ?? 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-gray-700">{(emp.overtime_hours ?? 0).toFixed(2)}</td>
+                          <td className="px-5 py-3 text-right font-semibold text-gray-900">
+                            {((emp.regular_hours ?? 0) + (emp.overtime_hours ?? 0)).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-gray-50 font-semibold text-sm">
+                        <td className="px-5 py-3 text-gray-700">Totals</td>
+                        <td className="px-4 py-3 text-right">{adpRows.reduce((s, e) => s + (e.regular_hours ?? 0), 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right">{adpRows.reduce((s, e) => s + (e.overtime_hours ?? 0), 0).toFixed(2)}</td>
+                        <td className="px-5 py-3 text-right text-brand-500">
+                          {adpRows.reduce((s, e) => s + (e.regular_hours ?? 0) + (e.overtime_hours ?? 0), 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -1162,15 +1258,52 @@ export default function AdminPayroll() {
       {/* Upload contractor invoice (admin, on behalf of a contractor) */}
       <Modal isOpen={invModal} onClose={() => setInvModal(false)} title="Upload Contractor Invoice">
         <div className="flex flex-col gap-4">
-          <div>
+          <div className="relative">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Contractor</label>
-            <select value={invForm.user_id} onChange={(e) => setInvForm((f) => ({ ...f, user_id: e.target.value }))}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
-              <option value="">— Select contractor —</option>
-              {employees.filter((e) => e.role === 'contractor' && e.is_active).map((e) => (
-                <option key={e.id} value={e.id}>{e.name}</option>
-              ))}
-            </select>
+            <input
+              type="text"
+              value={invContractorQuery}
+              onChange={(e) => {
+                setInvContractorQuery(e.target.value)
+                setInvForm((f) => ({ ...f, user_id: '' })) // typing invalidates whatever was picked before
+                setInvContractorOpen(true)
+              }}
+              onFocus={() => setInvContractorOpen(true)}
+              onBlur={() => setTimeout(() => setInvContractorOpen(false), 150)} // let a suggestion's onMouseDown land first
+              placeholder="Start typing a contractor's name…"
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+            />
+            {invForm.user_id && (
+              <p className="text-xs text-green-600 mt-1">✓ {invContractorQuery} selected</p>
+            )}
+            {invContractorOpen && invContractorQuery.trim() && !invForm.user_id && (
+              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                {contractorMatches.length > 0 ? (
+                  contractorMatches.map((c) => (
+                    <button key={c.id} type="button"
+                      onMouseDown={() => {
+                        setInvForm((f) => ({ ...f, user_id: String(c.id) }))
+                        setInvContractorQuery(c.name)
+                        setInvContractorOpen(false)
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      {c.name}
+                    </button>
+                  ))
+                ) : (
+                  <button type="button"
+                    onMouseDown={() => {
+                      setQuickAddContractor({ name: invContractorQuery.trim(), address: '' })
+                      setInvContractorOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-brand-600 font-semibold hover:bg-brand-50"
+                  >
+                    + Register "{invContractorQuery.trim()}" as a new contractor
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1215,6 +1348,26 @@ export default function AdminPayroll() {
           <div className="flex gap-3 pt-1">
             <Button variant="secondary" fullWidth onClick={() => setInvModal(false)}>Cancel</Button>
             <Button fullWidth loading={invSaving} onClick={handleUploadInvoice}>Upload</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Register new contractor — quick add from inside Upload Invoice */}
+      <Modal isOpen={!!quickAddContractor} onClose={() => setQuickAddContractor(null)} title="Register New Contractor">
+        <div className="flex flex-col gap-4">
+          <Input label="Name *" value={quickAddContractor?.name ?? ''}
+            onChange={(e) => setQuickAddContractor((f) => ({ ...f, name: e.target.value }))}
+            placeholder="Company or individual name" />
+          <Input label="Address (optional)" value={quickAddContractor?.address ?? ''}
+            onChange={(e) => setQuickAddContractor((f) => ({ ...f, address: e.target.value }))}
+            placeholder="Street, City, State — shown on printed checks" />
+          <p className="text-xs text-gray-400 -mt-2">
+            More details (phone, email, tax ID) can be added later from Employees.
+          </p>
+          {qacError && <p className="text-sm text-red-600">{qacError}</p>}
+          <div className="flex gap-3 pt-1">
+            <Button variant="secondary" fullWidth onClick={() => setQuickAddContractor(null)}>Cancel</Button>
+            <Button fullWidth loading={qacSaving} onClick={handleQuickAddContractor}>Register &amp; Select</Button>
           </div>
         </div>
       </Modal>
@@ -1338,7 +1491,7 @@ export default function AdminPayroll() {
             <select value={pcForm.user_id} onChange={(e) => setPcForm((f) => ({ ...f, user_id: e.target.value }))}
               className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
               <option value="">— Select employee —</option>
-              {employees.map((e) => <option key={e.id} value={e.id}>{e.name} ({e.pay_type?.toUpperCase()})</option>)}
+              {employees.filter((e) => e.role !== 'contractor').map((e) => <option key={e.id} value={e.id}>{e.name} ({e.pay_type?.toUpperCase()})</option>)}
             </select>
           </div>
           <div>

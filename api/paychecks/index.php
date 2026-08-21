@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 FROM paychecks p
                 JOIN users u ON u.id = p.user_id
                 LEFT JOIN check_registry cr ON cr.id = p.check_registry_id
-                WHERE u.role = "employee"';
+                WHERE u.role != "contractor"';
         $params = [];
         if ($uid) { $sql .= ' AND p.user_id = ?'; $params[] = $uid; }
         $sql .= ' ORDER BY p.period_end DESC, u.name ASC';

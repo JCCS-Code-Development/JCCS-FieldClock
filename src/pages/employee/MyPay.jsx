@@ -10,7 +10,6 @@ import { getEntries, createChangeRequest, getChangeRequests } from '../../api/ti
 import { listLoans, getMyPeriodLoanDeduction } from '../../api/loans'
 import { listPaychecks } from '../../api/paychecks'
 import { subscribeToPush, unsubscribeFromPush, getCurrentSubscription } from '../../api/push'
-import { getDailyMileage } from '../../api/gps'
 import PayPieChart from '../../components/ui/PayPieChart'
 import { getTimeOffRequests, createTimeOffRequest, reviewTimeOffRequest } from '../../api/timeoff'
 import { formatCurrency, formatHours, formatDate, formatTime } from '../../utils/format'
@@ -67,9 +66,6 @@ export default function MyPay() {
   const [pushSub,     setPushSub]     = useState(null)
   const [pushLoading, setPushLoading] = useState(false)
 
-  // Mileage
-  const [todayMiles, setTodayMiles] = useState(null)
-
   const p = periods[selectedPeriod]
 
   const loadTimeOff = () =>
@@ -92,7 +88,6 @@ export default function MyPay() {
   useEffect(() => {
     listPaychecks().then((d) => setPaychecks(d.paychecks ?? [])).catch(() => {})
     getCurrentSubscription().then(setPushSub).catch(() => {})
-    getDailyMileage().then((d) => setTodayMiles(d.daily_miles ?? 0)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -209,6 +204,7 @@ export default function MyPay() {
                   processing: { label: t('pay.paycheck.processing'), color: 'text-amber-700 bg-amber-50 border-amber-200' },
                   available:  { label: t('pay.paycheck.available'),  color: 'text-green-700 bg-green-50 border-green-200'  },
                   picked_up:  { label: t('pay.paycheck.pickedUp'),   color: 'text-gray-600  bg-gray-50  border-gray-200'   },
+                  voided:     { label: t('pay.paycheck.voided'),     color: 'text-red-700   bg-red-50   border-red-200'   },
                 }
                 const cfg = latest ? (statusCfg[latest.status] ?? statusCfg.processing) : null
                 return (
@@ -304,14 +300,6 @@ export default function MyPay() {
                           icon={GrossIcon}
                           color="green"
                         />
-                        {todayMiles !== null && (
-                          <StatsCard compact
-                            label={t('pay.todayMiles')}
-                            value={`${todayMiles.toFixed(1)} mi`}
-                            icon={MileageIcon}
-                            color="sky"
-                          />
-                        )}
                       </div>
 
                       {/* ── Pie chart ── */}
@@ -713,7 +701,6 @@ const CORR_TYPES = [
   { value: 'other', icon: '💬', label: 'Something Else' },
 ]
 
-const MileageIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 13l4.553 2.276A1 1 0 0021 21.382V10.618a1 1 0 00-.553-.894L15 7m0 13V7m0 0L9 4"/></svg>
 const ClockIcon  = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 7v5l3.5 3.5"/></svg>
 const CalendarIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="4" width="18" height="18" rx="2"/><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18"/></svg>
 const RateIcon   = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-2.21 0-4 .9-4 2s1.79 2 4 2 4 .9 4 2-1.79 2-4 2m0-8v1m0 9v1"/><circle cx="12" cy="12" r="9"/></svg>
