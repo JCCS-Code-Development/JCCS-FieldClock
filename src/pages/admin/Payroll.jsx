@@ -116,6 +116,7 @@ export default function AdminPayroll() {
   // Print contractor check(s)
   const [printInvoices, setPrintInvoices] = useState(null) // array of full invoice detail | null
   const [printLoading,  setPrintLoading]  = useState(false)
+  const [selectedInvIds, setSelectedInvIds] = useState(new Set()) // invoice ids picked for one combined print run
 
   // Gas review
   const [gasModal,     setGasModal]     = useState(false)
@@ -190,6 +191,7 @@ export default function AdminPayroll() {
     loadFlatRatePayments()
     getPeriodLoanTotals(p.start, p.end).then(setLoanDeductions).catch(() => setLoanDeductions({}))
     setFrPrintOpen(false)  // close flat rate print if period changes mid-open
+    setSelectedInvIds(new Set()) // a prior period's selection shouldn't carry over
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period])
 
@@ -453,6 +455,15 @@ export default function AdminPayroll() {
     }
     setInvSaving(false)
   }
+
+  // Invoices for the same contractor selected together print as one
+  // combined check (see PrintContractorCheck, which groups by contractor)
+  // instead of a separate physical check per project.
+  const toggleInvSelected = (id) => setSelectedInvIds((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
 
   // ── Print contractor check(s) ───────────────────────────────────────
   const printContractorChecks = async (invs) => {
@@ -945,13 +956,21 @@ export default function AdminPayroll() {
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 gap-3 flex-wrap">
             <div>
               <h3 className="font-semibold text-gray-900">Contractor Invoices</h3>
-              <p className="text-xs text-gray-400 mt-0.5">{p.label}</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {p.label} · check the box on multiple invoices for the same contractor to combine them into one check
+              </p>
             </div>
             <div className="flex items-center gap-2">
               {pendingInvCount > 0 && (
                 <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2.5 py-1 rounded-full">
                   {pendingInvCount} pending review
                 </span>
+              )}
+              {selectedInvIds.size > 0 && (
+                <Button size="sm" loading={printLoading}
+                  onClick={() => printContractorChecks(contractorInvs.filter((i) => selectedInvIds.has(i.id)))}>
+                  Print Selected ({selectedInvIds.size})
+                </Button>
               )}
               {checkReadyInvs.length > 0 && (
                 <Button size="sm" variant="secondary" loading={printLoading}
@@ -971,6 +990,7 @@ export default function AdminPayroll() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                  <th className="px-5 py-3 w-8" />
                   <th className="text-left px-5 py-3">Contractor</th>
                   <th className="text-left px-4 py-3">Invoice File</th>
                   <th className="text-left px-4 py-3">Paying Toward</th>
@@ -983,8 +1003,15 @@ export default function AdminPayroll() {
               <tbody className="divide-y divide-gray-50">
                 {contractorInvs.map((inv) => {
                   const meta = INV_STATUS[inv.status] ?? INV_STATUS.submitted
+                  const hasAmount = inv.amount && parseFloat(inv.amount) > 0
                   return (
                     <tr key={inv.id} className="hover:bg-gray-50">
+                      <td className="px-5 py-3">
+                        <input type="checkbox" checked={selectedInvIds.has(inv.id)} disabled={!hasAmount}
+                          onChange={() => toggleInvSelected(inv.id)}
+                          title={hasAmount ? 'Select to combine into one check with other selected invoices' : 'Add an amount before this can be selected'}
+                          className="w-4 h-4 rounded border-gray-300 accent-brand-500 disabled:opacity-30" />
+                      </td>
                       <td className="px-5 py-3 font-medium text-gray-900">{inv.contractor_name}</td>
                       <td className="px-4 py-3">
                         <a href={getDownloadUrl(inv.id)} target="_blank" rel="noopener noreferrer"
@@ -1012,7 +1039,7 @@ export default function AdminPayroll() {
                       </td>
                       <td className="px-5 py-3 text-right">
                         <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="secondary" loading={printLoading} disabled={!inv.amount || parseFloat(inv.amount) <= 0}
+                          <Button size="sm" variant="secondary" loading={printLoading} disabled={!hasAmount}
                             onClick={() => printContractorChecks([inv])}>
                             Print Check
                           </Button>
@@ -1416,7 +1443,7 @@ export default function AdminPayroll() {
       {printInvoices && (
         <PrintContractorCheck
           invoices={printInvoices}
-          onClose={() => setPrintInvoices(null)}
+          onClose={() => { setPrintInvoices(null); setSelectedInvIds(new Set()) }}
         />
       )}
 

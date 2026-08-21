@@ -4,22 +4,26 @@ import { formatCurrency } from '../../utils/format'
 import { format } from 'date-fns'
 import { amountToWords, CHECK_CON, SEC, CutLine, ES, esH, esC, SectionOverlays, printStylesheet } from './checkPrintKit'
 
-// ── Contractor pay stub — same table/typography as EarningsStatement and
-// FlatRateEarningsStatement in PrintChecks.jsx, with the fields this check
-// type needs: contractor/company name, address, invoice #, and the estimate
-// (with job) being paid toward ─────────────────────────────────────────
-function ContractorEarningsStatement({ inv, checkDate }) {
-  const amount = parseFloat(inv.amount)
+// ── Contractor pay stub — same table/typography as every other check type
+// in the app. One check per CONTRACTOR, not per invoice: a contractor with
+// several check-ready invoices (different projects/estimates) selected
+// together gets a single check whose stub itemizes every invoice, so the
+// company never cuts more than one physical check per person per run ────
+function ContractorEarningsStatement({ group, checkDate }) {
   const fmtPeriod = (() => {
+    const first = group.invoices[0]
     try {
-      return `${format(new Date(inv.period_start + 'T12:00'), 'MM/dd/yy')} – ${format(new Date(inv.period_end + 'T12:00'), 'MM/dd/yy')}`
-    } catch { return inv.period_start && inv.period_end ? `${inv.period_start} – ${inv.period_end}` : '—' }
+      return `${format(new Date(first.period_start + 'T12:00'), 'MM/dd/yy')} – ${format(new Date(first.period_end + 'T12:00'), 'MM/dd/yy')}`
+    } catch { return first.period_start && first.period_end ? `${first.period_start} – ${first.period_end}` : '—' }
   })()
-  const estimateNum = inv.resolved_estimate_number ?? inv.estimate_number
-  const jobRef       = inv.job_name ?? inv.job_location
-  const estimateLabel = estimateNum
-    ? `Estimate #${estimateNum}${jobRef ? ' — ' + jobRef : ''}`
-    : (jobRef || 'No estimate on file')
+
+  const lineLabel = (inv) => {
+    const estimateNum = inv.resolved_estimate_number ?? inv.estimate_number
+    const jobRef       = inv.job_name ?? inv.job_location
+    return estimateNum
+      ? `Estimate #${estimateNum}${jobRef ? ' — ' + jobRef : ''}`
+      : (jobRef || 'No estimate on file')
+  }
 
   return (
     <div style={{ fontFamily: ES.font, display: 'flex', flexDirection: 'column', gap: '5pt', height: '100%', justifyContent: 'center' }}>
@@ -28,47 +32,51 @@ function ContractorEarningsStatement({ inv, checkDate }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
         <thead>
           <tr>
-            <th style={{ ...esH({ textAlign: 'left', width: '38%' }) }}>Contractor</th>
-            <th style={{ ...esH({ width: '16%' }) }}>Pay Date</th>
-            <th style={{ ...esH({ width: '30%' }) }}>Pay Period</th>
-            <th style={{ ...esH({ width: '16%' }) }}>Invoice #</th>
+            <th style={{ ...esH({ textAlign: 'left', width: '44%' }) }}>Contractor</th>
+            <th style={{ ...esH({ width: '18%' }) }}>Pay Date</th>
+            <th style={{ ...esH({ width: '38%' }) }}>Pay Period</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td style={{ ...esC({ textAlign: 'left', verticalAlign: 'top', padding: '5pt 6pt' }) }}>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: '9pt', color: ES.accent }}>{inv.contractor_name}</p>
-              <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>{inv.contractor_address || 'Contractor'}</p>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: '9pt', color: ES.accent }}>{group.contractor_name}</p>
+              <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>{group.contractor_address || 'Contractor'}</p>
             </td>
             <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{checkDate}</td>
             <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{fmtPeriod}</td>
-            <td style={{ ...esC({ textAlign: 'center', fontWeight: 700, fontSize: '7.5pt' }) }}>{inv.invoice_number || '—'}</td>
           </tr>
         </tbody>
       </table>
 
-      {/* Paying toward + amount table */}
+      {/* Paying toward + amount table — one row per invoice, so a combined
+          check still shows exactly what it's paying for */}
       <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
         <thead>
           <tr>
-            <th style={{ ...esH({ textAlign: 'left', paddingLeft: '6pt', width: '70%' }) }}>Paying Toward</th>
-            <th style={{ ...esH({ textAlign: 'right', paddingRight: '6pt', width: '30%' }) }}>Amount</th>
+            <th style={{ ...esH({ textAlign: 'left', paddingLeft: '6pt', width: '54%' }) }}>Paying Toward</th>
+            <th style={{ ...esH({ width: '18%' }) }}>Invoice #</th>
+            <th style={{ ...esH({ textAlign: 'right', paddingRight: '6pt', width: '28%' }) }}>Amount</th>
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt', fontWeight: 500 }) }}>{estimateLabel}</td>
-            <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 600 }) }}>{formatCurrency(amount)}</td>
-          </tr>
-          <tr style={{ background: '#fdf9ee' }}>
-            <td style={{ ...esC({ paddingLeft: '6pt', color: '#666', fontSize: '7.5pt' }) }}>{inv.estimate_description || ' '}</td>
-            <td style={esC()}>&nbsp;</td>
-          </tr>
+          {group.invoices.map((inv) => (
+            <tr key={inv.id}>
+              <td style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt', verticalAlign: 'top' }) }}>
+                <p style={{ margin: 0, fontWeight: 500 }}>{lineLabel(inv)}</p>
+                {inv.estimate_description && (
+                  <p style={{ margin: '1pt 0 0', fontSize: '7pt', color: '#666' }}>{inv.estimate_description}</p>
+                )}
+              </td>
+              <td style={{ ...esC({ textAlign: 'center', fontSize: '7.5pt' }) }}>{inv.invoice_number || '—'}</td>
+              <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 600 }) }}>{formatCurrency(parseFloat(inv.amount))}</td>
+            </tr>
+          ))}
         </tbody>
         <tfoot>
           <tr style={{ background: ES.footerBg, borderTop: `1pt solid ${ES.border}` }}>
-            <td style={{ ...esC({ fontWeight: 700, textAlign: 'left', paddingLeft: '6pt', color: '#1e40af', background: ES.footerBg }) }}>Net Pay</td>
-            <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 700, color: '#1e40af', background: ES.footerBg }) }}>{formatCurrency(amount)}</td>
+            <td colSpan={2} style={{ ...esC({ fontWeight: 700, textAlign: 'left', paddingLeft: '6pt', color: '#1e40af', background: ES.footerBg }) }}>Net Pay</td>
+            <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 700, color: '#1e40af', background: ES.footerBg }) }}>{formatCurrency(group.totalAmount)}</td>
           </tr>
         </tfoot>
       </table>
@@ -78,9 +86,10 @@ function ContractorEarningsStatement({ inv, checkDate }) {
 
 // ── Contractor check page — positions from Contractor_Check_Template.key,
 // same SEC breakpoints/CutLine/section-overlay treatment as every other
-// printed check in the app ──────────────────────────────────────────────
-function ContractorCheckPage({ inv, today }) {
-  const amount = parseFloat(inv.amount)
+// printed check in the app. One page per contractor GROUP (not per
+// invoice) — group.totalAmount is what's actually printed on the check ──
+function ContractorCheckPage({ group, today }) {
+  const amount = group.totalAmount
 
   return (
     <div className="check-page" style={{
@@ -109,7 +118,7 @@ function ContractorCheckPage({ inv, today }) {
         position: 'absolute', top: CHECK_CON.payTo.top, left: CHECK_CON.payTo.left, width: CHECK_CON.payTo.w,
         fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif',
         fontWeight: 600, color: '#000', overflow: 'hidden', whiteSpace: 'nowrap',
-      }}>{inv.contractor_name}</div>
+      }}>{group.contractor_name}</div>
 
       <div style={{
         position: 'absolute', top: CHECK_CON.words.top, left: CHECK_CON.words.left, width: CHECK_CON.words.w,
@@ -122,16 +131,16 @@ function ContractorCheckPage({ inv, today }) {
         position: 'absolute', top: CHECK_CON.memo.top, left: CHECK_CON.memo.left, width: CHECK_CON.memo.w,
         fontSize: '11pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
         overflow: 'hidden', whiteSpace: 'nowrap',
-      }}>{inv.contractor_name}</div>
+      }}>{group.contractor_name}</div>
 
       {/* Address — envelope-window line 2 (the field the flat-rate/1099 check
           template doesn't have; contractor checks get their own address line) */}
-      {inv.contractor_address && (
+      {group.contractor_address && (
         <div style={{
           position: 'absolute', top: CHECK_CON.address.top, left: CHECK_CON.address.left, width: CHECK_CON.address.w,
           fontSize: '9.5pt', fontFamily: 'Calibri, "Helvetica Neue", Arial, sans-serif', color: '#000',
           overflow: 'hidden', whiteSpace: 'nowrap',
-        }}>{inv.contractor_address}</div>
+        }}>{group.contractor_address}</div>
       )}
 
       {/* ══ CONTRACTOR COPY (section 2 — middle) ══ */}
@@ -142,7 +151,7 @@ function ContractorCheckPage({ inv, today }) {
         left: '0.75in', right: '0.75in',
         overflow: 'hidden',
       }}>
-        <ContractorEarningsStatement inv={inv} checkDate={today} />
+        <ContractorEarningsStatement group={group} checkDate={today} />
       </div>
 
       {/* ══ COMPANY COPY (section 3 — bottom) ══ */}
@@ -153,7 +162,7 @@ function ContractorCheckPage({ inv, today }) {
         left: '0.75in', right: '0.75in',
         overflow: 'hidden',
       }}>
-        <ContractorEarningsStatement inv={inv} checkDate={today} />
+        <ContractorEarningsStatement group={group} checkDate={today} />
       </div>
     </div>
   )
@@ -168,6 +177,30 @@ export default function PrintContractorCheck({ invoices, onClose }) {
     return () => document.getElementById('print-contractor-css')?.remove()
   }, [])
 
+  // Group by contractor — this is what guarantees only one physical check
+  // per person, even if several of their invoices (different projects)
+  // were selected together. Every caller (single-row Print Check, Print
+  // All Check-Ready, Print Selected) funnels through here, so none of them
+  // need their own grouping logic.
+  const groups = (() => {
+    const byUser = new Map()
+    for (const inv of invoices) {
+      if (!byUser.has(inv.user_id)) {
+        byUser.set(inv.user_id, {
+          user_id: inv.user_id,
+          contractor_name: inv.contractor_name,
+          contractor_address: inv.contractor_address,
+          invoices: [],
+          totalAmount: 0,
+        })
+      }
+      const group = byUser.get(inv.user_id)
+      group.invoices.push(inv)
+      group.totalAmount += parseFloat(inv.amount) || 0
+    }
+    return Array.from(byUser.values())
+  })()
+
   // Default check date to the Friday of the FOLLOWING week, same rule
   // PrintChecks uses — pulled from the first invoice's period if it has one.
   const defaultFriday = (() => {
@@ -181,6 +214,7 @@ export default function PrintContractorCheck({ invoices, onClose }) {
   const today = (() => { try { return format(new Date(checkDateISO + 'T12:00'), 'MM/dd/yyyy') } catch { return checkDateISO } })()
 
   const missingAmount = invoices.some(inv => !inv.amount || parseFloat(inv.amount) <= 0)
+  const crowdedGroups = groups.some(g => g.invoices.length > 5)
 
   // Portal directly to <body> — the print stylesheet hides everything via
   // `body > *:not(#print-contractor-root)`, which only works if this root is
@@ -200,7 +234,8 @@ export default function PrintContractorCheck({ invoices, onClose }) {
         <div>
           <p style={{ fontWeight: 600, fontSize: '14px', margin: 0 }}>Print Contractor Checks</p>
           <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0' }}>
-            {invoices.length} check{invoices.length !== 1 ? 's' : ''}&ensp;·&ensp;Load check stock before printing
+            {groups.length} check{groups.length !== 1 ? 's' : ''} · {invoices.length} invoice{invoices.length !== 1 ? 's' : ''}
+            &ensp;·&ensp;Load check stock before printing
           </p>
         </div>
 
@@ -228,14 +263,14 @@ export default function PrintContractorCheck({ invoices, onClose }) {
           }}>
             ← Back
           </button>
-          <button onClick={() => window.print()} disabled={invoices.length === 0} style={{
+          <button onClick={() => window.print()} disabled={groups.length === 0} style={{
             padding: '8px 20px', borderRadius: 8,
-            background: invoices.length === 0 ? '#374151' : '#6366f1',
-            color: invoices.length === 0 ? '#6b7280' : '#fff',
-            border: 'none', cursor: invoices.length === 0 ? 'not-allowed' : 'pointer',
+            background: groups.length === 0 ? '#374151' : '#6366f1',
+            color: groups.length === 0 ? '#6b7280' : '#fff',
+            border: 'none', cursor: groups.length === 0 ? 'not-allowed' : 'pointer',
             fontWeight: 600, fontSize: 13,
           }}>
-            Print All ({invoices.length})
+            Print All ({groups.length})
           </button>
         </div>
       </div>
@@ -244,6 +279,11 @@ export default function PrintContractorCheck({ invoices, onClose }) {
       {missingAmount && (
         <div className="no-print" style={{ background: '#fee2e2', borderBottom: '1px solid #fecaca', padding: '7px 24px', fontSize: '11.5px', color: '#991b1b' }}>
           One or more selected invoices has no amount set — add it before printing, or the check will show $0.00.
+        </div>
+      )}
+      {crowdedGroups && (
+        <div className="no-print" style={{ background: '#fee2e2', borderBottom: '1px solid #fecaca', padding: '7px 24px', fontSize: '11.5px', color: '#991b1b' }}>
+          One of these checks has more than 5 invoices combined onto it — double-check the printed stub isn't cut off before mailing it.
         </div>
       )}
       <div className="no-print" style={{
@@ -255,10 +295,10 @@ export default function PrintContractorCheck({ invoices, onClose }) {
 
       {/* ── Check pages ──────────────────────────────────────────── */}
       <div style={{ padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 44, alignItems: 'center' }}>
-        {invoices.length === 0 && (
+        {groups.length === 0 && (
           <p style={{ color: '#6b7280', padding: '80px 0', fontSize: 14 }}>No checks selected.</p>
         )}
-        {invoices.map(inv => <ContractorCheckPage key={inv.id} inv={inv} today={today} />)}
+        {groups.map(group => <ContractorCheckPage key={group.user_id} group={group} today={today} />)}
       </div>
     </div>,
     document.body
