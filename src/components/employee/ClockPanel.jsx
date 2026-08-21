@@ -436,33 +436,36 @@ export default function ClockPanel({ showHeader = true }) {
       {/* ── CLOCK SECTION — full width on mobile, left col on desktop ── */}
       <div className="flex flex-col items-center gap-4 lg:gap-8 lg:py-2">
 
-        {/* Header: greeting + date, centered — omitted when embedded somewhere that already shows one */}
-        {showHeader && (
-          <div className="w-full text-center select-none">
-            <p className="text-xl lg:text-2xl font-bold text-gray-900 leading-tight">
-              {t('home.welcome', { name: firstName })}
-            </p>
-            <p className="text-sm lg:text-base text-gray-400 mt-0.5">
-              {t('home.todayIs', { date: format(now, 'EEEE, MMMM d', { locale: dateFnsLocale }) })}
-            </p>
-          </div>
-        )}
+        {/* Greeting/date + Today's Total (left column) and Clock button (right
+            column, enlarged to balance the stacked text) on mobile;
+            unchanged centered/stacked layout on desktop */}
+        <div className="flex items-center justify-between lg:justify-center w-full gap-4 lg:flex-col lg:gap-8">
 
-        {/* Today's total + Clock button — side by side on mobile, stacked on desktop */}
-        <div className="flex items-center justify-center w-full gap-6 lg:flex-col lg:gap-8">
-          <div className="text-center">
-            <p className="text-[10px] tracking-widest text-gray-400 uppercase font-semibold mb-1">{t('home.todaysTotal')}</p>
-            <p className={`text-3xl lg:text-5xl font-bold tabular-nums leading-none ${dayTotal > 0 ? 'text-gray-900' : 'text-gray-200'}`}>
-              {formatElapsed(dayTotal)}
-            </p>
+          <div className="flex flex-1 min-w-0 flex-col gap-4 lg:flex-none lg:items-center lg:gap-8 lg:w-full">
+            {showHeader && (
+              <div className="select-none lg:text-center lg:w-full">
+                <p className="text-xl lg:text-2xl font-bold text-gray-900 leading-tight">
+                  {t('home.welcome', { name: firstName })}
+                </p>
+                <p className="text-sm lg:text-base text-gray-400 mt-0.5">
+                  {t('home.todayIs', { date: format(now, 'EEEE, MMMM d', { locale: dateFnsLocale }) })}
+                </p>
+              </div>
+            )}
+            <div className="lg:text-center">
+              <p className="text-[10px] tracking-widest text-gray-400 uppercase font-semibold mb-1">{t('home.todaysTotal')}</p>
+              <p className={`text-3xl lg:text-5xl font-bold tabular-nums leading-none ${dayTotal > 0 ? 'text-gray-900' : 'text-gray-200'}`}>
+                {formatElapsed(dayTotal)}
+              </p>
+            </div>
           </div>
 
           <div className="relative flex items-center justify-center shrink-0">
-            {isClockedIn && <span className="absolute w-32 h-32 lg:w-60 lg:h-60 rounded-full animate-ping bg-red-400/20" />}
+            {isClockedIn && <span className="absolute w-40 h-40 lg:w-60 lg:h-60 rounded-full animate-ping bg-red-400/20" />}
             <button
               onClick={handleToggle}
               disabled={loading || !isOnline}
-              className={`relative w-28 h-28 lg:w-52 lg:h-52 rounded-full flex flex-col items-center justify-center gap-1 lg:gap-2 text-white font-semibold shadow-2xl transition-all duration-300 active:scale-95 disabled:opacity-50 ring-8 lg:ring-[10px]
+              className={`relative w-36 h-36 lg:w-52 lg:h-52 rounded-full flex flex-col items-center justify-center gap-1.5 lg:gap-2 text-white font-semibold shadow-2xl transition-all duration-300 active:scale-95 disabled:opacity-50 ring-8 lg:ring-[10px]
                 ${isClockedIn
                   ? 'bg-red-500 ring-red-100 shadow-red-300/50'
                   : 'bg-brand-500 ring-brand-100 shadow-brand-300/50'
@@ -472,10 +475,10 @@ export default function ClockPanel({ showHeader = true }) {
                 ? <Spinner size="lg" />
                 : <>
                     {isClockedIn
-                      ? <svg className="w-8 h-8 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                      : <svg className="w-8 h-8 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                      ? <svg className="w-9 h-9 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                      : <svg className="w-9 h-9 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                     }
-                    <span className="text-[11px] lg:text-base font-bold tracking-wide">
+                    <span className="text-xs lg:text-base font-bold tracking-wide">
                       {isClockedIn ? t('home.clockOut') : t('home.clockIn')}
                     </span>
                   </>
