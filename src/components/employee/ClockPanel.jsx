@@ -439,7 +439,7 @@ export default function ClockPanel({ showHeader = true }) {
         {/* Greeting/date + Today's Total (left column) and Clock button (right
             column, enlarged to balance the stacked text) on mobile;
             unchanged centered/stacked layout on desktop */}
-        <div className="flex items-center justify-center w-full gap-6 lg:flex-col lg:gap-8">
+        <div className="flex items-center justify-between w-full gap-4 lg:flex-col lg:gap-8 lg:justify-center">
 
           <div className="flex min-w-0 flex-col gap-4 lg:items-center lg:gap-8 lg:w-full">
             {showHeader && (
