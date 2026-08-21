@@ -68,6 +68,11 @@ const AlertIcon = () => (
     <path strokeLinecap="round" d="M12 10v4"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>
   </svg>
 )
+const ActivityIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h4l2-7 4 14 2-7h6"/>
+  </svg>
+)
 const ShieldIcon = () => (
   <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/>
@@ -521,7 +526,7 @@ export default function ClockPanel({ showHeader = true }) {
             )}
           </div>
 
-          <div className="px-4 py-3 border-b border-gray-50">
+          <div className="px-4 py-3">
             <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-2">
               {isClockedIn
                 ? (statusLabel === 'traveling' ? t('home.headingTo') : t('home.clockedInAt'))
@@ -596,74 +601,96 @@ export default function ClockPanel({ showHeader = true }) {
               </div>
             )}
           </div>
+        </div>
 
-          {/* Today's activity — collapsible */}
-          {(() => {
-            const visible = todayEntries.filter((e) => e.cost_category !== 'day_end')
-            return (
-              <div>
-                <button onClick={() => setActivityOpen(v => !v)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left">
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">{t('home.todaysActivity')}</p>
-                    {visible.length > 0 && (
-                      <span className="text-[10px] font-bold bg-brand-100 text-brand-600 px-1.5 py-0.5 rounded-full">{visible.length}</span>
+        {/* Today's activity — its own card, collapsible, with a live preview so
+            it's useful (and legible) at a glance even before tapping it open */}
+        {(() => {
+          const visible = todayEntries.filter((e) => e.cost_category !== 'day_end')
+          const lastEntry = visible[visible.length - 1] ?? null
+          return (
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+              <button onClick={() => setActivityOpen(v => !v)}
+                className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left active:bg-gray-50 transition-colors">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-9 h-9 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+                    <ActivityIcon />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-800">{t('home.todaysActivity')}</p>
+                      {visible.length > 0 && (
+                        <span className="text-[10px] font-bold bg-brand-100 text-brand-600 px-1.5 py-0.5 rounded-full">{visible.length}</span>
+                      )}
+                    </div>
+                    {!activityOpen && (
+                      <p className="text-xs text-gray-400 truncate mt-0.5">
+                        {lastEntry ? (
+                          <>
+                            <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle ${ENTRY_DOT[lastEntry.status_label] ?? 'bg-gray-400'}`} />
+                            <span className="capitalize font-medium text-gray-600">{lastEntry.status_label?.replace('_', ' ')}</span>
+                            {' · '}
+                            {format(new Date(lastEntry.start_time), 'h:mm a')}
+                            {lastEntry.end_time ? ` – ${format(new Date(lastEntry.end_time), 'h:mm a')}` : ` – ${t('home.now')}`}
+                          </>
+                        ) : t('home.noActivity')}
+                      </p>
                     )}
                   </div>
-                  <svg className={`w-4 h-4 text-gray-300 transition-transform ${activityOpen ? 'rotate-180' : ''}`}
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
-                  </svg>
-                </button>
-                {activityOpen && (
-                  <div className="px-4 pb-3">
-                    {visible.length === 0
-                      ? <p className="text-sm text-gray-300 text-center py-4">{t('home.noActivity')}</p>
-                      : <div className="flex flex-col divide-y divide-gray-50 max-h-40 lg:max-h-64 overflow-y-auto">
-                          {visible.map((entry, i) => {
-                            const dot = ENTRY_DOT[entry.status_label] ?? 'bg-gray-400'
-                            const loc = entry.job_name ?? (entry.notes ? entry.notes.replace('Location: ', '') : null)
-                            const hasReq = myRequests.some(r => String(r.entry_id) === String(entry.id) && r.status === 'pending')
-                            return (
-                              <button key={i} onClick={() => setDetailSheet(entry)}
-                                className="w-full flex items-start justify-between gap-3 py-2.5 first:pt-0 text-left active:bg-gray-50 -mx-1 px-1 rounded-lg transition-colors">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5 mb-0.5">
-                                    <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
-                                    <p className="text-xs font-semibold text-gray-800 capitalize">
-                                      {entry.status_label?.replace('_', ' ')}
-                                    </p>
-                                    {hasReq && <span className="text-[10px] text-amber-600 font-medium">· Pending</span>}
-                                  </div>
-                                  {loc && <p className="text-xs text-gray-400 truncate pl-3.5">{loc}</p>}
+                </div>
+                <svg className={`w-4 h-4 text-gray-300 transition-transform shrink-0 ${activityOpen ? 'rotate-180' : ''}`}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              {activityOpen && (
+                <div className="px-4 pb-3 border-t border-gray-50 pt-1">
+                  {visible.length === 0
+                    ? <p className="text-sm text-gray-300 text-center py-4">{t('home.noActivity')}</p>
+                    : <div className="flex flex-col divide-y divide-gray-50 max-h-40 lg:max-h-64 overflow-y-auto">
+                        {visible.map((entry, i) => {
+                          const dot = ENTRY_DOT[entry.status_label] ?? 'bg-gray-400'
+                          const loc = entry.job_name ?? (entry.notes ? entry.notes.replace('Location: ', '') : null)
+                          const hasReq = myRequests.some(r => String(r.entry_id) === String(entry.id) && r.status === 'pending')
+                          return (
+                            <button key={i} onClick={() => setDetailSheet(entry)}
+                              className="w-full flex items-start justify-between gap-3 py-2.5 first:pt-0 text-left active:bg-gray-50 -mx-1 px-1 rounded-lg transition-colors">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
+                                  <p className="text-xs font-semibold text-gray-800 capitalize">
+                                    {entry.status_label?.replace('_', ' ')}
+                                  </p>
+                                  {hasReq && <span className="text-[10px] text-amber-600 font-medium">· Pending</span>}
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <div className="text-right">
-                                    <p className="text-xs text-gray-500">
-                                      {format(new Date(entry.start_time), 'h:mm a')}
-                                      {' → '}
-                                      {entry.end_time
-                                        ? format(new Date(entry.end_time), 'h:mm a')
-                                        : <span className="text-brand-500 font-medium">{t('home.now')}</span>
-                                      }
-                                    </p>
-                                    <p className="text-xs font-bold text-gray-700 mt-0.5">
-                                      {formatDur(entry.start_time, entry.end_time)}
-                                    </p>
-                                  </div>
-                                  <svg className="w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                {loc && <p className="text-xs text-gray-400 truncate pl-3.5">{loc}</p>}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-right">
+                                  <p className="text-xs text-gray-500">
+                                    {format(new Date(entry.start_time), 'h:mm a')}
+                                    {' → '}
+                                    {entry.end_time
+                                      ? format(new Date(entry.end_time), 'h:mm a')
+                                      : <span className="text-brand-500 font-medium">{t('home.now')}</span>
+                                    }
+                                  </p>
+                                  <p className="text-xs font-bold text-gray-700 mt-0.5">
+                                    {formatDur(entry.start_time, entry.end_time)}
+                                  </p>
                                 </div>
-                              </button>
-                            )
-                          })}
-                        </div>
-                    }
-                  </div>
-                )}
-              </div>
-            )
-          })()}
-        </div>
+                                <svg className="w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                  }
+                </div>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* ── Shift detail bottom sheet ─────────────────────────── */}

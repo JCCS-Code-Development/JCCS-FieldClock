@@ -24,7 +24,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex-1 flex flex-col w-full">
+    <div className="flex-1 flex flex-col w-full pt-3 lg:pt-0">
       <ClockPanel />
     </div>
   )
