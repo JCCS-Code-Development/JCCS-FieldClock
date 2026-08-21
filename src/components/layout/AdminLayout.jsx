@@ -126,7 +126,7 @@ export default function AdminLayout() {
         {/* Spacer below fixed header (mobile only) */}
         <div className="lg:hidden h-[52px] shrink-0" />
 
-        <PullToRefresh className="flex-1 px-4 pt-4 lg:p-6 w-full"
+        <PullToRefresh className="flex-1 px-4 pt-4 lg:p-6 w-full scrollbar-hide"
           style={{ paddingBottom: 'max(96px, calc(64px + env(safe-area-inset-bottom)))' }}
           onRefresh={() => setRefreshKey(k => k + 1)}>
           <div key={refreshKey} className="max-w-7xl mx-auto w-full">

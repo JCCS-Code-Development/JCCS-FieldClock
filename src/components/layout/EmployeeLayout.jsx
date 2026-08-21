@@ -138,7 +138,7 @@ export default function EmployeeLayout() {
         {/* Spacer below fixed header (mobile only) */}
         <div className="lg:hidden h-[52px] shrink-0" />
 
-        <PullToRefresh className="flex-1 flex flex-col"
+        <PullToRefresh className="flex-1 flex flex-col scrollbar-hide"
           style={{ paddingBottom: 'max(96px, calc(64px + env(safe-area-inset-bottom)))' }}
           onRefresh={() => setRefreshKey(k => k + 1)}>
           <div key={refreshKey} className="max-w-4xl mx-auto w-full flex-1 flex flex-col px-4 pt-7 pb-4 lg:p-6">
