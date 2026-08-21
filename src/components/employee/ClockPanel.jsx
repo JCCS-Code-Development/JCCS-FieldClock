@@ -441,9 +441,10 @@ export default function ClockPanel({ showHeader = true }) {
             unchanged centered/stacked layout on desktop */}
         <div className="flex items-center justify-between w-full gap-4 lg:flex-col lg:gap-8 lg:justify-center">
 
-          <div className="flex min-w-0 flex-col gap-4 lg:items-center lg:gap-8 lg:w-full">
+          <div className="flex min-w-0 flex-col items-center gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4
+            lg:gap-8 lg:w-full lg:bg-transparent lg:border-0 lg:shadow-none lg:px-0 lg:py-0">
             {showHeader && (
-              <div className="select-none lg:text-center lg:w-full">
+              <div className="select-none text-center w-full">
                 <p className="text-xl lg:text-2xl font-bold text-gray-900 leading-tight">
                   {t('home.welcome', { name: firstName })}
                 </p>
@@ -452,7 +453,7 @@ export default function ClockPanel({ showHeader = true }) {
                 </p>
               </div>
             )}
-            <div className="lg:text-center">
+            <div className="text-center">
               <p className="text-[10px] tracking-widest text-gray-400 uppercase font-semibold mb-1">{t('home.todaysTotal')}</p>
               <p className={`text-3xl lg:text-5xl font-bold tabular-nums leading-none ${dayTotal > 0 ? 'text-gray-900' : 'text-gray-200'}`}>
                 {formatElapsed(dayTotal)}
