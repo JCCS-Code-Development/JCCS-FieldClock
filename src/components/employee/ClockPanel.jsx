@@ -441,8 +441,8 @@ export default function ClockPanel({ showHeader = true }) {
             unchanged centered/stacked layout on desktop */}
         <div className="flex items-center w-full gap-4 lg:flex-col lg:gap-8 lg:justify-center">
 
-          <div className="flex min-w-0 flex-col items-center gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 shrink-0
-            lg:gap-8 lg:w-full lg:bg-transparent lg:border-0 lg:shadow-none lg:px-0 lg:py-0">
+          <div className="flex min-w-0 basis-0 grow-[3] flex-col items-center gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4
+            lg:grow-0 lg:gap-8 lg:w-full lg:bg-transparent lg:border-0 lg:shadow-none lg:px-0 lg:py-0">
             {showHeader && (
               <div className="select-none text-center w-full">
                 <p className="text-xl lg:text-2xl font-bold text-gray-900 leading-tight">
@@ -461,7 +461,7 @@ export default function ClockPanel({ showHeader = true }) {
             </div>
           </div>
 
-          <div className="relative flex flex-1 lg:flex-none items-center justify-center">
+          <div className="relative flex basis-0 grow-[2] lg:grow-0 items-center justify-center">
             {isClockedIn && <span className="absolute w-40 h-40 lg:w-60 lg:h-60 rounded-full animate-ping bg-red-400/20" />}
             <button
               onClick={handleToggle}
