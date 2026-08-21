@@ -171,24 +171,30 @@ export default function MyPay() {
     <div className="px-4 pt-6 pb-6 flex flex-col gap-4 w-full">
       <h1 className="text-xl font-bold text-gray-900">{t('pay.title')}</h1>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {periods.map((per, i) => (
-          <button key={i} onClick={() => setSelectedPeriod(i)}
-            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
-              selectedPeriod === i ? 'bg-brand-500 text-white border-brand-500' : 'bg-white text-gray-600 border-gray-200 hover:border-brand-300'
-            }`}>
-            {per.label}
-          </button>
-        ))}
+      <div className="relative -mx-4">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide snap-x snap-proximity px-4 pb-1">
+          {periods.map((per, i) => (
+            <button key={i} onClick={() => setSelectedPeriod(i)}
+              className={`shrink-0 snap-start px-3.5 py-1.5 rounded-xl text-sm font-medium border transition-colors ${
+                selectedPeriod === i ? 'bg-brand-500 text-white border-brand-500' : 'bg-white text-gray-600 border-gray-200 hover:border-brand-300'
+              }`}>
+              {per.label}
+            </button>
+          ))}
+        </div>
+        <div className="pointer-events-none absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-l from-gray-50 to-transparent" />
       </div>
 
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
-        {TABS.map(([val, label]) => (
-          <button key={val} onClick={() => setTab(val)}
-            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${tab === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-            {label}
-          </button>
-        ))}
+      <div className="relative">
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto scrollbar-hide snap-x snap-proximity">
+          {TABS.map(([val, label]) => (
+            <button key={val} onClick={() => setTab(val)}
+              className={`shrink-0 snap-start whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${tab === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="pointer-events-none absolute right-1 top-1 bottom-1 w-8 bg-gradient-to-l from-gray-100 to-transparent rounded-r-xl" />
       </div>
 
       {loading ? (
