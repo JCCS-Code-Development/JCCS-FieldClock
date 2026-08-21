@@ -13,8 +13,20 @@ function requireFields(array $body, array $fields): void {
     }
 }
 
+// Despite the name, this is a trim/normalize step, not an HTML-escaping
+// step — it used to run every stored string through htmlspecialchars(),
+// which stored literal "&amp;", "&lt;", etc. in the database (e.g. "Smith
+// & Sons" became "Smith &amp; Sons" on disk). That's the wrong layer to
+// escape at: every write here goes through PDO prepared statements (no SQL
+// injection concern), every read is rendered by React via plain JSX text
+// nodes — never dangerouslySetInnerHTML anywhere in this app — so React
+// already does the correct HTML-escaping at render time, and the printed
+// checks are the same React components. Escaping again at storage time
+// only doubled up and corrupted the display everywhere, including on
+// physical checks. See api/migrations/fix_sanitized_html_entities.sql for
+// the one-time cleanup of data already corrupted this way.
 function sanitizeString(mixed $val): string {
-    return htmlspecialchars(trim((string)$val), ENT_QUOTES, 'UTF-8');
+    return trim((string)$val);
 }
 
 function sendSMS(string $to, string $message): bool {
