@@ -448,7 +448,7 @@ export default function ClockPanel({ showHeader = true }) {
                 <p className="text-xl lg:text-2xl font-bold text-gray-900 leading-tight">
                   {t('home.welcome', { name: firstName })}
                 </p>
-                <p className="text-sm lg:text-base text-gray-400 mt-0.5">
+                <p className="text-sm lg:text-base text-brand-700 font-semibold mt-1">
                   {t('home.todayIs', { date: format(now, 'EEEE, MMMM d', { locale: dateFnsLocale }) })}
                 </p>
               </div>
