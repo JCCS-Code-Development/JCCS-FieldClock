@@ -773,7 +773,7 @@ export default function MyPay() {
           Breakdown) can scroll fully clear of the fixed bottom nav — the
           page-level bottom padding alone isn't enough once a card near the
           end of the page grows taller. */}
-      <div className="h-6 shrink-0" />
+      <div className="h-24 shrink-0" />
     </div>
   )
 }
