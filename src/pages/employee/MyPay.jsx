@@ -758,6 +758,12 @@ export default function MyPay() {
           </div>
         </div>
       )}
+
+      {/* Extra trailing room so the last card's expanded content (e.g. Pay
+          Breakdown) can scroll fully clear of the fixed bottom nav — the
+          page-level bottom padding alone isn't enough once a card near the
+          end of the page grows taller. */}
+      <div className="h-16 shrink-0" />
     </div>
   )
 }
