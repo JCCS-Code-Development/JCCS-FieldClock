@@ -798,7 +798,7 @@ export default function AdminTimesheets() {
       </aside>
 
       {/* ── Timesheet detail ─────────────────────────────────── */}
-      <div className="flex-1 min-w-0 flex flex-col gap-4">
+      <div className="w-full flex-1 min-w-0 flex flex-col gap-4">
         {!selectedEmp ? (
           <div className="bg-white rounded-2xl border border-gray-100 flex items-center justify-center py-24">
             <p className="text-gray-400 text-sm">Select an employee to view timesheets</p>
