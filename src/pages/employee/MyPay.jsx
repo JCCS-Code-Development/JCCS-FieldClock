@@ -185,16 +185,14 @@ export default function MyPay() {
         </svg>
       </button>
 
-      <div className="relative">
-        <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1 overflow-x-auto scrollbar-hide snap-x snap-proximity">
-          {TABS.map(([val, label]) => (
-            <button key={val} onClick={() => setTab(val)}
-              className={`shrink-0 snap-start whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="pointer-events-none absolute right-1 top-1 bottom-1 w-8 bg-gradient-to-l from-gray-100 to-transparent rounded-r-xl" />
+      <div className="grid grid-cols-3 gap-1.5 bg-gray-100 rounded-xl p-1">
+        {TABS.map(([val, label]) => (
+          <button key={val} onClick={() => setTab(val)}
+            className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg text-xs font-semibold text-center leading-tight transition-colors ${tab === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+            {TAB_ICONS[val]}
+            {label}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -736,6 +734,17 @@ const CORR_TYPES = [
   { value: 'job',   icon: '📍', label: 'Job Site' },
   { value: 'other', icon: '💬', label: 'Something Else' },
 ]
+
+// Icons for the sub-tab tiles (Pay Summary / Time Log / My Requests / Time
+// Off / Loans) — sized smaller (w-5 h-5) than the shared w-6 h-6 set below,
+// which is used in the roomier stat cards.
+const TAB_ICONS = {
+  pay: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="2" y="5" width="20" height="14" rx="2"/><path strokeLinecap="round" d="M2 10h20M6 15h4M14 15h4"/></svg>,
+  log: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 7v5l3.5 3.5"/></svg>,
+  requests: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 4h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/><rect x="5" y="6" width="14" height="15" rx="1.5" strokeLinecap="round" strokeLinejoin="round"/><path strokeLinecap="round" d="M9 12l2 2 4-4"/></svg>,
+  timeoff: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="4" width="18" height="18" rx="2"/><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18"/></svg>,
+  loans: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10l9-6 9 6M4 10v9M20 10v9M8 10v9M16 10v9M2 19h20"/></svg>,
+}
 
 const ClockIcon  = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 7v5l3.5 3.5"/></svg>
 const CalendarIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="4" width="18" height="18" rx="2"/><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18"/></svg>
