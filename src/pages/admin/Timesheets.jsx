@@ -845,18 +845,18 @@ export default function AdminTimesheets() {
             </div>
 
             {/* Week navigator + tabs */}
-            <div className="flex flex-col items-center gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl overflow-hidden sm:self-start">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="flex items-center w-full bg-white border border-gray-200 rounded-xl overflow-hidden sm:w-auto sm:self-start">
                 <button onClick={() => setWeekOffset(w => w - 1)}
-                  className="px-3 py-2 text-gray-500 hover:bg-gray-50 transition-colors text-sm font-medium">‹</button>
-                <span className="px-3 py-2 text-sm font-semibold text-gray-900 min-w-[120px] text-center border-x border-gray-200">
+                  className="px-4 py-3 text-gray-500 active:bg-gray-50 transition-colors text-base font-medium">‹</button>
+                <span className="flex-1 sm:flex-none px-3 py-3 text-sm font-semibold text-gray-900 sm:min-w-[120px] text-center border-x border-gray-200">
                   {weekLabel}
                 </span>
                 <button onClick={() => setWeekOffset(w => Math.min(w + 1, 0))}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${weekOffset < 0 ? 'text-gray-500 hover:bg-gray-50' : 'text-gray-300 cursor-default'}`}
+                  className={`px-4 py-3 text-base font-medium transition-colors ${weekOffset < 0 ? 'text-gray-500 active:bg-gray-50' : 'text-gray-300 cursor-default'}`}
                   disabled={weekOffset >= 0}>›</button>
               </div>
-              <span className="text-xs text-gray-400">{dateFrom} – {dateTo}</span>
+              <span className="text-xs text-gray-400 text-center sm:text-left">{dateFrom} – {dateTo}</span>
               <div className="sm:flex-1" />
               <div className="grid grid-cols-3 w-full gap-1 bg-gray-100 rounded-xl p-1 sm:flex sm:w-auto sm:overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
                 <button onClick={() => setTab('log')}
