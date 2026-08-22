@@ -105,6 +105,7 @@
     "title": "My Pay",
     "thisWeek": "This Week",
     "lastWeek": "Last Week",
+    "selectPeriod": "Select Period",
     "noData": "No pay data for this period.",
     "noEntries": "No time entries for this period.",
     "noRequests": "No correction requests yet.",

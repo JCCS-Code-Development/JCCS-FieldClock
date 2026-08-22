@@ -32,6 +32,7 @@ export default function MyPay() {
   const periods = buildPeriods(t)
 
   const [selectedPeriod, setSelectedPeriod] = useState(0)
+  const [periodSheetOpen, setPeriodSheetOpen] = useState(false)
   const [data, setData]           = useState(null)
   const [loading, setLoading]     = useState(true)
   const [entries, setEntries]     = useState([])
@@ -171,25 +172,24 @@ export default function MyPay() {
     <div className="px-4 pt-6 pb-6 flex flex-col gap-4 w-full">
       <h1 className="text-xl font-bold text-gray-900">{t('pay.title')}</h1>
 
-      <div className="relative -mx-4">
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide snap-x snap-proximity px-4 pb-1">
-          {periods.map((per, i) => (
-            <button key={i} onClick={() => setSelectedPeriod(i)}
-              className={`shrink-0 snap-start px-3.5 py-1.5 rounded-xl text-sm font-medium border transition-colors ${
-                selectedPeriod === i ? 'bg-brand-500 text-white border-brand-500' : 'bg-white text-gray-600 border-gray-200 hover:border-brand-300'
-              }`}>
-              {per.label}
-            </button>
-          ))}
-        </div>
-        <div className="pointer-events-none absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-l from-gray-50 to-transparent" />
-      </div>
+      <button onClick={() => setPeriodSheetOpen(true)}
+        className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-2xl bg-white border border-gray-200 active:bg-gray-50 transition-colors">
+        <span className="flex items-center gap-2.5 min-w-0">
+          <span className="w-9 h-9 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+            {CalendarIcon}
+          </span>
+          <span className="text-sm font-semibold text-gray-900 truncate">{periods[selectedPeriod]?.label}</span>
+        </span>
+        <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
 
       <div className="relative">
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto scrollbar-hide snap-x snap-proximity">
+        <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1 overflow-x-auto scrollbar-hide snap-x snap-proximity">
           {TABS.map(([val, label]) => (
             <button key={val} onClick={() => setTab(val)}
-              className={`shrink-0 snap-start whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${tab === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              className={`shrink-0 snap-start whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
               {label}
             </button>
           ))}
@@ -683,6 +683,36 @@ export default function MyPay() {
           </div>
         )}
       </Modal>
+
+      {/* ── Period picker — bottom sheet ─────────────────────── */}
+      {periodSheetOpen && (
+        <div className="fixed inset-0 z-[1100] flex flex-col justify-end" onClick={() => setPeriodSheetOpen(false)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative bg-white rounded-t-3xl overflow-hidden" onClick={ev => ev.stopPropagation()}>
+            <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-gray-300" /></div>
+            <p className="text-center text-sm font-bold text-gray-900 pt-1 pb-3">{t('pay.selectPeriod')}</p>
+            <div className="flex flex-col divide-y divide-gray-50 pb-2">
+              {periods.map((per, i) => (
+                <button key={i}
+                  onClick={() => { setSelectedPeriod(i); setPeriodSheetOpen(false) }}
+                  className={`w-full flex items-center justify-between gap-3 px-5 py-4 text-left active:bg-gray-50 transition-colors ${
+                    selectedPeriod === i ? 'bg-brand-50' : ''
+                  }`}>
+                  <span className={`text-sm font-semibold ${selectedPeriod === i ? 'text-brand-700' : 'text-gray-800'}`}>
+                    {per.label}
+                  </span>
+                  {selectedPeriod === i && (
+                    <svg className="w-5 h-5 text-brand-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div style={{ height: 'max(12px, env(safe-area-inset-bottom))' }} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
