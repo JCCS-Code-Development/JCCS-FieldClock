@@ -89,6 +89,10 @@ export default function MyPay() {
   useEffect(() => {
     listPaychecks().then((d) => setPaychecks(d.paychecks ?? [])).catch(() => {})
     getCurrentSubscription().then(setPushSub).catch(() => {})
+    // Fetched eagerly (not just when the Loans tab is opened) so we know
+    // up-front whether to show that tab at all.
+    loadLoans()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -165,7 +169,8 @@ export default function MyPay() {
     ['log', t('pay.tabs.log')],
     ['requests', t('pay.tabs.requests')],
     ['timeoff', t('timeoff.title')],
-    ['loans', t('nav.loans')],
+    // Only shown to employees who actually have a loan on record.
+    ...(myLoans.length > 0 ? [['loans', t('nav.loans')]] : []),
   ]
 
   return (
