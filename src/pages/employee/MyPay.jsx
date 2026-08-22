@@ -209,14 +209,20 @@ export default function MyPay() {
         </svg>
       </button>
 
-      <div className="grid grid-cols-3 gap-1.5 bg-gray-100 rounded-xl p-1">
-        {TABS.map(([val, label]) => (
-          <button key={val} onClick={() => setTab(val)}
-            className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg text-xs font-semibold text-center leading-tight transition-colors ${tab === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
-            {TAB_ICONS[val]}
-            {label}
-          </button>
-        ))}
+      <div className="relative">
+        <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1 overflow-x-auto scrollbar-hide snap-x snap-proximity">
+          {TABS.map(([val, label]) => (
+            <button key={val} onClick={() => setTab(val)}
+              className={`basis-1/4 shrink-0 snap-start flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg text-xs font-semibold text-center leading-tight transition-colors ${tab === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+              {TAB_ICONS[val]}
+              {label}
+            </button>
+          ))}
+        </div>
+        {/* Only hints at more to scroll when Loans (the 5th tab) is present */}
+        {TABS.length > 4 && (
+          <div className="pointer-events-none absolute right-1 top-1 bottom-1 w-8 bg-gradient-to-l from-gray-100 to-transparent rounded-r-xl" />
+        )}
       </div>
 
       {loading ? (
