@@ -12,6 +12,7 @@ require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
 require_once __DIR__ . '/../middleware/auth.php';
+require_once __DIR__ . '/../middleware/validate.php';
 require_once __DIR__ . '/_helper.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit; }
@@ -38,10 +39,22 @@ beginTimeclockTransaction($pdo, (int)$auth['user_id']);
 // same employee registered) if provided
 if ($jobId) {
     $j = $pdo->prepare(
-        "SELECT id FROM jobs WHERE id = ? AND (status = 'active' OR (status = 'pending_review' AND registered_by = ?))"
+        "SELECT id, latitude, longitude, clock_in_radius_meters FROM jobs
+         WHERE id = ? AND (status = 'active' OR (status = 'pending_review' AND registered_by = ?))"
     );
     $j->execute([$jobId, $auth['user_id']]);
-    if (!$j->fetch()) $jobId = null;
+    $job = $j->fetch();
+    if (!$job) $jobId = null;
+}
+
+// Flag (but never block) a clock-in whose GPS position doesn't match the
+// selected job site — replaces the old "traveling" status/arrival flow.
+// The employee still clocks in normally; admins and the employee's own
+// activity view just see a warning on the entry.
+$withinRadius = null;
+if ($jobId && $lat !== null && $lng !== null && !empty($job['latitude']) && !empty($job['longitude'])) {
+    $distanceMeters = haversineMeters((float)$job['latitude'], (float)$job['longitude'], $lat, $lng);
+    $withinRadius   = $distanceMeters <= $job['clock_in_radius_meters'];
 }
 
 validateVisitCategory($pdo, $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription, $jobId);
@@ -61,9 +74,12 @@ if ($openRow = $open->fetch()) {
 }
 
 $result = openEntry(
-    $pdo, $auth['user_id'], $jobId, 'working', 'direct_labor', $lat, $lng, $acc, null, $notes,
+    $pdo, $auth['user_id'], $jobId, 'working', 'direct_labor', $lat, $lng, $acc, $withinRadius, $notes,
     $visitCategory, $estimateId, $estimateSubtype, $workOrderNumber, $engineerName, $visitDescription,
     source: 'day_start'
 );
 $pdo->commit();
-echo json_encode($result);
+echo json_encode($result + [
+    'within_radius'   => $withinRadius,
+    'distance_meters' => isset($distanceMeters) ? (int)round($distanceMeters) : null,
+]);

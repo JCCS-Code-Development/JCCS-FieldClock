@@ -22,3 +22,16 @@
     min-height: 100svh;
   }
 }
+
+@layer utilities {
+  /* Hides the scrollbar on horizontally-scrollable rows (e.g. mobile pill
+     tabs) while keeping the element scrollable via touch/wheel/drag. Native
+     scrollbar tracks look like broken UI chrome on a phone-width layout. */
+  .scrollbar-hide {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* old Edge/IE */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+}

@@ -58,9 +58,9 @@ export default function EmployeeLayout() {
     navigate('/login', { replace: true })
   }
 
+  // Jobs tab provisionally removed — may come back later.
   const NAV = [
     { to: '/',        icon: ClockIcon, label: t('nav.clock'),       end: true },
-    { to: '/jobs',    icon: JobsIcon,  label: t('nav.jobs') },
     { to: '/my-pay',  icon: PayIcon,   label: t('nav.myPay') },
     { to: '/my-docs', icon: DocsIcon,  label: t('nav.myDocuments') },
   ]
@@ -138,17 +138,16 @@ export default function EmployeeLayout() {
         {/* Spacer below fixed header (mobile only) */}
         <div className="lg:hidden h-[52px] shrink-0" />
 
-        <PullToRefresh className="flex-1 flex flex-col"
-          style={{ paddingBottom: 'max(96px, calc(64px + env(safe-area-inset-bottom)))' }}
+        <PullToRefresh className="flex-1 flex flex-col scrollbar-hide"
+          style={{ paddingBottom: 'max(76px, calc(64px + env(safe-area-inset-bottom)))' }}
           onRefresh={() => setRefreshKey(k => k + 1)}>
+          {/* Document reminder — sits right under the header; renders a spacer
+              here (in-flow) plus the actual fixed banner via portal */}
+          <PendingDocsBanner />
           <div key={refreshKey} className="max-w-4xl mx-auto w-full flex-1 flex flex-col px-4 pt-7 pb-4 lg:p-6">
             <Outlet />
-            <div className="lg:hidden h-24 shrink-0" />
           </div>
         </PullToRefresh>
-
-        {/* Document reminder — sits just above the bottom nav */}
-        <PendingDocsBanner />
 
         {/* ── Mobile bottom nav ────────────────────────────── */}
         <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-100 flex z-40"
@@ -168,13 +167,6 @@ export default function EmployeeLayout() {
                 <span>{t('nav.clock')}</span>
               </>
             )}
-          </NavLink>
-
-          <NavLink to="/jobs"
-            className={({ isActive }) =>
-              `flex-1 flex flex-col items-center justify-center py-3 gap-0.5 text-[11px] font-semibold transition-colors ${isActive ? 'text-brand-500' : 'text-gray-400'}`
-            }>
-            <JobsIcon /><span>{t('nav.jobs')}</span>
           </NavLink>
 
           <NavLink to="/my-pay"
@@ -227,7 +219,7 @@ export default function EmployeeLayout() {
                   </button>
                 )}
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-sm font-medium text-gray-700">Language</span>
+                  <span className="text-sm font-medium text-gray-700">{t('nav.language')}</span>
                   <LangSwitcher className="text-gray-500" />
                 </div>
                 <button onClick={handleLogout}

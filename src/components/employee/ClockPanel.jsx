@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -9,9 +9,8 @@ import { useTimeclockStore } from '../../store/timeclockStore'
 import { useAuthStore } from '../../store/authStore'
 import { useGPS } from '../../hooks/useGPS'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
-import { getStatus, dayStart, dayEnd, setTraveling, markArrival, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
+import { getStatus, dayStart, dayEnd, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
 import { getNearbyJobs, listJobs, registerJob } from '../../api/jobs'
-import { listEstimates } from '../../api/estimates'
 import { groupJobsByCompany } from '../../utils/jobs'
 import Spinner from '../ui/Spinner'
 import Modal from '../ui/Modal'
@@ -27,58 +26,27 @@ const dotMarker = L.divIcon({
   iconAnchor: [7, 7],
 })
 
-const PlayIcon = () => (
-  <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-)
-const StopIcon = () => (
-  <svg className="w-11 h-11" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-)
 const LocationPinIcon = ({ className = 'w-8 h-8' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
     <circle cx="12" cy="9" r="2.5"/>
   </svg>
 )
-const WrenchIcon = () => (
-  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
-  </svg>
-)
-const DocumentIcon = () => (
-  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7 3h7l4 4v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6M9 16h6M13 3v5h5"/>
-  </svg>
-)
-const ClipboardIcon = () => (
-  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 4h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/>
-    <rect x="5" y="6" width="14" height="15" rx="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    <path strokeLinecap="round" d="M9 12l2 2 4-4"/>
-  </svg>
-)
-const PlusIcon = () => (
-  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 8v8M8 12h8"/>
-  </svg>
-)
-const AlertIcon = () => (
-  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3.5l9.5 16.5H2.5L12 3.5z"/>
-    <path strokeLinecap="round" d="M12 10v4"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>
-  </svg>
-)
-const ShieldIcon = () => (
-  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4"/>
+const ActivityIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h4l2-7 4 14 2-7h6"/>
   </svg>
 )
 
 const STATUS_CONFIG = {
-  working:   { text: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
-  traveling: { text: 'text-sky-700',   bg: 'bg-sky-50',   border: 'border-sky-200' },
-  done:      { text: 'text-gray-500',  bg: 'bg-gray-50',  border: 'border-gray-200' },
+  working: { text: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
+  done:    { text: 'text-gray-500',  bg: 'bg-gray-50',  border: 'border-gray-200' },
+}
+
+// Matches the m/km convention already used in the job-site dropdown below.
+function formatDistanceLabel(m) {
+  if (m == null) return ''
+  return m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(1)}km`
 }
 
 async function reverseGeocode(lat, lng) {
@@ -154,6 +122,25 @@ export default function ClockPanel({ showHeader = true }) {
 
   const [loading, setLoading]               = useState(false)
   const [activityOpen, setActivityOpen]     = useState(false)
+  const rootRef         = useRef(null)
+  const activityCardRef = useRef(null)
+
+  // Expanding "Today's Activity" scrolls it comfortably into view; collapsing
+  // it scrolls back up to the main clock view instead of leaving the user
+  // stranded mid-page next to a now-empty card.
+  const toggleActivity = () => {
+    setActivityOpen((wasOpen) => {
+      const next = !wasOpen
+      requestAnimationFrame(() => {
+        if (next) {
+          activityCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        } else {
+          rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      })
+      return next
+    })
+  }
   const [jobs, setJobs]                     = useState([])
   const [selectedJobId, setSelectedJobId]   = useState('')
   const [locationLabel, setLocationLabel]   = useState(null)
@@ -161,6 +148,10 @@ export default function ClockPanel({ showHeader = true }) {
   const [showManual, setShowManual]         = useState(false)
   const [manualLocation, setManualLocation] = useState('')
   const [error, setError]                   = useState('')
+  // Set right after a clock-in whose GPS doesn't match the selected job site —
+  // a non-blocking heads-up, not an error. Replaces the old traveling/arrival
+  // flow: the clock-in always succeeds, this is just a flag on top of it.
+  const [offSiteNotice, setOffSiteNotice]   = useState(null)
 
   const [myRequests, setMyRequests]   = useState([])
   const [detailSheet, setDetailSheet] = useState(null)
@@ -172,25 +163,6 @@ export default function ClockPanel({ showHeader = true }) {
   const [corrReason, setCorrReason]   = useState('')
   const [corrSaving, setCorrSaving]   = useState(false)
   const [corrError, setCorrError]     = useState('')
-
-  const [visitModal, setVisitModal]               = useState(false)
-  const [visitStep, setVisitStep]                 = useState(1)
-  const [visitEstimates, setVisitEstimates]       = useState([])
-  const [loadingVisitEstimates, setLoadingVisitEstimates] = useState(false)
-  const [visitCategory, setVisitCategory]         = useState(null)
-  const [pickedEstimateId, setPickedEstimateId]   = useState(null)
-  const [workOrderNumber, setWorkOrderNumber]     = useState('')
-  const [fieldDescription, setFieldDescription]   = useState('')
-  const [engineerName, setEngineerName]           = useState('')
-  const [forceVisitPicker, setForceVisitPicker]   = useState(false)
-
-  const resetVisitFields = () => {
-    setVisitCategory(null)
-    setPickedEstimateId(null)
-    setWorkOrderNumber('')
-    setFieldDescription('')
-    setEngineerName('')
-  }
 
   const isClockedIn = dayStarted && statusLabel !== 'done' && statusLabel !== null
   const liveElapsed = useLiveElapsed(isClockedIn, currentEntry)
@@ -242,9 +214,9 @@ export default function ClockPanel({ showHeader = true }) {
   }
 
   const handleSubmitCorrection = async () => {
-    if (!corrReason.trim()) { setCorrError('Please provide an explanation.'); return }
-    if ((corrType === 'start' || corrType === 'both') && !corrStart) { setCorrError('Please enter the corrected clock-in time.'); return }
-    if ((corrType === 'end'   || corrType === 'both') && !corrEnd)   { setCorrError('Please enter the corrected clock-out time.'); return }
+    if (!corrReason.trim()) { setCorrError(t('pay.correctionModal.errors.reasonRequired')); return }
+    if ((corrType === 'start' || corrType === 'both') && !corrStart) { setCorrError(t('pay.correctionModal.errors.startRequired')); return }
+    if ((corrType === 'end'   || corrType === 'both') && !corrEnd)   { setCorrError(t('pay.correctionModal.errors.endRequired')); return }
     setCorrSaving(true); setCorrError('')
     try {
       await createChangeRequest({
@@ -257,7 +229,7 @@ export default function ClockPanel({ showHeader = true }) {
       const reqs = await getChangeRequests().catch(() => ({ requests: [] }))
       setMyRequests(reqs.requests ?? [])
     } catch (err) {
-      setCorrError(err?.response?.data?.error ?? 'Failed to submit. Please try again.')
+      setCorrError(err?.response?.data?.error ?? t('pay.correction.submitError'))
     } finally { setCorrSaving(false) }
   }
 
@@ -270,82 +242,24 @@ export default function ClockPanel({ showHeader = true }) {
         setError(t('home.noLocation'))
         return
       }
-      const selectedJob = jobs.find((j) => String(j.id) === String(selectedJobId))
-      const isFarFromJob = selectedJob
-        && selectedJob.distance_meters != null
-        && selectedJob.clock_in_radius_meters != null
-        && selectedJob.distance_meters > selectedJob.clock_in_radius_meters
-
-      if (selectedJobId && isFarFromJob) {
-        handleStartTraveling()
-      } else if (selectedJobId && selectedJob?.is_recurring_maintenance && !forceVisitPicker) {
-        finalizeVisit({})
-      } else {
-        resetVisitFields()
-        setVisitStep(1)
-        setVisitModal(true)
-      }
+      performClockIn()
     } else {
       setLoading(true)
       try {
         await dayEnd({ lat: position?.lat, lng: position?.lng })
         setTimeclockData({ statusLabel: 'done', currentEntry: null, activeJob: null, dayStarted: true })
+        setOffSiteNotice(null)
       } finally { setLoading(false) }
     }
   }
 
-  const handleStartTraveling = async () => {
+  // Clocking in always registers the shift immediately — no separate
+  // "traveling" status or "I've arrived" step. If GPS shows the employee
+  // isn't actually at the selected job site, the entry is just flagged
+  // (via within_radius, computed server-side) rather than blocked.
+  const performClockIn = async () => {
     setLoading(true)
-    try {
-      const data = await setTraveling({
-        job_id:   parseInt(selectedJobId),
-        lat:      position?.lat      ?? null,
-        lng:      position?.lng      ?? null,
-        accuracy: position?.accuracy ?? null,
-      })
-      setTimeclockData(data.timeclock)
-    } catch (err) {
-      setError(err?.response?.data?.error ?? t('home.travelStartError'))
-    } finally { setLoading(false) }
-  }
-
-  const openArrival = () => {
-    setError('')
-    if (activeJob?.is_recurring_maintenance && !forceVisitPicker) {
-      finalizeVisit({})
-      return
-    }
-    resetVisitFields()
-    setVisitStep(1)
-    setVisitModal(true)
-  }
-
-  const openEstimatePicker = () => {
-    setVisitStep(2)
-    setLoadingVisitEstimates(true)
-    listEstimates({ job_id: selectedJobId, active: 1 })
-      .then((d) => setVisitEstimates(d.estimates ?? []))
-      .catch(() => setVisitEstimates([]))
-      .finally(() => setLoadingVisitEstimates(false))
-  }
-
-  const handlePickCategory = (value) => {
-    setVisitCategory(value)
-    if (value === 'estimate') {
-      openEstimatePicker()
-    } else {
-      setVisitStep(2)
-    }
-  }
-
-  const finalizeVisit = (fields = {}) => {
-    if (statusLabel === 'traveling') return performArrival(fields)
-    return performClockIn(fields)
-  }
-
-  const performClockIn = async (fields = {}) => {
-    setVisitModal(false)
-    setLoading(true)
+    setOffSiteNotice(null)
     try {
       let jobId = selectedJobId ? parseInt(selectedJobId) : null
       if (!jobId && manualLocation.trim()) {
@@ -362,35 +276,15 @@ export default function ClockPanel({ showHeader = true }) {
         lat:      position?.lat      ?? null,
         lng:      position?.lng      ?? null,
         accuracy: position?.accuracy ?? null,
-        ...fields,
       })
       setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
       setShowManual(false)
       setManualLocation('')
-      setForceVisitPicker(false)
-    } catch (err) {
-      setError(err?.response?.data?.error ?? t('home.clockInError'))
-    } finally { setLoading(false) }
-  }
-
-  const performArrival = async (fields = {}) => {
-    setVisitModal(false)
-    setLoading(true)
-    try {
-      const data = await markArrival({
-        job_id:   parseInt(selectedJobId),
-        lat:      position?.lat      ?? null,
-        lng:      position?.lng      ?? null,
-        accuracy: position?.accuracy ?? null,
-        ...fields,
-      })
-      setTimeclockData(data.timeclock)
-      setForceVisitPicker(false)
       if (data.within_radius === false) {
-        setError(t('home.arrivalOutOfRadius', { distance: data.distance_meters }))
+        setOffSiteNotice({ distanceMeters: data.distance_meters })
       }
     } catch (err) {
-      setError(err?.response?.data?.error ?? t('home.arrivalError'))
+      setError(err?.response?.data?.error ?? t('home.clockInError'))
     } finally { setLoading(false) }
   }
 
@@ -404,41 +298,49 @@ export default function ClockPanel({ showHeader = true }) {
     ?? (currentEntry?.notes ? currentEntry.notes.replace('Location: ', '') : null)
     ?? locationLabel
 
-  const selectedJobObj = jobs.find((j) => String(j.id) === String(selectedJobId))
+  // currentEntry.within_radius comes straight from the DB column (0/1/null via
+  // PDO), so coerce loosely rather than assume a strict boolean.
+  const isOffSite = isClockedIn
+    && currentEntry?.within_radius !== null && currentEntry?.within_radius !== undefined
+    && Number(currentEntry.within_radius) === 0
 
   return (
-    <div className="flex flex-col gap-3.5 lg:grid lg:grid-cols-2 lg:gap-6 w-full">
+    <div ref={rootRef} className="flex flex-col gap-3.5 lg:grid lg:grid-cols-2 lg:gap-6 w-full scroll-mt-4">
 
       {/* ── CLOCK SECTION — full width on mobile, left col on desktop ── */}
       <div className="flex flex-col items-center gap-4 lg:gap-8 lg:py-2">
 
-        {/* Header: greeting + date, centered — omitted when embedded somewhere that already shows one */}
-        {showHeader && (
-          <div className="w-full text-center select-none">
-            <p className="text-xl lg:text-2xl font-bold text-gray-900 leading-tight">
-              {t('home.welcome', { name: firstName })}
-            </p>
-            <p className="text-sm lg:text-base text-gray-400 mt-0.5">
-              {t('home.todayIs', { date: format(now, 'EEEE, MMMM d', { locale: dateFnsLocale }) })}
-            </p>
-          </div>
-        )}
+        {/* Greeting/date + Today's Total (left column) and Clock button (right
+            column, enlarged to balance the stacked text) on mobile;
+            unchanged centered/stacked layout on desktop */}
+        <div className="flex items-center w-full gap-4 lg:flex-col lg:gap-8 lg:justify-center">
 
-        {/* Today's total + Clock button — side by side on mobile, stacked on desktop */}
-        <div className="flex items-center justify-center w-full gap-6 lg:flex-col lg:gap-8">
-          <div className="text-center">
-            <p className="text-[10px] tracking-widest text-gray-400 uppercase font-semibold mb-1">{t('home.todaysTotal')}</p>
-            <p className={`text-3xl lg:text-5xl font-bold tabular-nums leading-none ${dayTotal > 0 ? 'text-gray-900' : 'text-gray-200'}`}>
-              {formatElapsed(dayTotal)}
-            </p>
+          <div className="flex min-w-0 basis-0 grow-[3] flex-col items-center gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4
+            lg:grow-0 lg:gap-8 lg:w-full lg:bg-transparent lg:border-0 lg:shadow-none lg:px-0 lg:py-0">
+            {showHeader && (
+              <div className="select-none text-center w-full">
+                <p className="text-xl lg:text-2xl font-bold text-gray-900 leading-tight">
+                  {t('home.welcome', { name: firstName })}
+                </p>
+                <p className="text-sm lg:text-base text-brand-700 font-semibold mt-1">
+                  {t('home.todayIs', { date: format(now, 'EEEE, MMMM d', { locale: dateFnsLocale }) })}
+                </p>
+              </div>
+            )}
+            <div className="text-center">
+              <p className="text-[10px] tracking-widest text-gray-400 uppercase font-semibold mb-1">{t('home.todaysTotal')}</p>
+              <p className={`text-3xl lg:text-5xl font-bold tabular-nums leading-none ${dayTotal > 0 ? 'text-gray-900' : 'text-gray-200'}`}>
+                {formatElapsed(dayTotal)}
+              </p>
+            </div>
           </div>
 
-          <div className="relative flex items-center justify-center shrink-0">
-            {isClockedIn && <span className="absolute w-32 h-32 lg:w-60 lg:h-60 rounded-full animate-ping bg-red-400/20" />}
+          <div className="relative flex basis-0 grow-[2] lg:grow-0 items-center justify-center">
+            {isClockedIn && <span className="absolute w-40 h-40 lg:w-60 lg:h-60 rounded-full animate-ping bg-red-400/20" />}
             <button
               onClick={handleToggle}
               disabled={loading || !isOnline}
-              className={`relative w-28 h-28 lg:w-52 lg:h-52 rounded-full flex flex-col items-center justify-center gap-1 lg:gap-2 text-white font-semibold shadow-2xl transition-all duration-300 active:scale-95 disabled:opacity-50 ring-8 lg:ring-[10px]
+              className={`relative w-36 h-36 lg:w-52 lg:h-52 rounded-full flex flex-col items-center justify-center gap-1.5 lg:gap-2 text-white font-semibold shadow-2xl transition-all duration-300 active:scale-95 disabled:opacity-50 ring-8 lg:ring-[10px]
                 ${isClockedIn
                   ? 'bg-red-500 ring-red-100 shadow-red-300/50'
                   : 'bg-brand-500 ring-brand-100 shadow-brand-300/50'
@@ -448,10 +350,10 @@ export default function ClockPanel({ showHeader = true }) {
                 ? <Spinner size="lg" />
                 : <>
                     {isClockedIn
-                      ? <svg className="w-8 h-8 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                      : <svg className="w-8 h-8 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                      ? <svg className="w-9 h-9 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                      : <svg className="w-9 h-9 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                     }
-                    <span className="text-[11px] lg:text-base font-bold tracking-wide">
+                    <span className="text-xs lg:text-base font-bold tracking-wide">
                       {isClockedIn ? t('home.clockOut') : t('home.clockIn')}
                     </span>
                   </>
@@ -468,23 +370,20 @@ export default function ClockPanel({ showHeader = true }) {
               {t(`status.${statusLabel}`)}
             </span>
             {displayLocation && <p className="text-xs text-gray-400">{displayLocation}</p>}
+            {isOffSite && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                ⚠️ {t('home.offSiteBadge')}
+              </span>
+            )}
           </div>
         )}
 
-        {/* Traveling — show "I've Arrived" once clocked in and on the way */}
-        {isClockedIn && statusLabel === 'traveling' && (
-          <div className="w-full flex flex-col items-center gap-2">
-            <button onClick={openArrival} disabled={loading}
-              className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-2xl bg-sky-500 text-white font-bold text-base shadow-lg active:bg-sky-600 transition-colors disabled:opacity-50">
-              <LocationPinIcon className="w-5 h-5" />
-              {t('home.iveArrived')}
-            </button>
-            {activeJob?.is_recurring_maintenance && !forceVisitPicker && (
-              <button onClick={() => setForceVisitPicker(true)} className="text-xs text-gray-400 hover:text-brand-500 transition-colors">
-                {t('visitType.needsEstimateOrEmergency')}
-              </button>
-            )}
-          </div>
+        {/* One-time heads-up right after a clock-in whose GPS didn't match the
+            selected job site — non-blocking, the clock-in already succeeded */}
+        {offSiteNotice && (
+          <p className="text-xs text-amber-700 font-medium bg-amber-50 border border-amber-200 px-4 py-2.5 rounded-xl w-full text-center">
+            ⚠️ {t('home.offSiteNotice', { distance: formatDistanceLabel(offSiteNotice.distanceMeters) })}
+          </p>
         )}
 
         {!isOnline && (
@@ -521,11 +420,9 @@ export default function ClockPanel({ showHeader = true }) {
             )}
           </div>
 
-          <div className="px-4 py-3 border-b border-gray-50">
+          <div className="px-4 py-3">
             <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-2">
-              {isClockedIn
-                ? (statusLabel === 'traveling' ? t('home.headingTo') : t('home.clockedInAt'))
-                : t('home.selectLocation')}
+              {isClockedIn ? t('home.clockedInAt') : t('home.selectLocation')}
             </p>
             {isClockedIn ? (
               <div>
@@ -539,7 +436,7 @@ export default function ClockPanel({ showHeader = true }) {
                 <div className="relative">
                   <select
                     value={selectedJobId}
-                    onChange={(e) => { setSelectedJobId(e.target.value); setShowManual(false); setError(''); setForceVisitPicker(false) }}
+                    onChange={(e) => { setSelectedJobId(e.target.value); setShowManual(false); setError('') }}
                     className="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-gray-800 outline-none focus:border-brand-500 appearance-none"
                   >
                     <option value="">{t('home.selectJobSite')}</option>
@@ -557,11 +454,6 @@ export default function ClockPanel({ showHeader = true }) {
                   </select>
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
                 </div>
-                {selectedJobObj?.is_recurring_maintenance && !forceVisitPicker && (
-                  <button onClick={() => setForceVisitPicker(true)} className="text-xs text-gray-400 hover:text-brand-500 transition-colors text-left">
-                    {t('visitType.needsEstimateOrEmergency')}
-                  </button>
-                )}
                 {loadingJobs && <p className="text-xs text-gray-400">{t('home.loadingLocations')}</p>}
                 {(showManual || (!loadingJobs && jobs.length === 0)) ? (
                   <div className="flex flex-col gap-1">
@@ -596,74 +488,96 @@ export default function ClockPanel({ showHeader = true }) {
               </div>
             )}
           </div>
+        </div>
 
-          {/* Today's activity — collapsible */}
-          {(() => {
-            const visible = todayEntries.filter((e) => e.cost_category !== 'day_end')
-            return (
-              <div>
-                <button onClick={() => setActivityOpen(v => !v)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left">
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">{t('home.todaysActivity')}</p>
-                    {visible.length > 0 && (
-                      <span className="text-[10px] font-bold bg-brand-100 text-brand-600 px-1.5 py-0.5 rounded-full">{visible.length}</span>
+        {/* Today's activity — its own card, collapsible, with a live preview so
+            it's useful (and legible) at a glance even before tapping it open */}
+        {(() => {
+          const visible = todayEntries.filter((e) => e.cost_category !== 'day_end')
+          const lastEntry = visible[visible.length - 1] ?? null
+          return (
+            <div ref={activityCardRef} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm scroll-mt-16 scroll-mb-36">
+              <button onClick={toggleActivity}
+                className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left active:bg-gray-50 transition-colors">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-9 h-9 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+                    <ActivityIcon />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-800">{t('home.todaysActivity')}</p>
+                      {visible.length > 0 && (
+                        <span className="text-[10px] font-bold bg-brand-100 text-brand-600 px-1.5 py-0.5 rounded-full">{visible.length}</span>
+                      )}
+                    </div>
+                    {!activityOpen && (
+                      <p className="text-xs text-gray-400 truncate mt-0.5">
+                        {lastEntry ? (
+                          <>
+                            <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle ${ENTRY_DOT[lastEntry.status_label] ?? 'bg-gray-400'}`} />
+                            <span className="capitalize font-medium text-gray-600">{lastEntry.status_label?.replace('_', ' ')}</span>
+                            {' · '}
+                            {format(new Date(lastEntry.start_time), 'h:mm a', { locale: dateFnsLocale })}
+                            {lastEntry.end_time ? ` – ${format(new Date(lastEntry.end_time), 'h:mm a', { locale: dateFnsLocale })}` : ` – ${t('home.now')}`}
+                          </>
+                        ) : t('home.noActivity')}
+                      </p>
                     )}
                   </div>
-                  <svg className={`w-4 h-4 text-gray-300 transition-transform ${activityOpen ? 'rotate-180' : ''}`}
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
-                  </svg>
-                </button>
-                {activityOpen && (
-                  <div className="px-4 pb-3">
-                    {visible.length === 0
-                      ? <p className="text-sm text-gray-300 text-center py-4">{t('home.noActivity')}</p>
-                      : <div className="flex flex-col divide-y divide-gray-50 max-h-40 lg:max-h-64 overflow-y-auto">
-                          {visible.map((entry, i) => {
-                            const dot = ENTRY_DOT[entry.status_label] ?? 'bg-gray-400'
-                            const loc = entry.job_name ?? (entry.notes ? entry.notes.replace('Location: ', '') : null)
-                            const hasReq = myRequests.some(r => String(r.entry_id) === String(entry.id) && r.status === 'pending')
-                            return (
-                              <button key={i} onClick={() => setDetailSheet(entry)}
-                                className="w-full flex items-start justify-between gap-3 py-2.5 first:pt-0 text-left active:bg-gray-50 -mx-1 px-1 rounded-lg transition-colors">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5 mb-0.5">
-                                    <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
-                                    <p className="text-xs font-semibold text-gray-800 capitalize">
-                                      {entry.status_label?.replace('_', ' ')}
-                                    </p>
-                                    {hasReq && <span className="text-[10px] text-amber-600 font-medium">· Pending</span>}
-                                  </div>
-                                  {loc && <p className="text-xs text-gray-400 truncate pl-3.5">{loc}</p>}
+                </div>
+                <svg className={`w-4 h-4 text-gray-300 transition-transform shrink-0 ${activityOpen ? 'rotate-180' : ''}`}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              {activityOpen && (
+                <div className="px-4 pb-3 border-t border-gray-50 pt-1">
+                  {visible.length === 0
+                    ? <p className="text-sm text-gray-300 text-center py-4">{t('home.noActivity')}</p>
+                    : <div className="flex flex-col divide-y divide-gray-50 max-h-40 lg:max-h-64 overflow-y-auto">
+                        {visible.map((entry, i) => {
+                          const dot = ENTRY_DOT[entry.status_label] ?? 'bg-gray-400'
+                          const loc = entry.job_name ?? (entry.notes ? entry.notes.replace('Location: ', '') : null)
+                          const hasReq = myRequests.some(r => String(r.entry_id) === String(entry.id) && r.status === 'pending')
+                          return (
+                            <button key={i} onClick={() => setDetailSheet(entry)}
+                              className="w-full flex items-start justify-between gap-3 py-2.5 first:pt-0 text-left active:bg-gray-50 -mx-1 px-1 rounded-lg transition-colors">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
+                                  <p className="text-xs font-semibold text-gray-800 capitalize">
+                                    {entry.status_label?.replace('_', ' ')}
+                                  </p>
+                                  {hasReq && <span className="text-[10px] text-amber-600 font-medium">· Pending</span>}
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <div className="text-right">
-                                    <p className="text-xs text-gray-500">
-                                      {format(new Date(entry.start_time), 'h:mm a')}
-                                      {' → '}
-                                      {entry.end_time
-                                        ? format(new Date(entry.end_time), 'h:mm a')
-                                        : <span className="text-brand-500 font-medium">{t('home.now')}</span>
-                                      }
-                                    </p>
-                                    <p className="text-xs font-bold text-gray-700 mt-0.5">
-                                      {formatDur(entry.start_time, entry.end_time)}
-                                    </p>
-                                  </div>
-                                  <svg className="w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                {loc && <p className="text-xs text-gray-400 truncate pl-3.5">{loc}</p>}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-right">
+                                  <p className="text-xs text-gray-500">
+                                    {format(new Date(entry.start_time), 'h:mm a', { locale: dateFnsLocale })}
+                                    {' → '}
+                                    {entry.end_time
+                                      ? format(new Date(entry.end_time), 'h:mm a', { locale: dateFnsLocale })
+                                      : <span className="text-brand-500 font-medium">{t('home.now')}</span>
+                                    }
+                                  </p>
+                                  <p className="text-xs font-bold text-gray-700 mt-0.5">
+                                    {formatDur(entry.start_time, entry.end_time)}
+                                  </p>
                                 </div>
-                              </button>
-                            )
-                          })}
-                        </div>
-                    }
-                  </div>
-                )}
-              </div>
-            )
-          })()}
-        </div>
+                                <svg className="w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                  }
+                </div>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* ── Shift detail bottom sheet ─────────────────────────── */}
@@ -686,25 +600,25 @@ export default function ClockPanel({ showHeader = true }) {
                     <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
                     <span className="capitalize">{e.status_label?.replace('_', ' ')}</span>
                   </span>
-                  <p className="text-sm text-gray-400 font-medium">{format(new Date(e.start_time), 'MMM d, yyyy')}</p>
+                  <p className="text-sm text-gray-400 font-medium">{format(new Date(e.start_time), 'MMM d, yyyy', { locale: dateFnsLocale })}</p>
                 </div>
                 <div className="bg-gray-50 rounded-2xl px-5 py-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">Clock In</p>
-                      <p className="text-2xl font-bold text-gray-900">{format(new Date(e.start_time), 'h:mm a')}</p>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">{t('pay.detail.clockIn')}</p>
+                      <p className="text-2xl font-bold text-gray-900">{format(new Date(e.start_time), 'h:mm a', { locale: dateFnsLocale })}</p>
                     </div>
                     <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                     <div className="text-right">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">Clock Out</p>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">{t('pay.detail.clockOut')}</p>
                       <p className={`text-2xl font-bold ${e.end_time ? 'text-gray-900' : 'text-orange-400'}`}>
-                        {e.end_time ? format(new Date(e.end_time), 'h:mm a') : 'In Progress'}
+                        {e.end_time ? format(new Date(e.end_time), 'h:mm a', { locale: dateFnsLocale }) : t('pay.inProgress')}
                       </p>
                     </div>
                   </div>
                   {durMs > 0 && (
                     <div className="border-t border-gray-200 pt-3 mt-3 text-center">
-                      <p className="text-sm font-semibold text-gray-600">{dh > 0 ? `${dh}h ${dm}m` : `${dm}m`} total</p>
+                      <p className="text-sm font-semibold text-gray-600">{t('pay.detail.total', { time: dh > 0 ? `${dh}h ${dm}m` : `${dm}m` })}</p>
                     </div>
                   )}
                 </div>
@@ -717,12 +631,12 @@ export default function ClockPanel({ showHeader = true }) {
                 {e.end_time && (
                   hasReq
                     ? <div className="bg-amber-50 rounded-2xl px-4 py-3.5 text-center">
-                        <p className="text-sm font-semibold text-amber-700">Modification Pending Review</p>
-                        <p className="text-xs text-amber-500 mt-0.5">Your administrator is reviewing this request.</p>
+                        <p className="text-sm font-semibold text-amber-700">{t('pay.detail.modificationPending')}</p>
+                        <p className="text-xs text-amber-500 mt-0.5">{t('pay.detail.adminReviewing')}</p>
                       </div>
                     : <button onClick={() => { setDetailSheet(null); openCorrection(e) }}
                         className="w-full bg-brand-500 text-white font-semibold py-3.5 rounded-2xl text-sm active:bg-brand-600 transition-colors">
-                        Request Modification
+                        {t('pay.detail.requestModification')}
                       </button>
                 )}
               </div>
@@ -733,15 +647,15 @@ export default function ClockPanel({ showHeader = true }) {
       })()}
 
       {/* ── Modification questionnaire ─────────────────────────── */}
-      <Modal isOpen={!!corrModal} onClose={() => setCorrModal(null)} title="Request Modification">
+      <Modal isOpen={!!corrModal} onClose={() => setCorrModal(null)} title={t('pay.detail.requestModification')}>
         {corrModal && (
           <div className="flex flex-col gap-4">
             <div className={`rounded-xl px-4 py-3 ${(ENTRY_CFG[corrModal.status_label] ?? ENTRY_CFG.done).bg}`}>
               <p className={`text-sm font-semibold capitalize ${(ENTRY_CFG[corrModal.status_label] ?? ENTRY_CFG.done).text}`}>
-                {corrModal.status_label?.replace('_', ' ')} · {format(new Date(corrModal.start_time), 'MMM d, yyyy')}
+                {corrModal.status_label?.replace('_', ' ')} · {format(new Date(corrModal.start_time), 'MMM d, yyyy', { locale: dateFnsLocale })}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
-                {format(new Date(corrModal.start_time), 'h:mm a')} → {corrModal.end_time ? format(new Date(corrModal.end_time), 'h:mm a') : 'In Progress'}
+                {format(new Date(corrModal.start_time), 'h:mm a', { locale: dateFnsLocale })} → {corrModal.end_time ? format(new Date(corrModal.end_time), 'h:mm a', { locale: dateFnsLocale }) : t('pay.inProgress')}
                 {corrModal.job_name && ` · ${corrModal.job_name}`}
               </p>
             </div>
@@ -752,20 +666,20 @@ export default function ClockPanel({ showHeader = true }) {
             </div>
             {corrStep === 1 && (
               <>
-                <p className="text-sm font-semibold text-gray-800">What needs to be corrected?</p>
+                <p className="text-sm font-semibold text-gray-800">{t('pay.correctionModal.whatNeedsCorrection')}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {CORR_TYPES.map(opt => (
                     <button key={opt.value} onClick={() => setCorrType(opt.value)}
                       className={`flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 text-sm font-semibold transition-colors text-left
                         ${corrType === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 active:border-gray-300 bg-white'}`}>
                       <span className="text-base">{opt.icon}</span>
-                      <span className="leading-tight">{opt.label}</span>
+                      <span className="leading-tight">{t(opt.labelKey)}</span>
                     </button>
                   ))}
                 </div>
                 <div className="flex gap-3 pt-1">
-                  <Button variant="secondary" fullWidth onClick={() => setCorrModal(null)}>Cancel</Button>
-                  <Button fullWidth disabled={!corrType} onClick={() => setCorrStep(2)}>Next →</Button>
+                  <Button variant="secondary" fullWidth onClick={() => setCorrModal(null)}>{t('common.cancel')}</Button>
+                  <Button fullWidth disabled={!corrType} onClick={() => setCorrStep(2)}>{t('pay.correctionModal.next')}</Button>
                 </div>
               </>
             )}
@@ -773,151 +687,39 @@ export default function ClockPanel({ showHeader = true }) {
               <>
                 {(corrType === 'start' || corrType === 'both') && (
                   <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Correct Clock-In Time</label>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('pay.correctionModal.correctClockIn')}</label>
                     <input type="datetime-local" value={corrStart} onChange={e => setCorrStart(e.target.value)}
                       className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
                   </div>
                 )}
                 {(corrType === 'end' || corrType === 'both') && (
                   <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Correct Clock-Out Time</label>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('pay.correctionModal.correctClockOut')}</label>
                     <input type="datetime-local" value={corrEnd} onChange={e => setCorrEnd(e.target.value)}
                       className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
                   </div>
                 )}
                 <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
-                    {corrType === 'job'   ? 'What is the correct job site?' :
-                     corrType === 'other' ? 'Describe what needs to change' :
-                     'Why is this change needed?'}{' *'}
+                    {corrType === 'job'   ? t('pay.correctionModal.jobSiteQuestion') :
+                     corrType === 'other' ? t('pay.correctionModal.describeChange') :
+                     t('pay.correctionModal.whyNeeded')}{' *'}
                   </label>
                   <textarea rows={3} value={corrReason} onChange={e => setCorrReason(e.target.value)}
                     placeholder={
-                      corrType === 'job'   ? 'e.g. Should be Smith Residence, not Johnson Ave' :
-                      corrType === 'other' ? 'Describe the issue...' :
-                      'e.g. I forgot to clock back in after lunch'
+                      corrType === 'job'   ? t('pay.correctionModal.jobSitePlaceholder') :
+                      corrType === 'other' ? t('pay.correctionModal.otherPlaceholder') :
+                      t('pay.correctionModal.reasonPlaceholder')
                     }
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500 resize-none" />
                 </div>
                 {corrError && <p className="text-sm text-red-600">{corrError}</p>}
                 <div className="flex gap-3 pt-1">
-                  <Button variant="secondary" fullWidth onClick={() => setCorrStep(1)}>← Back</Button>
-                  <Button fullWidth loading={corrSaving} onClick={handleSubmitCorrection}>Submit</Button>
+                  <Button variant="secondary" fullWidth onClick={() => setCorrStep(1)}>{t('pay.correctionModal.back')}</Button>
+                  <Button fullWidth loading={corrSaving} onClick={handleSubmitCorrection}>{t('pay.correctionModal.submit')}</Button>
                 </div>
               </>
             )}
-          </div>
-        )}
-      </Modal>
-
-      {/* ── Visit classification picker — shown right before clocking in ──── */}
-      <Modal isOpen={visitModal} onClose={() => setVisitModal(false)} title={t('visitType.title')}>
-        {visitStep === 1 && (
-          <div className="flex flex-col gap-4">
-            <p className="text-sm font-semibold text-gray-800">
-              {selectedJobId ? t('visitType.existingLocation') : t('visitType.newLocation')}
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {(selectedJobId ? EXISTING_CATEGORIES : NEW_LOCATION_CATEGORIES).map((opt) => (
-                <button key={opt.value}
-                  onClick={() => handlePickCategory(opt.value)}
-                  className="flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 text-sm font-semibold transition-colors text-left border-gray-200 text-gray-600 active:border-brand-300 bg-white">
-                  {opt.icon}
-                  <span className="leading-tight">{t(opt.labelKey)}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Step 2 — Work Order fields */}
-        {visitStep === 2 && visitCategory === 'work_order' && (
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('visitType.workOrderNumber')}</label>
-              <input value={workOrderNumber} onChange={(e) => setWorkOrderNumber(e.target.value)} autoFocus
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('visitType.description')}</label>
-              <textarea rows={3} value={fieldDescription} onChange={(e) => setFieldDescription(e.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500 resize-none" />
-            </div>
-            <div className="flex gap-3 pt-1">
-              <Button variant="secondary" fullWidth onClick={() => setVisitStep(1)}>{t('visitType.back')}</Button>
-              <Button fullWidth
-                disabled={!workOrderNumber.trim() || !fieldDescription.trim()}
-                onClick={() => finalizeVisit({ visit_category: 'work_order', work_order_number: workOrderNumber.trim(), visit_description: fieldDescription.trim() })}>
-                {t('visitType.confirm')}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2 — Estimate list (existing job) */}
-        {visitStep === 2 && visitCategory === 'estimate' && (
-          <div className="flex flex-col gap-4">
-            <p className="text-sm font-semibold text-gray-800">{t('visitType.selectEstimate')}</p>
-            {loadingVisitEstimates ? (
-              <div className="flex justify-center py-6"><Spinner size="md" /></div>
-            ) : visitEstimates.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">{t('visitType.noEstimates')}</p>
-            ) : (
-              <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
-                {visitEstimates.map((est) => (
-                  <button key={est.id} onClick={() => { setPickedEstimateId(est.id); setVisitStep(3) }}
-                    className="w-full text-left px-4 py-3 rounded-2xl border-2 border-gray-200 active:border-brand-300 bg-white transition-colors">
-                    <p className="text-sm font-semibold text-gray-800">#{est.estimate_number}</p>
-                    {est.description && <p className="text-xs text-gray-400 mt-0.5">{est.description}</p>}
-                  </button>
-                ))}
-              </div>
-            )}
-            <Button variant="secondary" fullWidth onClick={() => setVisitStep(1)}>{t('visitType.back')}</Button>
-          </div>
-        )}
-
-        {/* Step 2 — new-location fields (Regular / Estimate unknown / Emergency / Warranty / Add-On) */}
-        {visitStep === 2 && visitCategory && visitCategory !== 'work_order' && visitCategory !== 'estimate' && (
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
-                {visitCategory === 'add_on' ? t('visitType.originalEstimateDescription') : t('visitType.description')}
-              </label>
-              <textarea rows={3} value={fieldDescription} onChange={(e) => setFieldDescription(e.target.value)} autoFocus
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500 resize-none" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('visitType.engineer')}</label>
-              <input value={engineerName} onChange={(e) => setEngineerName(e.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
-            </div>
-            <div className="flex gap-3 pt-1">
-              <Button variant="secondary" fullWidth onClick={() => setVisitStep(1)}>{t('visitType.back')}</Button>
-              <Button fullWidth
-                disabled={!fieldDescription.trim() || !engineerName.trim()}
-                onClick={() => finalizeVisit({ visit_category: visitCategory, engineer_name: engineerName.trim(), visit_description: fieldDescription.trim() })}>
-                {t('visitType.confirm')}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3 — Estimate sub-type (existing job, known estimate) */}
-        {visitStep === 3 && (
-          <div className="flex flex-col gap-4">
-            <p className="text-sm font-semibold text-gray-800">{t('visitType.selectVisitKind')}</p>
-            <div className="grid grid-cols-2 gap-2">
-              {ESTIMATE_SUBTYPES.map((opt) => (
-                <button key={opt.value}
-                  onClick={() => finalizeVisit({ visit_category: 'estimate', estimate_id: pickedEstimateId, estimate_subtype: opt.value })}
-                  className="flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 text-sm font-semibold transition-colors text-left border-gray-200 text-gray-600 active:border-brand-300 bg-white">
-                  {opt.icon}
-                  <span className="leading-tight">{t(opt.labelKey)}</span>
-                </button>
-              ))}
-            </div>
-            <Button variant="secondary" fullWidth onClick={() => setVisitStep(2)}>{t('visitType.back')}</Button>
           </div>
         )}
       </Modal>
@@ -938,26 +740,9 @@ const ENTRY_CFG = {
   done:         { dot: 'bg-gray-400',   bg: 'bg-gray-50',   text: 'text-gray-500'   },
 }
 const CORR_TYPES = [
-  { value: 'start', icon: '🕐', label: 'Clock-In Time' },
-  { value: 'end',   icon: '🕑', label: 'Clock-Out Time' },
-  { value: 'both',  icon: '⏱',  label: 'Both Times' },
-  { value: 'job',   icon: '📍', label: 'Job Site' },
-  { value: 'other', icon: '💬', label: 'Something Else' },
-]
-const EXISTING_CATEGORIES = [
-  { value: 'work_order', icon: <DocumentIcon />,  labelKey: 'visitType.workOrder' },
-  { value: 'estimate',   icon: <ClipboardIcon />, labelKey: 'visitType.estimate' },
-]
-const NEW_LOCATION_CATEGORIES = [
-  { value: 'regular',          icon: <WrenchIcon />,    labelKey: 'visitType.regular' },
-  { value: 'estimate_unknown', icon: <ClipboardIcon />, labelKey: 'visitType.estimateUnknown' },
-  { value: 'add_on',           icon: <PlusIcon />,      labelKey: 'visitType.addOn' },
-  { value: 'emergency',        icon: <AlertIcon />,     labelKey: 'visitType.emergency' },
-  { value: 'warranty',         icon: <ShieldIcon />,    labelKey: 'visitType.warranty' },
-]
-const ESTIMATE_SUBTYPES = [
-  { value: 'regular',   icon: <WrenchIcon />, labelKey: 'visitType.regular' },
-  { value: 'add_on',    icon: <PlusIcon />,   labelKey: 'visitType.addOn' },
-  { value: 'emergency', icon: <AlertIcon />,  labelKey: 'visitType.emergency' },
-  { value: 'warranty',  icon: <ShieldIcon />, labelKey: 'visitType.warranty' },
+  { value: 'start', icon: '🕐', labelKey: 'pay.correctionModal.types.start' },
+  { value: 'end',   icon: '🕑', labelKey: 'pay.correctionModal.types.end' },
+  { value: 'both',  icon: '⏱',  labelKey: 'pay.correctionModal.types.both' },
+  { value: 'job',   icon: '📍', labelKey: 'pay.correctionModal.types.job' },
+  { value: 'other', icon: '💬', labelKey: 'pay.correctionModal.types.other' },
 ]

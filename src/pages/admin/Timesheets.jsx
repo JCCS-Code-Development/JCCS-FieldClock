@@ -79,11 +79,6 @@ function visitColor(entry) {
   return 'bg-gray-100 text-gray-500'
 }
 
-const STATUS_OPTIONS = [
-  { value: 'working',   label: 'Working' },
-  { value: 'traveling', label: 'Traveling' },
-]
-
 const EditIcon = () => (
   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -125,6 +120,13 @@ function totalMins(entries) {
     .reduce((s, e) => s + entryMins(e), 0)
 }
 
+// Flags a clock-in whose GPS didn't match the selected job site (replaces
+// the old "traveling" status) — never blocks the entry, just surfaces it.
+function formatDistance(m) {
+  if (m == null) return 'Off-site'
+  return m < 1000 ? `${Math.round(m)}m away` : `${(m / 1000).toFixed(1)}km away`
+}
+
 // ── Entry edit / create modal ────────────────────────────────────
 function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClose }) {
   const isNew    = !entry?.id
@@ -138,7 +140,9 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
   const initStart = isNew ? '08:00' : (entry?.start_time ? format(new Date(entry.start_time), 'HH:mm') : '')
   const initEnd   = isNew ? '17:00' : (entry?.end_time   ? format(new Date(entry.end_time),   'HH:mm') : '')
 
-  const [statusLabel, setStatusLabel] = useState(entry?.status_label ?? 'working')
+  // No longer user-selectable (traveling was the only other option); new
+  // entries are always 'working', existing entries keep whatever they had.
+  const [statusLabel] = useState(entry?.status_label ?? 'working')
   const [entryDate,   setEntryDate]   = useState(initDate)
   const [startTime,   setStartTime]   = useState(initStart)
   const [endTime,     setEndTime]     = useState(initEnd)
@@ -231,21 +235,6 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
           </p>
         </div>
       )}
-
-      {/* Entry type */}
-      <div>
-        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Type</label>
-        <div className="grid grid-cols-2 gap-2">
-          {STATUS_OPTIONS.map(opt => (
-            <button key={opt.value} onClick={() => setStatusLabel(opt.value)}
-              className={`py-2.5 rounded-xl text-xs font-semibold border-2 transition-colors ${
-                statusLabel === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
-              }`}>
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* Time inputs */}
       <div className="grid grid-cols-2 gap-4">
@@ -403,17 +392,18 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
           <div className="md:hidden divide-y divide-gray-50">
             {entries.map(entry => {
               const mins     = entryMins(entry)
-              const isDayEnd = entry.cost_category === 'day_end'
-              const isTravel = entry.status_label === 'traveling'
+              const isDayEnd  = entry.cost_category === 'day_end'
+              const isOffSite = entry.within_radius === false
               const loc      = entry.job_name ?? (entry.notes?.startsWith('Location:') ? entry.notes.replace('Location: ', '') : null)
               const comment  = entry.notes?.startsWith('Adjustment:') ? entry.notes.replace('Adjustment: ', '')
                              : entry.notes?.startsWith('Location:')   ? ''
                              : (entry.notes ?? '')
               return (
                 <div key={entry.id} className={`flex items-center gap-2.5 px-4 py-3 ${isDayEnd ? 'opacity-40' : ''}`}>
-                  {isTravel && (
-                    <span className="inline-flex px-2 py-0.5 rounded-md text-xs font-semibold shrink-0 bg-sky-100 text-sky-700">
-                      Traveling
+                  {isOffSite && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold shrink-0 bg-amber-100 text-amber-700"
+                      title="Clocked in away from the selected job site">
+                      ⚠️ {formatDistance(entry.distance_meters)}
                     </span>
                   )}
                   <div className="flex-1 min-w-0">
@@ -463,8 +453,8 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
               <tbody className="divide-y divide-gray-50">
                 {entries.map(entry => {
                   const mins     = entryMins(entry)
-                  const isDayEnd = entry.cost_category === 'day_end'
-                  const isTravel = entry.status_label === 'traveling'
+                  const isDayEnd  = entry.cost_category === 'day_end'
+                  const isOffSite = entry.within_radius === false
                   const loc      = entry.job_name ?? (entry.notes?.startsWith('Location:') ? entry.notes.replace('Location: ', '') : null)
                   const comment  = entry.notes?.startsWith('Adjustment:') ? entry.notes.replace('Adjustment: ', '')
                                  : entry.notes?.startsWith('Location:')   ? ''
@@ -473,9 +463,10 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                     <tr key={entry.id} className={`group ${isDayEnd ? 'opacity-40' : ''}`}>
                       <td className="px-4 py-2.5 text-gray-600 text-xs truncate max-w-0">
                         <span className="inline-flex items-center gap-1.5">
-                          {isTravel && (
-                            <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 bg-sky-100 text-sky-700">
-                              Traveling
+                          {isOffSite && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 bg-amber-100 text-amber-700"
+                              title="Clocked in away from the selected job site">
+                              ⚠️ {formatDistance(entry.distance_meters)}
                             </span>
                           )}
                           <span className="truncate">{loc || <span className="text-gray-300">—</span>}</span>

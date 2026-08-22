@@ -6,12 +6,6 @@ export const getStatus = () =>
 export const dayStart = (payload) =>
   client.post('/timeclock/day-start.php', payload).then((r) => r.data)
 
-export const setTraveling = (payload) =>
-  client.post('/timeclock/traveling.php', payload).then((r) => r.data)
-
-export const markArrival = (payload) =>
-  client.post('/timeclock/mark-arrival.php', payload).then((r) => r.data)
-
 export const setWorking = (payload) =>
   client.post('/timeclock/working.php', payload).then((r) => r.data)
 
