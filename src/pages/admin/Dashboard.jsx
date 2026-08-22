@@ -9,22 +9,20 @@ import { getStatus } from '../../api/timeclock'
 import { useTimeclockStore } from '../../store/timeclockStore'
 import { useAuthStore } from '../../store/authStore'
 import { getChangeRequests } from '../../api/timeclock'
-import { listJobs } from '../../api/jobs'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { user } = useAuthStore()
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ clockedIn: [], pendingApprovals: 0, activeJobs: 0 })
+  const [stats, setStats] = useState({ clockedIn: [], pendingApprovals: 0 })
   const { setTimeclockData } = useTimeclockStore()
 
   useEffect(() => {
     Promise.all([
       getStatus().catch(() => ({ active_employees: [] })),
       getChangeRequests({ status: 'pending' }).catch(() => ({ requests: [] })),
-      listJobs({ status: 'active' }).catch(() => ({ jobs: [] })),
-    ]).then(([status, changeRequests, jobs]) => {
+    ]).then(([status, changeRequests]) => {
       setTimeclockData({
         statusLabel:  status.statusLabel  ?? null,
         currentEntry: status.currentEntry ?? null,
@@ -34,7 +32,6 @@ export default function AdminDashboard() {
       setStats({
         clockedIn:        status.active_employees ?? [],
         pendingApprovals: changeRequests.requests?.length ?? 0,
-        activeJobs:       jobs.jobs?.length ?? 0,
       })
     }).finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,8 +49,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex flex-col gap-4 w-full">
-      <h1 className="text-xl lg:text-2xl font-bold text-gray-900 text-center">{t('nav.dashboard')}</h1>
-
       {/* Your clock — hourly admins only; salaried admins don't clock in/out at all.
           Renders exactly like the employee Clock page (same card, greeting, and
           layout) instead of being boxed in an extra "Your Clock" wrapper card. */}
@@ -66,9 +61,6 @@ export default function AdminDashboard() {
         <StatsCard label={t('dashboard.changeRequests')} value={stats.pendingApprovals} color="amber"
           onClick={() => navigate('/admin/timesheets')}
           icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 7v5l3.5 3.5"/></svg>} />
-        <StatsCard label={t('dashboard.activeJobs')} value={stats.activeJobs} color="blue"
-          onClick={() => navigate('/admin/jobs')}
-          icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>} />
       </div>
 
       {/* Clocked-in employees */}
