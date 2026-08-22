@@ -214,9 +214,9 @@ export default function ClockPanel({ showHeader = true }) {
   }
 
   const handleSubmitCorrection = async () => {
-    if (!corrReason.trim()) { setCorrError('Please provide an explanation.'); return }
-    if ((corrType === 'start' || corrType === 'both') && !corrStart) { setCorrError('Please enter the corrected clock-in time.'); return }
-    if ((corrType === 'end'   || corrType === 'both') && !corrEnd)   { setCorrError('Please enter the corrected clock-out time.'); return }
+    if (!corrReason.trim()) { setCorrError(t('pay.correctionModal.errors.reasonRequired')); return }
+    if ((corrType === 'start' || corrType === 'both') && !corrStart) { setCorrError(t('pay.correctionModal.errors.startRequired')); return }
+    if ((corrType === 'end'   || corrType === 'both') && !corrEnd)   { setCorrError(t('pay.correctionModal.errors.endRequired')); return }
     setCorrSaving(true); setCorrError('')
     try {
       await createChangeRequest({
@@ -229,7 +229,7 @@ export default function ClockPanel({ showHeader = true }) {
       const reqs = await getChangeRequests().catch(() => ({ requests: [] }))
       setMyRequests(reqs.requests ?? [])
     } catch (err) {
-      setCorrError(err?.response?.data?.error ?? 'Failed to submit. Please try again.')
+      setCorrError(err?.response?.data?.error ?? t('pay.correction.submitError'))
     } finally { setCorrSaving(false) }
   }
 
@@ -517,8 +517,8 @@ export default function ClockPanel({ showHeader = true }) {
                             <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle ${ENTRY_DOT[lastEntry.status_label] ?? 'bg-gray-400'}`} />
                             <span className="capitalize font-medium text-gray-600">{lastEntry.status_label?.replace('_', ' ')}</span>
                             {' · '}
-                            {format(new Date(lastEntry.start_time), 'h:mm a')}
-                            {lastEntry.end_time ? ` – ${format(new Date(lastEntry.end_time), 'h:mm a')}` : ` – ${t('home.now')}`}
+                            {format(new Date(lastEntry.start_time), 'h:mm a', { locale: dateFnsLocale })}
+                            {lastEntry.end_time ? ` – ${format(new Date(lastEntry.end_time), 'h:mm a', { locale: dateFnsLocale })}` : ` – ${t('home.now')}`}
                           </>
                         ) : t('home.noActivity')}
                       </p>
@@ -555,10 +555,10 @@ export default function ClockPanel({ showHeader = true }) {
                               <div className="flex items-center gap-2 shrink-0">
                                 <div className="text-right">
                                   <p className="text-xs text-gray-500">
-                                    {format(new Date(entry.start_time), 'h:mm a')}
+                                    {format(new Date(entry.start_time), 'h:mm a', { locale: dateFnsLocale })}
                                     {' → '}
                                     {entry.end_time
-                                      ? format(new Date(entry.end_time), 'h:mm a')
+                                      ? format(new Date(entry.end_time), 'h:mm a', { locale: dateFnsLocale })
                                       : <span className="text-brand-500 font-medium">{t('home.now')}</span>
                                     }
                                   </p>
@@ -600,25 +600,25 @@ export default function ClockPanel({ showHeader = true }) {
                     <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
                     <span className="capitalize">{e.status_label?.replace('_', ' ')}</span>
                   </span>
-                  <p className="text-sm text-gray-400 font-medium">{format(new Date(e.start_time), 'MMM d, yyyy')}</p>
+                  <p className="text-sm text-gray-400 font-medium">{format(new Date(e.start_time), 'MMM d, yyyy', { locale: dateFnsLocale })}</p>
                 </div>
                 <div className="bg-gray-50 rounded-2xl px-5 py-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">Clock In</p>
-                      <p className="text-2xl font-bold text-gray-900">{format(new Date(e.start_time), 'h:mm a')}</p>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">{t('pay.detail.clockIn')}</p>
+                      <p className="text-2xl font-bold text-gray-900">{format(new Date(e.start_time), 'h:mm a', { locale: dateFnsLocale })}</p>
                     </div>
                     <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                     <div className="text-right">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">Clock Out</p>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">{t('pay.detail.clockOut')}</p>
                       <p className={`text-2xl font-bold ${e.end_time ? 'text-gray-900' : 'text-orange-400'}`}>
-                        {e.end_time ? format(new Date(e.end_time), 'h:mm a') : 'In Progress'}
+                        {e.end_time ? format(new Date(e.end_time), 'h:mm a', { locale: dateFnsLocale }) : t('pay.inProgress')}
                       </p>
                     </div>
                   </div>
                   {durMs > 0 && (
                     <div className="border-t border-gray-200 pt-3 mt-3 text-center">
-                      <p className="text-sm font-semibold text-gray-600">{dh > 0 ? `${dh}h ${dm}m` : `${dm}m`} total</p>
+                      <p className="text-sm font-semibold text-gray-600">{t('pay.detail.total', { time: dh > 0 ? `${dh}h ${dm}m` : `${dm}m` })}</p>
                     </div>
                   )}
                 </div>
@@ -631,12 +631,12 @@ export default function ClockPanel({ showHeader = true }) {
                 {e.end_time && (
                   hasReq
                     ? <div className="bg-amber-50 rounded-2xl px-4 py-3.5 text-center">
-                        <p className="text-sm font-semibold text-amber-700">Modification Pending Review</p>
-                        <p className="text-xs text-amber-500 mt-0.5">Your administrator is reviewing this request.</p>
+                        <p className="text-sm font-semibold text-amber-700">{t('pay.detail.modificationPending')}</p>
+                        <p className="text-xs text-amber-500 mt-0.5">{t('pay.detail.adminReviewing')}</p>
                       </div>
                     : <button onClick={() => { setDetailSheet(null); openCorrection(e) }}
                         className="w-full bg-brand-500 text-white font-semibold py-3.5 rounded-2xl text-sm active:bg-brand-600 transition-colors">
-                        Request Modification
+                        {t('pay.detail.requestModification')}
                       </button>
                 )}
               </div>
@@ -647,15 +647,15 @@ export default function ClockPanel({ showHeader = true }) {
       })()}
 
       {/* ── Modification questionnaire ─────────────────────────── */}
-      <Modal isOpen={!!corrModal} onClose={() => setCorrModal(null)} title="Request Modification">
+      <Modal isOpen={!!corrModal} onClose={() => setCorrModal(null)} title={t('pay.detail.requestModification')}>
         {corrModal && (
           <div className="flex flex-col gap-4">
             <div className={`rounded-xl px-4 py-3 ${(ENTRY_CFG[corrModal.status_label] ?? ENTRY_CFG.done).bg}`}>
               <p className={`text-sm font-semibold capitalize ${(ENTRY_CFG[corrModal.status_label] ?? ENTRY_CFG.done).text}`}>
-                {corrModal.status_label?.replace('_', ' ')} · {format(new Date(corrModal.start_time), 'MMM d, yyyy')}
+                {corrModal.status_label?.replace('_', ' ')} · {format(new Date(corrModal.start_time), 'MMM d, yyyy', { locale: dateFnsLocale })}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
-                {format(new Date(corrModal.start_time), 'h:mm a')} → {corrModal.end_time ? format(new Date(corrModal.end_time), 'h:mm a') : 'In Progress'}
+                {format(new Date(corrModal.start_time), 'h:mm a', { locale: dateFnsLocale })} → {corrModal.end_time ? format(new Date(corrModal.end_time), 'h:mm a', { locale: dateFnsLocale }) : t('pay.inProgress')}
                 {corrModal.job_name && ` · ${corrModal.job_name}`}
               </p>
             </div>
@@ -666,20 +666,20 @@ export default function ClockPanel({ showHeader = true }) {
             </div>
             {corrStep === 1 && (
               <>
-                <p className="text-sm font-semibold text-gray-800">What needs to be corrected?</p>
+                <p className="text-sm font-semibold text-gray-800">{t('pay.correctionModal.whatNeedsCorrection')}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {CORR_TYPES.map(opt => (
                     <button key={opt.value} onClick={() => setCorrType(opt.value)}
                       className={`flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 text-sm font-semibold transition-colors text-left
                         ${corrType === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 active:border-gray-300 bg-white'}`}>
                       <span className="text-base">{opt.icon}</span>
-                      <span className="leading-tight">{opt.label}</span>
+                      <span className="leading-tight">{t(opt.labelKey)}</span>
                     </button>
                   ))}
                 </div>
                 <div className="flex gap-3 pt-1">
-                  <Button variant="secondary" fullWidth onClick={() => setCorrModal(null)}>Cancel</Button>
-                  <Button fullWidth disabled={!corrType} onClick={() => setCorrStep(2)}>Next →</Button>
+                  <Button variant="secondary" fullWidth onClick={() => setCorrModal(null)}>{t('common.cancel')}</Button>
+                  <Button fullWidth disabled={!corrType} onClick={() => setCorrStep(2)}>{t('pay.correctionModal.next')}</Button>
                 </div>
               </>
             )}
@@ -687,36 +687,36 @@ export default function ClockPanel({ showHeader = true }) {
               <>
                 {(corrType === 'start' || corrType === 'both') && (
                   <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Correct Clock-In Time</label>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('pay.correctionModal.correctClockIn')}</label>
                     <input type="datetime-local" value={corrStart} onChange={e => setCorrStart(e.target.value)}
                       className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
                   </div>
                 )}
                 {(corrType === 'end' || corrType === 'both') && (
                   <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Correct Clock-Out Time</label>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('pay.correctionModal.correctClockOut')}</label>
                     <input type="datetime-local" value={corrEnd} onChange={e => setCorrEnd(e.target.value)}
                       className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
                   </div>
                 )}
                 <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
-                    {corrType === 'job'   ? 'What is the correct job site?' :
-                     corrType === 'other' ? 'Describe what needs to change' :
-                     'Why is this change needed?'}{' *'}
+                    {corrType === 'job'   ? t('pay.correctionModal.jobSiteQuestion') :
+                     corrType === 'other' ? t('pay.correctionModal.describeChange') :
+                     t('pay.correctionModal.whyNeeded')}{' *'}
                   </label>
                   <textarea rows={3} value={corrReason} onChange={e => setCorrReason(e.target.value)}
                     placeholder={
-                      corrType === 'job'   ? 'e.g. Should be Smith Residence, not Johnson Ave' :
-                      corrType === 'other' ? 'Describe the issue...' :
-                      'e.g. I forgot to clock back in after lunch'
+                      corrType === 'job'   ? t('pay.correctionModal.jobSitePlaceholder') :
+                      corrType === 'other' ? t('pay.correctionModal.otherPlaceholder') :
+                      t('pay.correctionModal.reasonPlaceholder')
                     }
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500 resize-none" />
                 </div>
                 {corrError && <p className="text-sm text-red-600">{corrError}</p>}
                 <div className="flex gap-3 pt-1">
-                  <Button variant="secondary" fullWidth onClick={() => setCorrStep(1)}>← Back</Button>
-                  <Button fullWidth loading={corrSaving} onClick={handleSubmitCorrection}>Submit</Button>
+                  <Button variant="secondary" fullWidth onClick={() => setCorrStep(1)}>{t('pay.correctionModal.back')}</Button>
+                  <Button fullWidth loading={corrSaving} onClick={handleSubmitCorrection}>{t('pay.correctionModal.submit')}</Button>
                 </div>
               </>
             )}
@@ -740,9 +740,9 @@ const ENTRY_CFG = {
   done:         { dot: 'bg-gray-400',   bg: 'bg-gray-50',   text: 'text-gray-500'   },
 }
 const CORR_TYPES = [
-  { value: 'start', icon: '🕐', label: 'Clock-In Time' },
-  { value: 'end',   icon: '🕑', label: 'Clock-Out Time' },
-  { value: 'both',  icon: '⏱',  label: 'Both Times' },
-  { value: 'job',   icon: '📍', label: 'Job Site' },
-  { value: 'other', icon: '💬', label: 'Something Else' },
+  { value: 'start', icon: '🕐', labelKey: 'pay.correctionModal.types.start' },
+  { value: 'end',   icon: '🕑', labelKey: 'pay.correctionModal.types.end' },
+  { value: 'both',  icon: '⏱',  labelKey: 'pay.correctionModal.types.both' },
+  { value: 'job',   icon: '📍', labelKey: 'pay.correctionModal.types.job' },
+  { value: 'other', icon: '💬', labelKey: 'pay.correctionModal.types.other' },
 ]

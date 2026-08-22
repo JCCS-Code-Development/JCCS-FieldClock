@@ -219,7 +219,7 @@ export default function EmployeeLayout() {
                   </button>
                 )}
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-sm font-medium text-gray-700">Language</span>
+                  <span className="text-sm font-medium text-gray-700">{t('nav.language')}</span>
                   <LangSwitcher className="text-gray-500" />
                 </div>
                 <button onClick={handleLogout}

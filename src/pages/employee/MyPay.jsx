@@ -12,6 +12,13 @@ import PayPieChart from '../../components/ui/PayPieChart'
 import { getTimeOffRequests, createTimeOffRequest, reviewTimeOffRequest } from '../../api/timeoff'
 import { formatCurrency, formatHours, formatDate, formatTime } from '../../utils/format'
 import { format, startOfWeek, endOfWeek, subWeeks, differenceInCalendarDays, parseISO, eachDayOfInterval } from 'date-fns'
+import { es as esLocale, enUS } from 'date-fns/locale'
+import i18n from '../../i18n'
+
+// Module-level (buildPeriods runs outside the component) — reads the current
+// language fresh each call so weekday/month names follow the app's language
+// instead of always rendering in English.
+const dfLocale = () => (i18n.language?.startsWith('es') ? esLocale : enUS)
 
 const buildPeriods = (t) => Array.from({ length: 4 }, (_, i) => {
   const w     = i + 1 // start from last week, skip current week
@@ -19,7 +26,7 @@ const buildPeriods = (t) => Array.from({ length: 4 }, (_, i) => {
   const start = startOfWeek(subWeeks(now, w), { weekStartsOn: 1 })
   const end   = endOfWeek(subWeeks(now, w), { weekStartsOn: 1 })
   return {
-    label: i === 0 ? t('pay.lastWeek') : `${format(start, 'MMM d')} – ${format(end, 'MMM d')}`,
+    label: i === 0 ? t('pay.lastWeek') : `${format(start, 'MMM d', { locale: dfLocale() })} – ${format(end, 'MMM d', { locale: dfLocale() })}`,
     start: format(start, 'yyyy-MM-dd'),
     end:   format(end,   'yyyy-MM-dd'),
   }
@@ -145,9 +152,9 @@ export default function MyPay() {
   }
 
   const handleSubmitCorrection = async () => {
-    if (!corrReason.trim()) { setCorrError('Please provide an explanation.'); return }
-    if ((corrType === 'start' || corrType === 'both') && !corrStart) { setCorrError('Please enter the corrected clock-in time.'); return }
-    if ((corrType === 'end'   || corrType === 'both') && !corrEnd)   { setCorrError('Please enter the corrected clock-out time.'); return }
+    if (!corrReason.trim()) { setCorrError(t('pay.correctionModal.errors.reasonRequired')); return }
+    if ((corrType === 'start' || corrType === 'both') && !corrStart) { setCorrError(t('pay.correctionModal.errors.startRequired')); return }
+    if ((corrType === 'end'   || corrType === 'both') && !corrEnd)   { setCorrError(t('pay.correctionModal.errors.endRequired')); return }
     setCorrSaving(true)
     setCorrError('')
     try {
@@ -166,8 +173,8 @@ export default function MyPay() {
   }
 
   const handleSubmitTimeOff = async () => {
-    if (!toStart || !toEnd) { setToError('Start and end dates are required.'); return }
-    if (toEnd < toStart)    { setToError('End date must be after start date.'); return }
+    if (!toStart || !toEnd) { setToError(t('timeoff.errors.datesRequired')); return }
+    if (toEnd < toStart)    { setToError(t('timeoff.errors.endBeforeStart')); return }
     setToSaving(true); setToError('')
     try {
       await createTimeOffRequest({ type: toType, start_date: toStart, end_date: toEnd, reason: toReason.trim() || null })
@@ -442,10 +449,10 @@ export default function MyPay() {
                     <div key={key}>
                       <div className={`flex items-baseline gap-2 px-1 pb-2 mb-2 border-b ${hasEntries ? 'border-gray-200' : 'border-gray-100'}`}>
                         <p className={`text-sm font-bold ${hasEntries ? 'text-gray-900' : 'text-gray-400'}`}>
-                          {format(day, 'EEEE')}
+                          {format(day, 'EEEE', { locale: dfLocale() })}
                         </p>
                         <p className={`text-xs font-medium ${hasEntries ? 'text-green-600' : 'text-gray-400'}`}>
-                          {format(day, 'MMM d, yyyy')}
+                          {format(day, 'MMM d, yyyy', { locale: dfLocale() })}
                         </p>
                       </div>
                       {hasEntries && (
@@ -504,7 +511,7 @@ export default function MyPay() {
             loadingLoans
               ? <div className="flex justify-center py-12"><Spinner size="lg" /></div>
               : myLoans.length === 0
-                ? <p className="text-center text-gray-400 py-12 text-sm">No active loans on record.</p>
+                ? <p className="text-center text-gray-400 py-12 text-sm">{t('pay.loans.noLoans')}</p>
                 : <div className="flex flex-col gap-3">
                     {myLoans.map((loan) => {
                       const pct = loan.amount > 0 ? Math.min((loan.paid_total / loan.amount) * 100, 100) : 0
@@ -514,10 +521,10 @@ export default function MyPay() {
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-semibold text-gray-900">{formatCurrency(loan.amount)} Loan</span>
+                                <span className="font-semibold text-gray-900">{formatCurrency(loan.amount)} {t('pay.loans.loan')}</span>
                                 {isPaidOff
-                                  ? <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">Paid Off</span>
-                                  : <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">Active</span>}
+                                  ? <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">{t('pay.loans.paidOff')}</span>
+                                  : <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">{t('pay.loans.active')}</span>}
                               </div>
                               {loan.description && <p className="text-xs text-gray-500 mt-0.5">{loan.description}</p>}
                               <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2">
@@ -525,17 +532,17 @@ export default function MyPay() {
                               </div>
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <p className="text-xs text-gray-400">Remaining</p>
+                              <p className="text-xs text-gray-400">{t('pay.loans.remaining')}</p>
                               <p className={`text-lg font-bold ${isPaidOff ? 'text-green-600' : 'text-gray-900'}`}>
                                 {isPaidOff ? formatCurrency(0) : formatCurrency(loan.remaining)}
                               </p>
-                              <p className="text-xs text-gray-400 mt-0.5">{formatCurrency(loan.paid_total)} paid</p>
+                              <p className="text-xs text-gray-400 mt-0.5">{t('pay.loans.paidAmount', { amount: formatCurrency(loan.paid_total) })}</p>
                             </div>
                           </div>
                         </div>
                       )
                     })}
-                    <p className="text-xs text-center text-gray-400 mt-1">Loan deductions are processed each paycheck by your administrator.</p>
+                    <p className="text-xs text-center text-gray-400 mt-1">{t('pay.loans.deductionNotice')}</p>
                   </div>
           )}
 
@@ -554,7 +561,7 @@ export default function MyPay() {
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold text-gray-900">{t(`timeoff.types.${req.type}`)}</span>
                             <span className="text-xs text-gray-400">·</span>
-                            <span className="text-xs text-gray-500">{days} {days === 1 ? 'day' : 'days'}</span>
+                            <span className="text-xs text-gray-500">{t('timeoff.days', { count: days })}</span>
                           </div>
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                             req.status === 'pending'  ? 'bg-amber-100 text-amber-700'  :
@@ -562,7 +569,7 @@ export default function MyPay() {
                                                         'bg-red-100 text-red-700'
                           }`}>{t(`timeoff.status.${req.status}`)}</span>
                         </div>
-                        <p className="text-xs text-gray-500">{format(parseISO(req.start_date), 'MMM d')} – {format(parseISO(req.end_date), 'MMM d, yyyy')}</p>
+                        <p className="text-xs text-gray-500">{format(parseISO(req.start_date), 'MMM d', { locale: dfLocale() })} – {format(parseISO(req.end_date), 'MMM d, yyyy', { locale: dfLocale() })}</p>
                         {req.reason && <p className="text-xs text-gray-400 mt-1">{req.reason}</p>}
                         {req.admin_note && <p className="text-xs text-gray-400 mt-1 italic">{t('timeoff.adminNote')}: {req.admin_note}</p>}
                         {req.status === 'pending' && (
@@ -584,7 +591,7 @@ export default function MyPay() {
         <div className="flex flex-col gap-4">
           {/* Type */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Type</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('timeoff.type')}</label>
             <div className="grid grid-cols-2 gap-2">
               {['vacation','sick','personal','unpaid'].map(type => (
                 <button key={type} onClick={() => setToType(type)}
@@ -649,21 +656,21 @@ export default function MyPay() {
                 <div className="bg-gray-50 rounded-2xl px-5 py-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">Clock In</p>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">{t('pay.detail.clockIn')}</p>
                       <p className="text-2xl font-bold text-gray-900">{formatTime(e.start_time)}</p>
                     </div>
                     <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                     <div className="text-right">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">Clock Out</p>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-1">{t('pay.detail.clockOut')}</p>
                       <p className={`text-2xl font-bold ${e.end_time ? 'text-gray-900' : 'text-orange-400'}`}>
-                        {e.end_time ? formatTime(e.end_time) : 'In Progress'}
+                        {e.end_time ? formatTime(e.end_time) : t('pay.inProgress')}
                       </p>
                     </div>
                   </div>
                   {durMs > 0 && (
                     <div className="border-t border-gray-200 pt-3 mt-3 text-center">
                       <p className="text-sm font-semibold text-gray-600">
-                        {dh > 0 ? `${dh}h ${dm}m` : `${dm}m`} total
+                        {t('pay.detail.total', { time: dh > 0 ? `${dh}h ${dm}m` : `${dm}m` })}
                       </p>
                     </div>
                   )}
@@ -679,12 +686,12 @@ export default function MyPay() {
                 {e.end_time && (
                   hasReq
                     ? <div className="bg-amber-50 rounded-2xl px-4 py-3.5 text-center">
-                        <p className="text-sm font-semibold text-amber-700">Modification Pending Review</p>
-                        <p className="text-xs text-amber-500 mt-0.5">Your administrator is reviewing this request.</p>
+                        <p className="text-sm font-semibold text-amber-700">{t('pay.detail.modificationPending')}</p>
+                        <p className="text-xs text-amber-500 mt-0.5">{t('pay.detail.adminReviewing')}</p>
                       </div>
                     : <button onClick={() => { setDetailSheet(null); openCorrection(e) }}
                         className="w-full bg-brand-500 text-white font-semibold py-3.5 rounded-2xl text-sm active:bg-brand-600 transition-colors">
-                        Request Modification
+                        {t('pay.detail.requestModification')}
                       </button>
                 )}
               </div>
@@ -695,7 +702,7 @@ export default function MyPay() {
       })()}
 
       {/* ── Modification request questionnaire ─────────────────── */}
-      <Modal isOpen={!!corrModal} onClose={() => setCorrModal(null)} title="Request Modification">
+      <Modal isOpen={!!corrModal} onClose={() => setCorrModal(null)} title={t('pay.detail.requestModification')}>
         {corrModal && (
           <div className="flex flex-col gap-4">
             {/* Entry summary strip */}
@@ -704,7 +711,7 @@ export default function MyPay() {
                 {corrModal.status_label?.replace('_', ' ')} · {formatDate(corrModal.start_time)}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
-                {formatTime(corrModal.start_time)} → {corrModal.end_time ? formatTime(corrModal.end_time) : 'In Progress'}
+                {formatTime(corrModal.start_time)} → {corrModal.end_time ? formatTime(corrModal.end_time) : t('pay.inProgress')}
                 {corrModal.job_name && ` · ${corrModal.job_name}`}
               </p>
             </div>
@@ -718,20 +725,20 @@ export default function MyPay() {
 
             {corrStep === 1 && (
               <>
-                <p className="text-sm font-semibold text-gray-800">What needs to be corrected?</p>
+                <p className="text-sm font-semibold text-gray-800">{t('pay.correctionModal.whatNeedsCorrection')}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {CORR_TYPES.map(opt => (
                     <button key={opt.value} onClick={() => setCorrType(opt.value)}
                       className={`flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 text-sm font-semibold transition-colors text-left
                         ${corrType === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 active:border-gray-300 bg-white'}`}>
                       <span className="text-base">{opt.icon}</span>
-                      <span className="leading-tight">{opt.label}</span>
+                      <span className="leading-tight">{t(opt.labelKey)}</span>
                     </button>
                   ))}
                 </div>
                 <div className="flex gap-3 pt-1">
-                  <Button variant="secondary" fullWidth onClick={() => setCorrModal(null)}>Cancel</Button>
-                  <Button fullWidth disabled={!corrType} onClick={() => setCorrStep(2)}>Next →</Button>
+                  <Button variant="secondary" fullWidth onClick={() => setCorrModal(null)}>{t('common.cancel')}</Button>
+                  <Button fullWidth disabled={!corrType} onClick={() => setCorrStep(2)}>{t('pay.correctionModal.next')}</Button>
                 </div>
               </>
             )}
@@ -740,37 +747,37 @@ export default function MyPay() {
               <>
                 {(corrType === 'start' || corrType === 'both') && (
                   <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Correct Clock-In Time</label>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('pay.correctionModal.correctClockIn')}</label>
                     <input type="datetime-local" value={corrStart} onChange={e => setCorrStart(e.target.value)}
                       className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
                   </div>
                 )}
                 {(corrType === 'end' || corrType === 'both') && (
                   <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Correct Clock-Out Time</label>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('pay.correctionModal.correctClockOut')}</label>
                     <input type="datetime-local" value={corrEnd} onChange={e => setCorrEnd(e.target.value)}
                       className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
                   </div>
                 )}
                 <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
-                    {corrType === 'job'   ? 'What is the correct job site?' :
-                     corrType === 'other' ? 'Describe what needs to change' :
-                     'Why is this change needed?'}
+                    {corrType === 'job'   ? t('pay.correctionModal.jobSiteQuestion') :
+                     corrType === 'other' ? t('pay.correctionModal.describeChange') :
+                     t('pay.correctionModal.whyNeeded')}
                     {' *'}
                   </label>
                   <textarea rows={3} value={corrReason} onChange={e => setCorrReason(e.target.value)}
                     placeholder={
-                      corrType === 'job'   ? 'e.g. Should be Smith Residence, not Johnson Ave' :
-                      corrType === 'other' ? 'Describe the issue...' :
-                      'e.g. I forgot to clock back in after lunch'
+                      corrType === 'job'   ? t('pay.correctionModal.jobSitePlaceholder') :
+                      corrType === 'other' ? t('pay.correctionModal.otherPlaceholder') :
+                      t('pay.correctionModal.reasonPlaceholder')
                     }
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500 resize-none" />
                 </div>
                 {corrError && <p className="text-sm text-red-600">{corrError}</p>}
                 <div className="flex gap-3 pt-1">
-                  <Button variant="secondary" fullWidth onClick={() => setCorrStep(1)}>← Back</Button>
-                  <Button fullWidth loading={corrSaving} onClick={handleSubmitCorrection}>Submit</Button>
+                  <Button variant="secondary" fullWidth onClick={() => setCorrStep(1)}>{t('pay.correctionModal.back')}</Button>
+                  <Button fullWidth loading={corrSaving} onClick={handleSubmitCorrection}>{t('pay.correctionModal.submit')}</Button>
                 </div>
               </>
             )}
@@ -830,11 +837,11 @@ const ENTRY_CFG = {
   done:         { dot: 'bg-gray-400',   bg: 'bg-gray-50',   text: 'text-gray-500'   },
 }
 const CORR_TYPES = [
-  { value: 'start', icon: '🕐', label: 'Clock-In Time' },
-  { value: 'end',   icon: '🕑', label: 'Clock-Out Time' },
-  { value: 'both',  icon: '⏱', label: 'Both Times' },
-  { value: 'job',   icon: '📍', label: 'Job Site' },
-  { value: 'other', icon: '💬', label: 'Something Else' },
+  { value: 'start', icon: '🕐', labelKey: 'pay.correctionModal.types.start' },
+  { value: 'end',   icon: '🕑', labelKey: 'pay.correctionModal.types.end' },
+  { value: 'both',  icon: '⏱', labelKey: 'pay.correctionModal.types.both' },
+  { value: 'job',   icon: '📍', labelKey: 'pay.correctionModal.types.job' },
+  { value: 'other', icon: '💬', labelKey: 'pay.correctionModal.types.other' },
 ]
 
 // Icons for the sub-tab tiles (Pay Summary / Time Log / My Requests / Time

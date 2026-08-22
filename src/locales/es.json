@@ -17,7 +17,8 @@
     "fieldclock": "FieldClock",
     "documents": "Documentos",
     "myDocuments": "Mis Docs",
-    "hrDocs": "RRHH"
+    "hrDocs": "RRHH",
+    "language": "Idioma"
   },
   "role": {
     "admin": "Administrador",
@@ -145,6 +146,49 @@
       "submit": "Enviar Solicitud",
       "submitError": "No se pudo enviar. Intenta de nuevo."
     },
+    "correctionModal": {
+      "whatNeedsCorrection": "¿Qué necesita corregirse?",
+      "types": {
+        "start": "Hora de Entrada",
+        "end": "Hora de Salida",
+        "both": "Ambas Horas",
+        "job": "Sitio de Trabajo",
+        "other": "Algo Más"
+      },
+      "next": "Siguiente →",
+      "back": "← Atrás",
+      "submit": "Enviar",
+      "correctClockIn": "Corregir Hora de Entrada",
+      "correctClockOut": "Corregir Hora de Salida",
+      "jobSiteQuestion": "¿Cuál es el sitio de trabajo correcto?",
+      "describeChange": "Describe qué necesita cambiar",
+      "whyNeeded": "¿Por qué se necesita este cambio?",
+      "jobSitePlaceholder": "ej. Debería ser Smith Residence, no Johnson Ave",
+      "otherPlaceholder": "Describe el problema...",
+      "reasonPlaceholder": "ej. Olvidé marcar entrada después del almuerzo",
+      "errors": {
+        "reasonRequired": "Por favor proporciona una explicación.",
+        "startRequired": "Ingresa la hora de entrada corregida.",
+        "endRequired": "Ingresa la hora de salida corregida."
+      }
+    },
+    "detail": {
+      "clockIn": "Entrada",
+      "clockOut": "Salida",
+      "total": "{{time}} total",
+      "modificationPending": "Modificación Pendiente de Revisión",
+      "adminReviewing": "Tu administrador está revisando esta solicitud.",
+      "requestModification": "Solicitar Modificación"
+    },
+    "loans": {
+      "noLoans": "No hay préstamos activos registrados.",
+      "loan": "Préstamo",
+      "active": "Activo",
+      "paidOff": "Pagado",
+      "remaining": "Restante",
+      "paidAmount": "{{amount}} pagado",
+      "deductionNotice": "Las deducciones del préstamo se procesan en cada cheque de pago por tu administrador."
+    },
     "todayHours": "Horas de Hoy",
     "weekHours": "Esta Semana",
     "rate": "Tarifa",
@@ -169,6 +213,7 @@
   },
   "timeoff": {
     "title": "Tiempo Libre",
+    "type": "Tipo",
     "request": "Solicitar Tiempo Libre",
     "noRequests": "Sin solicitudes de tiempo libre.",
     "startDate": "Fecha de Inicio",
@@ -181,6 +226,10 @@
     "adminNote": "Nota del administrador",
     "days_one": "{{count}} día",
     "days_other": "{{count}} días",
+    "errors": {
+      "datesRequired": "Se requieren fecha de inicio y fin.",
+      "endBeforeStart": "La fecha de fin debe ser posterior a la de inicio."
+    },
     "types": {
       "vacation": "Vacaciones",
       "sick": "Día de Enfermedad",

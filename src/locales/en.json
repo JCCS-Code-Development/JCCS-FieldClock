@@ -17,7 +17,8 @@
     "fieldclock": "FieldClock",
     "documents": "Documents",
     "myDocuments": "My Docs",
-    "hrDocs": "HR Docs"
+    "hrDocs": "HR Docs",
+    "language": "Language"
   },
   "role": {
     "admin": "Admin",
@@ -145,6 +146,49 @@
       "submit": "Submit Request",
       "submitError": "Could not submit. Try again."
     },
+    "correctionModal": {
+      "whatNeedsCorrection": "What needs to be corrected?",
+      "types": {
+        "start": "Clock-In Time",
+        "end": "Clock-Out Time",
+        "both": "Both Times",
+        "job": "Job Site",
+        "other": "Something Else"
+      },
+      "next": "Next →",
+      "back": "← Back",
+      "submit": "Submit",
+      "correctClockIn": "Correct Clock-In Time",
+      "correctClockOut": "Correct Clock-Out Time",
+      "jobSiteQuestion": "What is the correct job site?",
+      "describeChange": "Describe what needs to change",
+      "whyNeeded": "Why is this change needed?",
+      "jobSitePlaceholder": "e.g. Should be Smith Residence, not Johnson Ave",
+      "otherPlaceholder": "Describe the issue...",
+      "reasonPlaceholder": "e.g. I forgot to clock back in after lunch",
+      "errors": {
+        "reasonRequired": "Please provide an explanation.",
+        "startRequired": "Please enter the corrected clock-in time.",
+        "endRequired": "Please enter the corrected clock-out time."
+      }
+    },
+    "detail": {
+      "clockIn": "Clock In",
+      "clockOut": "Clock Out",
+      "total": "{{time}} total",
+      "modificationPending": "Modification Pending Review",
+      "adminReviewing": "Your administrator is reviewing this request.",
+      "requestModification": "Request Modification"
+    },
+    "loans": {
+      "noLoans": "No active loans on record.",
+      "loan": "Loan",
+      "active": "Active",
+      "paidOff": "Paid Off",
+      "remaining": "Remaining",
+      "paidAmount": "{{amount}} paid",
+      "deductionNotice": "Loan deductions are processed each paycheck by your administrator."
+    },
     "todayHours": "Today's Hours",
     "weekHours": "This Week",
     "rate": "Pay Rate",
@@ -169,6 +213,7 @@
   },
   "timeoff": {
     "title": "Time Off",
+    "type": "Type",
     "request": "Request Time Off",
     "noRequests": "No time off requests yet.",
     "startDate": "Start Date",
@@ -181,6 +226,10 @@
     "adminNote": "Admin note",
     "days_one": "{{count}} day",
     "days_other": "{{count}} days",
+    "errors": {
+      "datesRequired": "Start and end dates are required.",
+      "endBeforeStart": "End date must be after start date."
+    },
     "types": {
       "vacation": "Vacation",
       "sick": "Sick Day",

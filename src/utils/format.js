@@ -1,8 +1,15 @@
 import { format, parseISO, differenceInMinutes } from 'date-fns'
+import { es, enUS } from 'date-fns/locale'
+import i18n from '../i18n'
 
-export const formatDate     = (iso) => iso ? format(parseISO(iso), 'MMM d, yyyy')        : '—'
-export const formatTime     = (iso) => iso ? format(parseISO(iso), 'h:mm a')             : '—'
-export const formatDateTime = (iso) => iso ? format(parseISO(iso), 'MMM d, yyyy h:mm a') : '—'
+// Plain (non-hook) module, called from render — i18n.language is read fresh
+// each call, and the component re-renders on language change anyway (it's
+// already reading `t()`), so this stays in sync without extra plumbing.
+const dfLocale = () => (i18n.language?.startsWith('es') ? es : enUS)
+
+export const formatDate     = (iso) => iso ? format(parseISO(iso), 'MMM d, yyyy',        { locale: dfLocale() }) : '—'
+export const formatTime     = (iso) => iso ? format(parseISO(iso), 'h:mm a',             { locale: dfLocale() }) : '—'
+export const formatDateTime = (iso) => iso ? format(parseISO(iso), 'MMM d, yyyy h:mm a', { locale: dfLocale() }) : '—'
 
 export const formatCurrency = (n) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n ?? 0)
