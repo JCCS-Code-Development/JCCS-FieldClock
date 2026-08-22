@@ -333,9 +333,11 @@ export default function AdminLoans() {
 
             return (
               <div key={loan.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                {/* Loan row */}
+                {/* Loan row — stacked sections on mobile (each gets full card
+                    width instead of 3 columns fighting for space), a single
+                    row again from sm: up */}
                 <div
-                  className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                  className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-4 cursor-pointer hover:bg-gray-50 transition-colors"
                   onClick={() => toggleExpand(loan)}
                 >
                   {/* Employee + description */}
@@ -363,7 +365,7 @@ export default function AdminLoans() {
                   </div>
 
                   {/* Amounts */}
-                  <div className="text-right flex-shrink-0">
+                  <div className="sm:text-right sm:flex-shrink-0">
                     <p className="text-xs text-gray-400">Remaining</p>
                     <p className={`text-lg font-bold ${isPaidOff ? 'text-green-600' : 'text-gray-900'}`}>
                       {isPaidOff ? formatCurrency(0) : formatCurrency(loan.remaining)}
@@ -374,7 +376,7 @@ export default function AdminLoans() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     <Button size="sm" variant="secondary" onClick={() => openPrintCheck(loan)}>
                       {loan.check_printed_at ? 'Reprint Check' : 'Print Check'}
                     </Button>
@@ -383,7 +385,7 @@ export default function AdminLoans() {
                     )}
                     <button
                       onClick={() => toggleExpand(loan)}
-                      className={`p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-all ${isExpanded ? 'rotate-180' : ''}`}
+                      className={`p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-all ml-auto sm:ml-0 ${isExpanded ? 'rotate-180' : ''}`}
                     >
                       <ChevronDown />
                     </button>
