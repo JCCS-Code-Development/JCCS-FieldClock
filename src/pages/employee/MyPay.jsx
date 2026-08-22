@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
@@ -66,6 +66,25 @@ export default function MyPay() {
   const [pushLoading, setPushLoading] = useState(false)
   const [paycheckHistoryOpen, setPaycheckHistoryOpen] = useState(false)
   const [breakdownOpen, setBreakdownOpen] = useState(false)
+  const rootRef = useRef(null)
+  const paycheckCardRef = useRef(null)
+  const breakdownCardRef = useRef(null)
+
+  // Same pattern as Today's Activity on the Clock page: expanding scrolls
+  // the card comfortably into view, collapsing scrolls back up to the top.
+  const toggleSection = (setOpen, cardRef) => {
+    setOpen((wasOpen) => {
+      const next = !wasOpen
+      requestAnimationFrame(() => {
+        if (next) {
+          cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        } else {
+          rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      })
+      return next
+    })
+  }
 
   const p = periods[selectedPeriod]
 
@@ -174,7 +193,7 @@ export default function MyPay() {
   ]
 
   return (
-    <div className="px-4 pt-6 pb-6 flex flex-col gap-4 w-full">
+    <div ref={rootRef} className="px-4 pt-6 pb-6 flex flex-col gap-4 w-full scroll-mt-4">
       <h1 className="text-xl font-bold text-gray-900">{t('pay.title')}</h1>
 
       <button onClick={() => setPeriodSheetOpen(true)}
@@ -218,7 +237,7 @@ export default function MyPay() {
                 const cfg = latest ? (statusCfg[latest.status] ?? statusCfg.processing) : null
                 const hasHistory = paychecks.length > 1
                 return (
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div ref={paycheckCardRef} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden scroll-mt-16 scroll-mb-36">
                     <div className="flex items-center justify-between gap-2 px-4 pt-3.5 pb-1">
                       <h2 className="text-sm font-semibold text-gray-900">{t('pay.paycheck.title')}</h2>
                       <button
@@ -237,7 +256,7 @@ export default function MyPay() {
                       : (
                         <>
                           <button
-                            onClick={() => hasHistory && setPaycheckHistoryOpen(v => !v)}
+                            onClick={() => hasHistory && toggleSection(setPaycheckHistoryOpen, paycheckCardRef)}
                             disabled={!hasHistory}
                             className="w-full flex items-center gap-2 px-4 pb-4 text-left disabled:cursor-default">
                             <div className={`flex-1 flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${cfg.color}`}>
@@ -318,8 +337,8 @@ export default function MyPay() {
 
                         {/* ── Pay Breakdown — collapsed by default, same pattern as
                             Today's Activity on the Clock page ── */}
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                          <button onClick={() => setBreakdownOpen(v => !v)}
+                        <div ref={breakdownCardRef} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden scroll-mt-16 scroll-mb-36">
+                          <button onClick={() => toggleSection(setBreakdownOpen, breakdownCardRef)}
                             className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left active:bg-gray-50 transition-colors">
                             <div className="flex items-center gap-3 min-w-0">
                               <span className="w-9 h-9 rounded-full bg-green-50 text-green-600 flex items-center justify-center shrink-0">
