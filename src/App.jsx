@@ -10,7 +10,6 @@ import PhoneLogin from './pages/auth/PhoneLogin'
 import SetupPassword from './pages/auth/SetupPassword'
 
 import Home from './pages/employee/Home'
-import JobList from './pages/employee/JobList'
 import MyPay from './pages/employee/MyPay'
 import MyDocuments from './pages/employee/MyDocuments'
 
@@ -46,7 +45,6 @@ export default function App() {
         <Route element={<RoleRoute allowedRoles={['employee', 'admin']} />}>
           <Route element={<EmployeeLayout />}>
             <Route path="/" element={<Home />} />
-            <Route path="/jobs" element={<JobList />} />
             <Route path="/my-pay" element={<MyPay />} />
             <Route path="/my-docs" element={<MyDocuments />} />
           </Route>

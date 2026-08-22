@@ -58,9 +58,9 @@ export default function EmployeeLayout() {
     navigate('/login', { replace: true })
   }
 
+  // Jobs tab provisionally removed — may come back later.
   const NAV = [
     { to: '/',        icon: ClockIcon, label: t('nav.clock'),       end: true },
-    { to: '/jobs',    icon: JobsIcon,  label: t('nav.jobs') },
     { to: '/my-pay',  icon: PayIcon,   label: t('nav.myPay') },
     { to: '/my-docs', icon: DocsIcon,  label: t('nav.myDocuments') },
   ]
@@ -167,13 +167,6 @@ export default function EmployeeLayout() {
                 <span>{t('nav.clock')}</span>
               </>
             )}
-          </NavLink>
-
-          <NavLink to="/jobs"
-            className={({ isActive }) =>
-              `flex-1 flex flex-col items-center justify-center py-3 gap-0.5 text-[11px] font-semibold transition-colors ${isActive ? 'text-brand-500' : 'text-gray-400'}`
-            }>
-            <JobsIcon /><span>{t('nav.jobs')}</span>
           </NavLink>
 
           <NavLink to="/my-pay"
