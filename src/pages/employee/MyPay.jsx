@@ -382,15 +382,15 @@ export default function MyPay() {
                               <div className="flex flex-col gap-3">
                                 {isSalary
                                   ? <Row label={t('pay.weeklyRate')} value={formatCurrency(rate)} />
-                                  : <>
-                                      <Row label={`${t('pay.regularHours')} (${formatHours(data.regular_hours ?? 0)})`} value={formatCurrency((data.regular_hours ?? 0) * rate)} />
-                                      {(data.overtime_hours ?? 0) > 0 && (
-                                        // Same rate as regular hours — this company pays no
-                                        // overtime multiplier (see my-pay.php), so the row
-                                        // must match that, not assume a 1.5x premium.
-                                        <Row label={`${t('pay.overtimeHours')} (${formatHours(data.overtime_hours ?? 0)})`} value={formatCurrency((data.overtime_hours ?? 0) * rate)} accent />
-                                      )}
-                                    </>
+                                  : (() => {
+                                      // This company pays no overtime — every hour is the
+                                      // same rate (see my-pay.php) — so hours are shown as
+                                      // one combined total, not split into a separate
+                                      // Overtime row that would imply a premium that
+                                      // doesn't exist.
+                                      const totalHours = (data.regular_hours ?? 0) + (data.overtime_hours ?? 0)
+                                      return <Row label={`${t('pay.regularHours')} (${formatHours(totalHours)})`} value={formatCurrency(totalHours * rate)} />
+                                    })()
                                 }
                                 {gas > 0 && <Row label={t('pay.gasAllowance')} value={formatCurrency(gas)} />}
                                 {data.adjustments?.filter((a) => a.type !== 'gas_allowance').map((adj, i) => (
