@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import Card from '../../components/ui/Card'
-import StatsCard from '../../components/admin/StatsCard'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
@@ -66,6 +64,8 @@ export default function MyPay() {
   const [paychecks,   setPaychecks]   = useState([])
   const [pushSub,     setPushSub]     = useState(null)
   const [pushLoading, setPushLoading] = useState(false)
+  const [paycheckHistoryOpen, setPaycheckHistoryOpen] = useState(false)
+  const [breakdownOpen, setBreakdownOpen] = useState(false)
 
   const p = periods[selectedPeriod]
 
@@ -206,7 +206,7 @@ export default function MyPay() {
         <>
           {tab === 'pay' && (
             <>
-              {/* ── Paycheck status ── */}
+              {/* ── Paycheck status — compact; history tucked behind a tap ── */}
               {(() => {
                 const latest = paychecks[0] ?? null
                 const statusCfg = {
@@ -216,40 +216,51 @@ export default function MyPay() {
                   voided:     { label: t('pay.paycheck.voided'),     color: 'text-red-700   bg-red-50   border-red-200'   },
                 }
                 const cfg = latest ? (statusCfg[latest.status] ?? statusCfg.processing) : null
+                const hasHistory = paychecks.length > 1
                 return (
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-base font-semibold text-gray-900">{t('pay.paycheck.title')}</h2>
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between gap-2 px-4 pt-3.5 pb-1">
+                      <h2 className="text-sm font-semibold text-gray-900">{t('pay.paycheck.title')}</h2>
                       <button
                         onClick={togglePush}
                         disabled={pushLoading}
                         title={pushSub ? t('pay.paycheck.notificationsOn') : t('pay.paycheck.enableNotifications')}
-                        className={`p-2 rounded-xl transition-colors ${pushSub ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                        className={`p-1.5 rounded-lg transition-colors ${pushSub ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                       >
-                        <svg viewBox="0 0 24 24" fill={pushSub ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+                        <svg viewBox="0 0 24 24" fill={pushSub ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className="w-4 h-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                         </svg>
                       </button>
                     </div>
                     {!latest
-                      ? <p className="text-sm text-gray-400">{t('pay.paycheck.none')}</p>
+                      ? <p className="text-sm text-gray-400 px-4 pb-4">{t('pay.paycheck.none')}</p>
                       : (
-                        <div className="space-y-3">
-                          <div className={`flex items-center justify-between rounded-xl border px-4 py-3 ${cfg.color}`}>
-                            <div>
-                              <p className="text-sm font-semibold">{cfg.label}</p>
-                              <p className="text-xs opacity-70 mt-0.5">
-                                {formatDate(latest.period_start)} – {formatDate(latest.period_end)}
-                                {latest.amount ? ` · ${formatCurrency(parseFloat(latest.amount))}` : ''}
-                              </p>
-                              {latest.notes && <p className="text-xs opacity-60 mt-0.5">{latest.notes}</p>}
+                        <>
+                          <button
+                            onClick={() => hasHistory && setPaycheckHistoryOpen(v => !v)}
+                            disabled={!hasHistory}
+                            className="w-full flex items-center gap-2 px-4 pb-4 text-left disabled:cursor-default">
+                            <div className={`flex-1 flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${cfg.color}`}>
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold truncate">{cfg.label}</p>
+                                <p className="text-xs opacity-70 mt-0.5 truncate">
+                                  {formatDate(latest.period_start)} – {formatDate(latest.period_end)}
+                                  {latest.amount ? ` · ${formatCurrency(parseFloat(latest.amount))}` : ''}
+                                </p>
+                              </div>
+                              {latest.status === 'available' && (
+                                <span className="text-xl shrink-0 ml-2" title={t('pay.paycheck.available')}>🎉</span>
+                              )}
                             </div>
-                            {latest.status === 'available' && (
-                              <span className="text-2xl" title={t('pay.paycheck.available')}>🎉</span>
+                            {hasHistory && (
+                              <svg className={`w-4 h-4 text-gray-300 shrink-0 transition-transform ${paycheckHistoryOpen ? 'rotate-180' : ''}`}
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                              </svg>
                             )}
-                          </div>
-                          {paychecks.length > 1 && (
-                            <div>
+                          </button>
+                          {paycheckHistoryOpen && hasHistory && (
+                            <div className="px-4 pb-4 border-t border-gray-50 pt-3">
                               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{t('pay.paycheck.history')}</p>
                               <div className="space-y-1.5">
                                 {paychecks.slice(1, 5).map((pc) => {
@@ -264,7 +275,7 @@ export default function MyPay() {
                               </div>
                             </div>
                           )}
-                        </div>
+                        </>
                       )
                     }
                   </div>
@@ -283,81 +294,93 @@ export default function MyPay() {
                     const otRate   = data.user?.overtime_rate ?? 0
                     return (
                       <>
-                        {/* ── Stat cards ── */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <StatsCard compact
-                          label={t('pay.todayHours')}
-                          value={formatHours(data.today_hours ?? 0)}
-                          icon={ClockIcon}
-                          color="blue"
-                        />
-                        <StatsCard compact
-                          label={selectedPeriod === 0 ? t('pay.weekHours') : t('pay.approvedHours')}
-                          value={formatHours(data.approved_hours ?? 0)}
-                          icon={CalendarIcon}
-                          color="indigo"
-                        />
-                        <StatsCard compact
-                          label={t('pay.rate')}
-                          value={isSalary ? formatCurrency(rate) : `${formatCurrency(rate)}/hr`}
-                          icon={RateIcon}
-                          color="purple"
-                        />
-                        <StatsCard compact
-                          label={t('pay.estimatedGross')}
-                          value={formatCurrency(data.estimated_total ?? 0)}
-                          icon={GrossIcon}
-                          color="green"
-                        />
-                      </div>
-
-                      {/* ── Pie chart ── */}
-                      {(data.estimated_total ?? 0) > 0 && (
-                        <Card title={t('pay.breakdown')}>
-                          <PayPieChart
-                            base={data.base_gross ?? 0}
-                            gas={gas}
-                            bonus={bonusAdj}
-                            loan={periodLoanDed}
-                            compact
-                          />
-                        </Card>
-                      )}
-
-                      {/* ── Breakdown detail ── */}
-                      <Card title={t('pay.breakdownDetail')}>
-                        <div className="flex flex-col gap-3">
-                          {isSalary
-                            ? <Row label={t('pay.weeklyRate')} value={formatCurrency(rate)} />
-                            : <>
-                                <Row label={`${t('pay.regularHours')} (${formatHours(data.regular_hours ?? 0)})`} value={formatCurrency((data.regular_hours ?? 0) * rate)} />
-                                {(data.overtime_hours ?? 0) > 0 && (
-                                  <Row label={`${t('pay.overtimeHours')} (${formatHours(data.overtime_hours ?? 0)})`} value={formatCurrency((data.overtime_hours ?? 0) * (otRate || rate * 1.5))} accent />
-                                )}
-                              </>
-                          }
-                          {gas > 0 && <Row label={t('pay.gasAllowance')} value={formatCurrency(gas)} />}
-                          {data.adjustments?.filter((a) => a.type !== 'gas_allowance').map((adj, i) => (
-                            <Row key={i}
-                              label={adj.type.replace(/_/g,' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-                              value={formatCurrency(adj.amount)}
-                              note={adj.description}
-                            />
-                          ))}
-                          {periodLoanDed > 0 && (
-                            <Row label={t('pay.loanDeduction')} value={`−${formatCurrency(periodLoanDed)}`} accent />
-                          )}
-                          <div className="border-t border-gray-100 pt-3 mt-1">
-                            <Row label={t('pay.estimatedTotal')} value={formatCurrency(data.estimated_total ?? 0)} bold />
+                        {/* ── Stats — one card, 4 cells, no per-item chrome ── */}
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+                            {[
+                              [t('pay.todayHours'), formatHours(data.today_hours ?? 0), ClockIcon, 'bg-blue-50 text-blue-600'],
+                              [selectedPeriod === 0 ? t('pay.weekHours') : t('pay.approvedHours'), formatHours(data.approved_hours ?? 0), CalendarIcon, 'bg-indigo-50 text-indigo-600'],
+                              [t('pay.rate'), isSalary ? formatCurrency(rate) : `${formatCurrency(rate)}/hr`, RateIcon, 'bg-purple-50 text-purple-600'],
+                              [t('pay.estimatedGross'), formatCurrency(data.estimated_total ?? 0), GrossIcon, 'bg-green-50 text-green-600'],
+                            ].map(([label, value, icon, colorCls], i) => (
+                              <div key={i} className="flex items-center gap-2.5 min-w-0">
+                                <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${colorCls}`}>
+                                  {icon}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold text-gray-900 truncate">{value}</p>
+                                  <p className="text-[11px] text-gray-400 truncate">{label}</p>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      </Card>
 
-                      {isW2  && <div className="bg-green-50 rounded-xl px-4 py-3 text-sm text-green-700">{t('pay.w2Notice')}</div>}
-                      {!isW2 && <div className="bg-blue-50  rounded-xl px-4 py-3 text-sm text-blue-700" >{t('pay.1099Notice')}</div>}
-                    </>
-                  )
-                })()}
+                        {/* ── Pay Breakdown — collapsed by default, same pattern as
+                            Today's Activity on the Clock page ── */}
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                          <button onClick={() => setBreakdownOpen(v => !v)}
+                            className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left active:bg-gray-50 transition-colors">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="w-9 h-9 rounded-full bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+                                {GrossIcon}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-gray-800">{t('pay.breakdown')}</p>
+                                <p className="text-xs text-gray-400 truncate mt-0.5">
+                                  {t('pay.estimatedTotal')} · {formatCurrency(data.estimated_total ?? 0)}
+                                </p>
+                              </div>
+                            </div>
+                            <svg className={`w-4 h-4 text-gray-300 shrink-0 transition-transform ${breakdownOpen ? 'rotate-180' : ''}`}
+                              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                          </button>
+                          {breakdownOpen && (
+                            <div className="px-4 pb-4 border-t border-gray-50 pt-3 flex flex-col gap-4">
+                              {(data.estimated_total ?? 0) > 0 && (
+                                <PayPieChart
+                                  base={data.base_gross ?? 0}
+                                  gas={gas}
+                                  bonus={bonusAdj}
+                                  loan={periodLoanDed}
+                                  compact
+                                />
+                              )}
+                              <div className="flex flex-col gap-3">
+                                {isSalary
+                                  ? <Row label={t('pay.weeklyRate')} value={formatCurrency(rate)} />
+                                  : <>
+                                      <Row label={`${t('pay.regularHours')} (${formatHours(data.regular_hours ?? 0)})`} value={formatCurrency((data.regular_hours ?? 0) * rate)} />
+                                      {(data.overtime_hours ?? 0) > 0 && (
+                                        <Row label={`${t('pay.overtimeHours')} (${formatHours(data.overtime_hours ?? 0)})`} value={formatCurrency((data.overtime_hours ?? 0) * (otRate || rate * 1.5))} accent />
+                                      )}
+                                    </>
+                                }
+                                {gas > 0 && <Row label={t('pay.gasAllowance')} value={formatCurrency(gas)} />}
+                                {data.adjustments?.filter((a) => a.type !== 'gas_allowance').map((adj, i) => (
+                                  <Row key={i}
+                                    label={adj.type.replace(/_/g,' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                                    value={formatCurrency(adj.amount)}
+                                    note={adj.description}
+                                  />
+                                ))}
+                                {periodLoanDed > 0 && (
+                                  <Row label={t('pay.loanDeduction')} value={`−${formatCurrency(periodLoanDed)}`} accent />
+                                )}
+                                <div className="border-t border-gray-100 pt-3 mt-1">
+                                  <Row label={t('pay.estimatedTotal')} value={formatCurrency(data.estimated_total ?? 0)} bold />
+                                </div>
+                              </div>
+                              {isW2  && <div className="bg-green-50 rounded-xl px-4 py-3 text-sm text-green-700">{t('pay.w2Notice')}</div>}
+                              {!isW2 && <div className="bg-blue-50  rounded-xl px-4 py-3 text-sm text-blue-700" >{t('pay.1099Notice')}</div>}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )
+                  })()}
             </>
           )}
 
