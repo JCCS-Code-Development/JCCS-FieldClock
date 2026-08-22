@@ -342,6 +342,20 @@ export default function MyPay() {
                           </div>
                         </div>
 
+                        {/* ── Pie chart — always visible in the main view (only the
+                            itemized dollar breakdown below is collapsible) ── */}
+                        {(data.estimated_total ?? 0) > 0 && (
+                          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                            <PayPieChart
+                              base={data.base_gross ?? 0}
+                              gas={gas}
+                              bonus={bonusAdj}
+                              loan={periodLoanDed}
+                              compact
+                            />
+                          </div>
+                        )}
+
                         {/* ── Pay Breakdown — collapsed by default, same pattern as
                             Today's Activity on the Clock page ── */}
                         <div ref={breakdownCardRef} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden scroll-mt-16 scroll-mb-36">
@@ -365,15 +379,6 @@ export default function MyPay() {
                           </button>
                           {breakdownOpen && (
                             <div className="px-4 pb-4 border-t border-gray-50 pt-3 flex flex-col gap-4">
-                              {(data.estimated_total ?? 0) > 0 && (
-                                <PayPieChart
-                                  base={data.base_gross ?? 0}
-                                  gas={gas}
-                                  bonus={bonusAdj}
-                                  loan={periodLoanDed}
-                                  compact
-                                />
-                              )}
                               <div className="flex flex-col gap-3">
                                 {isSalary
                                   ? <Row label={t('pay.weeklyRate')} value={formatCurrency(rate)} />
