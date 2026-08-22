@@ -9,9 +9,8 @@ import { useTimeclockStore } from '../../store/timeclockStore'
 import { useAuthStore } from '../../store/authStore'
 import { useGPS } from '../../hooks/useGPS'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
-import { getStatus, dayStart, dayEnd, setTraveling, markArrival, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
+import { getStatus, dayStart, dayEnd, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
 import { getNearbyJobs, listJobs, registerJob } from '../../api/jobs'
-import { listEstimates } from '../../api/estimates'
 import { groupJobsByCompany } from '../../utils/jobs'
 import Spinner from '../ui/Spinner'
 import Modal from '../ui/Modal'
@@ -27,45 +26,10 @@ const dotMarker = L.divIcon({
   iconAnchor: [7, 7],
 })
 
-const PlayIcon = () => (
-  <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-)
-const StopIcon = () => (
-  <svg className="w-11 h-11" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-)
 const LocationPinIcon = ({ className = 'w-8 h-8' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
     <circle cx="12" cy="9" r="2.5"/>
-  </svg>
-)
-const WrenchIcon = () => (
-  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
-  </svg>
-)
-const DocumentIcon = () => (
-  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7 3h7l4 4v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6M9 16h6M13 3v5h5"/>
-  </svg>
-)
-const ClipboardIcon = () => (
-  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 4h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/>
-    <rect x="5" y="6" width="14" height="15" rx="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    <path strokeLinecap="round" d="M9 12l2 2 4-4"/>
-  </svg>
-)
-const PlusIcon = () => (
-  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 8v8M8 12h8"/>
-  </svg>
-)
-const AlertIcon = () => (
-  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3.5l9.5 16.5H2.5L12 3.5z"/>
-    <path strokeLinecap="round" d="M12 10v4"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>
   </svg>
 )
 const ActivityIcon = () => (
@@ -73,17 +37,16 @@ const ActivityIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h4l2-7 4 14 2-7h6"/>
   </svg>
 )
-const ShieldIcon = () => (
-  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4"/>
-  </svg>
-)
 
 const STATUS_CONFIG = {
-  working:   { text: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
-  traveling: { text: 'text-sky-700',   bg: 'bg-sky-50',   border: 'border-sky-200' },
-  done:      { text: 'text-gray-500',  bg: 'bg-gray-50',  border: 'border-gray-200' },
+  working: { text: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
+  done:    { text: 'text-gray-500',  bg: 'bg-gray-50',  border: 'border-gray-200' },
+}
+
+// Matches the m/km convention already used in the job-site dropdown below.
+function formatDistanceLabel(m) {
+  if (m == null) return ''
+  return m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(1)}km`
 }
 
 async function reverseGeocode(lat, lng) {
@@ -185,6 +148,10 @@ export default function ClockPanel({ showHeader = true }) {
   const [showManual, setShowManual]         = useState(false)
   const [manualLocation, setManualLocation] = useState('')
   const [error, setError]                   = useState('')
+  // Set right after a clock-in whose GPS doesn't match the selected job site —
+  // a non-blocking heads-up, not an error. Replaces the old traveling/arrival
+  // flow: the clock-in always succeeds, this is just a flag on top of it.
+  const [offSiteNotice, setOffSiteNotice]   = useState(null)
 
   const [myRequests, setMyRequests]   = useState([])
   const [detailSheet, setDetailSheet] = useState(null)
@@ -196,25 +163,6 @@ export default function ClockPanel({ showHeader = true }) {
   const [corrReason, setCorrReason]   = useState('')
   const [corrSaving, setCorrSaving]   = useState(false)
   const [corrError, setCorrError]     = useState('')
-
-  const [visitModal, setVisitModal]               = useState(false)
-  const [visitStep, setVisitStep]                 = useState(1)
-  const [visitEstimates, setVisitEstimates]       = useState([])
-  const [loadingVisitEstimates, setLoadingVisitEstimates] = useState(false)
-  const [visitCategory, setVisitCategory]         = useState(null)
-  const [pickedEstimateId, setPickedEstimateId]   = useState(null)
-  const [workOrderNumber, setWorkOrderNumber]     = useState('')
-  const [fieldDescription, setFieldDescription]   = useState('')
-  const [engineerName, setEngineerName]           = useState('')
-  const [forceVisitPicker, setForceVisitPicker]   = useState(false)
-
-  const resetVisitFields = () => {
-    setVisitCategory(null)
-    setPickedEstimateId(null)
-    setWorkOrderNumber('')
-    setFieldDescription('')
-    setEngineerName('')
-  }
 
   const isClockedIn = dayStarted && statusLabel !== 'done' && statusLabel !== null
   const liveElapsed = useLiveElapsed(isClockedIn, currentEntry)
@@ -294,82 +242,24 @@ export default function ClockPanel({ showHeader = true }) {
         setError(t('home.noLocation'))
         return
       }
-      const selectedJob = jobs.find((j) => String(j.id) === String(selectedJobId))
-      const isFarFromJob = selectedJob
-        && selectedJob.distance_meters != null
-        && selectedJob.clock_in_radius_meters != null
-        && selectedJob.distance_meters > selectedJob.clock_in_radius_meters
-
-      if (selectedJobId && isFarFromJob) {
-        handleStartTraveling()
-      } else if (selectedJobId && selectedJob?.is_recurring_maintenance && !forceVisitPicker) {
-        finalizeVisit({})
-      } else {
-        resetVisitFields()
-        setVisitStep(1)
-        setVisitModal(true)
-      }
+      performClockIn()
     } else {
       setLoading(true)
       try {
         await dayEnd({ lat: position?.lat, lng: position?.lng })
         setTimeclockData({ statusLabel: 'done', currentEntry: null, activeJob: null, dayStarted: true })
+        setOffSiteNotice(null)
       } finally { setLoading(false) }
     }
   }
 
-  const handleStartTraveling = async () => {
+  // Clocking in always registers the shift immediately — no separate
+  // "traveling" status or "I've arrived" step. If GPS shows the employee
+  // isn't actually at the selected job site, the entry is just flagged
+  // (via within_radius, computed server-side) rather than blocked.
+  const performClockIn = async () => {
     setLoading(true)
-    try {
-      const data = await setTraveling({
-        job_id:   parseInt(selectedJobId),
-        lat:      position?.lat      ?? null,
-        lng:      position?.lng      ?? null,
-        accuracy: position?.accuracy ?? null,
-      })
-      setTimeclockData(data.timeclock)
-    } catch (err) {
-      setError(err?.response?.data?.error ?? t('home.travelStartError'))
-    } finally { setLoading(false) }
-  }
-
-  const openArrival = () => {
-    setError('')
-    if (activeJob?.is_recurring_maintenance && !forceVisitPicker) {
-      finalizeVisit({})
-      return
-    }
-    resetVisitFields()
-    setVisitStep(1)
-    setVisitModal(true)
-  }
-
-  const openEstimatePicker = () => {
-    setVisitStep(2)
-    setLoadingVisitEstimates(true)
-    listEstimates({ job_id: selectedJobId, active: 1 })
-      .then((d) => setVisitEstimates(d.estimates ?? []))
-      .catch(() => setVisitEstimates([]))
-      .finally(() => setLoadingVisitEstimates(false))
-  }
-
-  const handlePickCategory = (value) => {
-    setVisitCategory(value)
-    if (value === 'estimate') {
-      openEstimatePicker()
-    } else {
-      setVisitStep(2)
-    }
-  }
-
-  const finalizeVisit = (fields = {}) => {
-    if (statusLabel === 'traveling') return performArrival(fields)
-    return performClockIn(fields)
-  }
-
-  const performClockIn = async (fields = {}) => {
-    setVisitModal(false)
-    setLoading(true)
+    setOffSiteNotice(null)
     try {
       let jobId = selectedJobId ? parseInt(selectedJobId) : null
       if (!jobId && manualLocation.trim()) {
@@ -386,35 +276,15 @@ export default function ClockPanel({ showHeader = true }) {
         lat:      position?.lat      ?? null,
         lng:      position?.lng      ?? null,
         accuracy: position?.accuracy ?? null,
-        ...fields,
       })
       setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
       setShowManual(false)
       setManualLocation('')
-      setForceVisitPicker(false)
-    } catch (err) {
-      setError(err?.response?.data?.error ?? t('home.clockInError'))
-    } finally { setLoading(false) }
-  }
-
-  const performArrival = async (fields = {}) => {
-    setVisitModal(false)
-    setLoading(true)
-    try {
-      const data = await markArrival({
-        job_id:   parseInt(selectedJobId),
-        lat:      position?.lat      ?? null,
-        lng:      position?.lng      ?? null,
-        accuracy: position?.accuracy ?? null,
-        ...fields,
-      })
-      setTimeclockData(data.timeclock)
-      setForceVisitPicker(false)
       if (data.within_radius === false) {
-        setError(t('home.arrivalOutOfRadius', { distance: data.distance_meters }))
+        setOffSiteNotice({ distanceMeters: data.distance_meters })
       }
     } catch (err) {
-      setError(err?.response?.data?.error ?? t('home.arrivalError'))
+      setError(err?.response?.data?.error ?? t('home.clockInError'))
     } finally { setLoading(false) }
   }
 
@@ -428,7 +298,11 @@ export default function ClockPanel({ showHeader = true }) {
     ?? (currentEntry?.notes ? currentEntry.notes.replace('Location: ', '') : null)
     ?? locationLabel
 
-  const selectedJobObj = jobs.find((j) => String(j.id) === String(selectedJobId))
+  // currentEntry.within_radius comes straight from the DB column (0/1/null via
+  // PDO), so coerce loosely rather than assume a strict boolean.
+  const isOffSite = isClockedIn
+    && currentEntry?.within_radius !== null && currentEntry?.within_radius !== undefined
+    && Number(currentEntry.within_radius) === 0
 
   return (
     <div ref={rootRef} className="flex flex-col gap-3.5 lg:grid lg:grid-cols-2 lg:gap-6 w-full scroll-mt-4">
@@ -496,23 +370,20 @@ export default function ClockPanel({ showHeader = true }) {
               {t(`status.${statusLabel}`)}
             </span>
             {displayLocation && <p className="text-xs text-gray-400">{displayLocation}</p>}
+            {isOffSite && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                ⚠️ {t('home.offSiteBadge')}
+              </span>
+            )}
           </div>
         )}
 
-        {/* Traveling — show "I've Arrived" once clocked in and on the way */}
-        {isClockedIn && statusLabel === 'traveling' && (
-          <div className="w-full flex flex-col items-center gap-2">
-            <button onClick={openArrival} disabled={loading}
-              className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-2xl bg-sky-500 text-white font-bold text-base shadow-lg active:bg-sky-600 transition-colors disabled:opacity-50">
-              <LocationPinIcon className="w-5 h-5" />
-              {t('home.iveArrived')}
-            </button>
-            {activeJob?.is_recurring_maintenance && !forceVisitPicker && (
-              <button onClick={() => setForceVisitPicker(true)} className="text-xs text-gray-400 hover:text-brand-500 transition-colors">
-                {t('visitType.needsEstimateOrEmergency')}
-              </button>
-            )}
-          </div>
+        {/* One-time heads-up right after a clock-in whose GPS didn't match the
+            selected job site — non-blocking, the clock-in already succeeded */}
+        {offSiteNotice && (
+          <p className="text-xs text-amber-700 font-medium bg-amber-50 border border-amber-200 px-4 py-2.5 rounded-xl w-full text-center">
+            ⚠️ {t('home.offSiteNotice', { distance: formatDistanceLabel(offSiteNotice.distanceMeters) })}
+          </p>
         )}
 
         {!isOnline && (
@@ -551,9 +422,7 @@ export default function ClockPanel({ showHeader = true }) {
 
           <div className="px-4 py-3">
             <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-2">
-              {isClockedIn
-                ? (statusLabel === 'traveling' ? t('home.headingTo') : t('home.clockedInAt'))
-                : t('home.selectLocation')}
+              {isClockedIn ? t('home.clockedInAt') : t('home.selectLocation')}
             </p>
             {isClockedIn ? (
               <div>
@@ -567,7 +436,7 @@ export default function ClockPanel({ showHeader = true }) {
                 <div className="relative">
                   <select
                     value={selectedJobId}
-                    onChange={(e) => { setSelectedJobId(e.target.value); setShowManual(false); setError(''); setForceVisitPicker(false) }}
+                    onChange={(e) => { setSelectedJobId(e.target.value); setShowManual(false); setError('') }}
                     className="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-gray-800 outline-none focus:border-brand-500 appearance-none"
                   >
                     <option value="">{t('home.selectJobSite')}</option>
@@ -585,11 +454,6 @@ export default function ClockPanel({ showHeader = true }) {
                   </select>
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
                 </div>
-                {selectedJobObj?.is_recurring_maintenance && !forceVisitPicker && (
-                  <button onClick={() => setForceVisitPicker(true)} className="text-xs text-gray-400 hover:text-brand-500 transition-colors text-left">
-                    {t('visitType.needsEstimateOrEmergency')}
-                  </button>
-                )}
                 {loadingJobs && <p className="text-xs text-gray-400">{t('home.loadingLocations')}</p>}
                 {(showManual || (!loadingJobs && jobs.length === 0)) ? (
                   <div className="flex flex-col gap-1">
@@ -859,118 +723,6 @@ export default function ClockPanel({ showHeader = true }) {
           </div>
         )}
       </Modal>
-
-      {/* ── Visit classification picker — shown right before clocking in ──── */}
-      <Modal isOpen={visitModal} onClose={() => setVisitModal(false)} title={t('visitType.title')}>
-        {visitStep === 1 && (
-          <div className="flex flex-col gap-4">
-            <p className="text-sm font-semibold text-gray-800">
-              {selectedJobId ? t('visitType.existingLocation') : t('visitType.newLocation')}
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {(selectedJobId ? EXISTING_CATEGORIES : NEW_LOCATION_CATEGORIES).map((opt) => (
-                <button key={opt.value}
-                  onClick={() => handlePickCategory(opt.value)}
-                  className="flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 text-sm font-semibold transition-colors text-left border-gray-200 text-gray-600 active:border-brand-300 bg-white">
-                  {opt.icon}
-                  <span className="leading-tight">{t(opt.labelKey)}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Step 2 — Work Order fields */}
-        {visitStep === 2 && visitCategory === 'work_order' && (
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('visitType.workOrderNumber')}</label>
-              <input value={workOrderNumber} onChange={(e) => setWorkOrderNumber(e.target.value)} autoFocus
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('visitType.description')}</label>
-              <textarea rows={3} value={fieldDescription} onChange={(e) => setFieldDescription(e.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500 resize-none" />
-            </div>
-            <div className="flex gap-3 pt-1">
-              <Button variant="secondary" fullWidth onClick={() => setVisitStep(1)}>{t('visitType.back')}</Button>
-              <Button fullWidth
-                disabled={!workOrderNumber.trim() || !fieldDescription.trim()}
-                onClick={() => finalizeVisit({ visit_category: 'work_order', work_order_number: workOrderNumber.trim(), visit_description: fieldDescription.trim() })}>
-                {t('visitType.confirm')}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2 — Estimate list (existing job) */}
-        {visitStep === 2 && visitCategory === 'estimate' && (
-          <div className="flex flex-col gap-4">
-            <p className="text-sm font-semibold text-gray-800">{t('visitType.selectEstimate')}</p>
-            {loadingVisitEstimates ? (
-              <div className="flex justify-center py-6"><Spinner size="md" /></div>
-            ) : visitEstimates.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">{t('visitType.noEstimates')}</p>
-            ) : (
-              <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
-                {visitEstimates.map((est) => (
-                  <button key={est.id} onClick={() => { setPickedEstimateId(est.id); setVisitStep(3) }}
-                    className="w-full text-left px-4 py-3 rounded-2xl border-2 border-gray-200 active:border-brand-300 bg-white transition-colors">
-                    <p className="text-sm font-semibold text-gray-800">#{est.estimate_number}</p>
-                    {est.description && <p className="text-xs text-gray-400 mt-0.5">{est.description}</p>}
-                  </button>
-                ))}
-              </div>
-            )}
-            <Button variant="secondary" fullWidth onClick={() => setVisitStep(1)}>{t('visitType.back')}</Button>
-          </div>
-        )}
-
-        {/* Step 2 — new-location fields (Regular / Estimate unknown / Emergency / Warranty / Add-On) */}
-        {visitStep === 2 && visitCategory && visitCategory !== 'work_order' && visitCategory !== 'estimate' && (
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
-                {visitCategory === 'add_on' ? t('visitType.originalEstimateDescription') : t('visitType.description')}
-              </label>
-              <textarea rows={3} value={fieldDescription} onChange={(e) => setFieldDescription(e.target.value)} autoFocus
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500 resize-none" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">{t('visitType.engineer')}</label>
-              <input value={engineerName} onChange={(e) => setEngineerName(e.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500" />
-            </div>
-            <div className="flex gap-3 pt-1">
-              <Button variant="secondary" fullWidth onClick={() => setVisitStep(1)}>{t('visitType.back')}</Button>
-              <Button fullWidth
-                disabled={!fieldDescription.trim() || !engineerName.trim()}
-                onClick={() => finalizeVisit({ visit_category: visitCategory, engineer_name: engineerName.trim(), visit_description: fieldDescription.trim() })}>
-                {t('visitType.confirm')}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3 — Estimate sub-type (existing job, known estimate) */}
-        {visitStep === 3 && (
-          <div className="flex flex-col gap-4">
-            <p className="text-sm font-semibold text-gray-800">{t('visitType.selectVisitKind')}</p>
-            <div className="grid grid-cols-2 gap-2">
-              {ESTIMATE_SUBTYPES.map((opt) => (
-                <button key={opt.value}
-                  onClick={() => finalizeVisit({ visit_category: 'estimate', estimate_id: pickedEstimateId, estimate_subtype: opt.value })}
-                  className="flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 text-sm font-semibold transition-colors text-left border-gray-200 text-gray-600 active:border-brand-300 bg-white">
-                  {opt.icon}
-                  <span className="leading-tight">{t(opt.labelKey)}</span>
-                </button>
-              ))}
-            </div>
-            <Button variant="secondary" fullWidth onClick={() => setVisitStep(2)}>{t('visitType.back')}</Button>
-          </div>
-        )}
-      </Modal>
     </div>
   )
 }
@@ -993,21 +745,4 @@ const CORR_TYPES = [
   { value: 'both',  icon: '⏱',  label: 'Both Times' },
   { value: 'job',   icon: '📍', label: 'Job Site' },
   { value: 'other', icon: '💬', label: 'Something Else' },
-]
-const EXISTING_CATEGORIES = [
-  { value: 'work_order', icon: <DocumentIcon />,  labelKey: 'visitType.workOrder' },
-  { value: 'estimate',   icon: <ClipboardIcon />, labelKey: 'visitType.estimate' },
-]
-const NEW_LOCATION_CATEGORIES = [
-  { value: 'regular',          icon: <WrenchIcon />,    labelKey: 'visitType.regular' },
-  { value: 'estimate_unknown', icon: <ClipboardIcon />, labelKey: 'visitType.estimateUnknown' },
-  { value: 'add_on',           icon: <PlusIcon />,      labelKey: 'visitType.addOn' },
-  { value: 'emergency',        icon: <AlertIcon />,     labelKey: 'visitType.emergency' },
-  { value: 'warranty',         icon: <ShieldIcon />,    labelKey: 'visitType.warranty' },
-]
-const ESTIMATE_SUBTYPES = [
-  { value: 'regular',   icon: <WrenchIcon />, labelKey: 'visitType.regular' },
-  { value: 'add_on',    icon: <PlusIcon />,   labelKey: 'visitType.addOn' },
-  { value: 'emergency', icon: <AlertIcon />,  labelKey: 'visitType.emergency' },
-  { value: 'warranty',  icon: <ShieldIcon />, labelKey: 'visitType.warranty' },
 ]

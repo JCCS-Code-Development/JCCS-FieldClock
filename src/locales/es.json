@@ -61,11 +61,8 @@
     "clockOutFailed": "Error al registrar salida. Sigues marcado como activo.",
     "clockInFailed": "Error al registrar entrada. Intenta de nuevo.",
     "switchJob": "Cambiar a Este Trabajo",
-    "headingTo": "En camino a",
-    "iveArrived": "He Llegado",
-    "travelStartError": "No se pudo iniciar el viaje. Intenta de nuevo.",
-    "arrivalError": "No se pudo confirmar la llegada. Intenta de nuevo.",
-    "arrivalOutOfRadius": "Pareces estar a {{distance}}m del sitio de trabajo. Llegada registrada — tu administrador puede revisarla."
+    "offSiteBadge": "Fuera del sitio",
+    "offSiteNotice": "Marcaste entrada, pero tu GPS muestra que estás a {{distance}} del sitio de trabajo seleccionado."
   },
   "status": {
     "working": "Trabajando",

@@ -40,12 +40,10 @@ registerRoute(
 // ── Push notifications ───────────────────────────────────────────
 const PUSH_CONFIGS = {
   en: {
-    paycheck:        { body: 'Your paycheck is available. Tap to view.',        tag: 'paycheck',        url: '/my-pay' },
-    travel_reminder: { body: "Still traveling? Tap to confirm you've arrived.",  tag: 'travel-reminder', url: '/' },
+    paycheck: { body: 'Your paycheck is available. Tap to view.',         tag: 'paycheck', url: '/my-pay' },
   },
   es: {
-    paycheck:        { body: 'Tu cheque de pago está disponible. Toca para ver.',        tag: 'paycheck',        url: '/my-pay' },
-    travel_reminder: { body: '¿Sigues en camino? Toca para confirmar tu llegada.',        tag: 'travel-reminder', url: '/' },
+    paycheck: { body: 'Tu cheque de pago está disponible. Toca para ver.', tag: 'paycheck', url: '/my-pay' },
   },
 }
 
