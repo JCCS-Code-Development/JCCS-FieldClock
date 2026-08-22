@@ -193,7 +193,7 @@ export default function MyPay() {
   ]
 
   return (
-    <div ref={rootRef} className="px-4 pt-6 pb-6 flex flex-col gap-4 w-full scroll-mt-4">
+    <div ref={rootRef} className="flex flex-col gap-4 w-full scroll-mt-4">
       <h1 className="text-xl font-bold text-gray-900">{t('pay.title')}</h1>
 
       <button onClick={() => setPeriodSheetOpen(true)}
@@ -763,7 +763,7 @@ export default function MyPay() {
           Breakdown) can scroll fully clear of the fixed bottom nav — the
           page-level bottom padding alone isn't enough once a card near the
           end of the page grows taller. */}
-      <div className="h-16 shrink-0" />
+      <div className="h-6 shrink-0" />
     </div>
   )
 }
