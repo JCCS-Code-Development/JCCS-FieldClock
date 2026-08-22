@@ -310,13 +310,14 @@ export default function MyPay() {
               {!data
                 ? <p className="text-center text-gray-400 py-12 text-sm">{t('pay.noData')}</p>
                 : (() => {
-                    const gasAdj   = data.adjustments?.filter((a) => a.type === 'gas_allowance').reduce((s, a) => s + parseFloat(a.amount), 0) ?? 0
+                    // data.gas_total is already the sum of gas_allowance adjustments
+                    // (computed server-side in my-pay.php) — do not re-add them here,
+                    // that was double-counting the gas allowance.
                     const bonusAdj = data.adjustments?.filter((a) => a.type !== 'gas_allowance').reduce((s, a) => s + parseFloat(a.amount), 0) ?? 0
-                    const gas      = (data.gas_total ?? 0) + gasAdj
+                    const gas      = data.gas_total ?? 0
                     const isSalary = data.pay_structure === 'salary'
                     const isW2     = data.pay_type === 'w2'
                     const rate     = data.pay_rate ?? 0
-                    const otRate   = data.user?.overtime_rate ?? 0
                     return (
                       <>
                         {/* ── Stats — one card, 4 cells, no per-item chrome ── */}
@@ -379,7 +380,10 @@ export default function MyPay() {
                                   : <>
                                       <Row label={`${t('pay.regularHours')} (${formatHours(data.regular_hours ?? 0)})`} value={formatCurrency((data.regular_hours ?? 0) * rate)} />
                                       {(data.overtime_hours ?? 0) > 0 && (
-                                        <Row label={`${t('pay.overtimeHours')} (${formatHours(data.overtime_hours ?? 0)})`} value={formatCurrency((data.overtime_hours ?? 0) * (otRate || rate * 1.5))} accent />
+                                        // Same rate as regular hours — this company pays no
+                                        // overtime multiplier (see my-pay.php), so the row
+                                        // must match that, not assume a 1.5x premium.
+                                        <Row label={`${t('pay.overtimeHours')} (${formatHours(data.overtime_hours ?? 0)})`} value={formatCurrency((data.overtime_hours ?? 0) * rate)} accent />
                                       )}
                                     </>
                                 }
