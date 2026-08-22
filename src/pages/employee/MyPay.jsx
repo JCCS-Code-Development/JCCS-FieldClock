@@ -416,28 +416,55 @@ export default function MyPay() {
           {tab === 'log' && (
             entries.length === 0
               ? <p className="text-center text-gray-400 py-12 text-sm">{t('pay.noEntries')}</p>
-              : <div className="flex flex-col gap-2">
-                  {entries.map((entry) => {
-                    const hasRequest = myRequests.some((r) => String(r.entry_id) === String(entry.id) && r.status === 'pending')
-                    const dot = ENTRY_DOT[entry.status_label] ?? 'bg-gray-400'
-                    return (
-                      <button key={entry.id} onClick={() => setDetailSheet(entry)}
-                        className="w-full text-left bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3 active:bg-gray-50 transition-colors">
-                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-gray-400">{formatDate(entry.start_time)}</p>
-                          <p className="text-sm font-semibold text-gray-900 capitalize">{entry.status_label?.replace('_',' ')}</p>
-                          <p className="text-xs text-gray-500">
-                            {formatTime(entry.start_time)} → {entry.end_time ? formatTime(entry.end_time) : <span className="text-orange-500">{t('pay.inProgress')}</span>}
-                            {entry.job_name && ` · ${entry.job_name}`}
-                          </p>
+              : (() => {
+                  // Group consecutive entries by calendar day (entries already
+                  // arrive most-recent-first) so each weekday reads as its own
+                  // clearly-divided section instead of a flat repeated list.
+                  const groups = []
+                  for (const entry of entries) {
+                    const dateKey = entry.start_time.slice(0, 10)
+                    const last = groups[groups.length - 1]
+                    if (last && last.dateKey === dateKey) last.items.push(entry)
+                    else groups.push({ dateKey, items: [entry] })
+                  }
+                  return (
+                    <div className="flex flex-col gap-5">
+                      {groups.map((g) => (
+                        <div key={g.dateKey}>
+                          <div className="flex items-baseline gap-2 px-1 pb-2 mb-2 border-b border-gray-200">
+                            <p className="text-sm font-bold text-gray-900">
+                              {format(new Date(g.items[0].start_time), 'EEEE')}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {format(new Date(g.items[0].start_time), 'MMM d, yyyy')}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            {g.items.map((entry) => {
+                              const hasRequest = myRequests.some((r) => String(r.entry_id) === String(entry.id) && r.status === 'pending')
+                              const dot = ENTRY_DOT[entry.status_label] ?? 'bg-gray-400'
+                              return (
+                                <button key={entry.id} onClick={() => setDetailSheet(entry)}
+                                  className="w-full text-left bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3 active:bg-gray-50 transition-colors">
+                                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-gray-900 capitalize">{entry.status_label?.replace('_',' ')}</p>
+                                    <p className="text-xs text-gray-500">
+                                      {formatTime(entry.start_time)} → {entry.end_time ? formatTime(entry.end_time) : <span className="text-orange-500">{t('pay.inProgress')}</span>}
+                                      {entry.job_name && ` · ${entry.job_name}`}
+                                    </p>
+                                  </div>
+                                  {hasRequest && <span className="text-xs text-amber-600 font-medium shrink-0">{t('pay.pendingReview')}</span>}
+                                  <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
-                        {hasRequest && <span className="text-xs text-amber-600 font-medium shrink-0">{t('pay.pendingReview')}</span>}
-                        <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
-                      </button>
-                    )
-                  })}
-                </div>
+                      ))}
+                    </div>
+                  )
+                })()
           )}
 
           {tab === 'requests' && (
