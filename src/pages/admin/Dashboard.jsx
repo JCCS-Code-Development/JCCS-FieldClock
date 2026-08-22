@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { format } from 'date-fns'
-import { es, enUS } from 'date-fns/locale'
 import StatsCard from '../../components/admin/StatsCard'
 import Badge from '../../components/ui/Badge'
 import Spinner from '../../components/ui/Spinner'
@@ -15,9 +13,8 @@ import { listJobs } from '../../api/jobs'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { user } = useAuthStore()
-  const dateFnsLocale = i18n.language.startsWith('es') ? es : enUS
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ clockedIn: [], pendingApprovals: 0, activeJobs: 0 })
   const { setTimeclockData } = useTimeclockStore()
@@ -55,21 +52,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex flex-col gap-4 w-full">
-      <div className="text-center">
-        <h1 className="text-xl lg:text-2xl font-bold text-gray-900">{t('nav.dashboard')}</h1>
-        <p className="text-base font-semibold text-brand-500 mt-1">{t('home.welcome', { name: user?.name?.split(' ')[0] })}</p>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {t('home.todayIs', { date: format(new Date(), 'EEEE, MMMM d', { locale: dateFnsLocale }) })}
-        </p>
-      </div>
+      <h1 className="text-xl lg:text-2xl font-bold text-gray-900 text-center">{t('nav.dashboard')}</h1>
 
-      {/* Your clock — hourly admins only; salaried admins don't clock in/out at all */}
-      {!isSalaried && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 lg:p-6">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 lg:mb-4">{t('dashboard.yourClock')}</p>
-          <ClockPanel showHeader={false} />
-        </div>
-      )}
+      {/* Your clock — hourly admins only; salaried admins don't clock in/out at all.
+          Renders exactly like the employee Clock page (same card, greeting, and
+          layout) instead of being boxed in an extra "Your Clock" wrapper card. */}
+      {!isSalaried && <ClockPanel />}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
