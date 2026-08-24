@@ -11,7 +11,6 @@ import { logout as logoutAPI } from '../../api/auth'
 import LiveClock from '../ui/LiveClock'
 
 const STATUS_COLORS = {
-  traveling:    'bg-sky-500',
   working:      'bg-green-500',
   lunch:        'bg-amber-500',
   material_run: 'bg-violet-600',

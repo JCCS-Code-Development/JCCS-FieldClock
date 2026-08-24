@@ -12,11 +12,15 @@ i18n
       en: { translation: en },
       es: { translation: es },
     },
-    fallbackLng: 'en',
+    // Spanish is the app's default for anyone who hasn't picked a language
+    // yet — intentionally not browser-locale-detected, so an English-locale
+    // browser doesn't silently override it. localStorage (an explicit prior
+    // choice via LangSwitcher) is the only thing allowed to take precedence.
+    fallbackLng: 'es',
     supportedLngs: ['en', 'es'],
     interpolation: { escapeValue: false },
     detection: {
-      order: ['localStorage', 'navigator'],
+      order: ['localStorage'],
       caches: ['localStorage'],
       lookupLocalStorage: 'fieldclock-lang',
     },

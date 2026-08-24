@@ -1,5 +1,8 @@
 import client from './client'
 
+export const checkIdentifier = (identifier) =>
+  client.post('/auth/check-identifier.php', { identifier }).then((r) => r.data)
+
 export const login = (identifier, password) =>
   client.post('/auth/login.php', { identifier, password }).then((r) => r.data)
 

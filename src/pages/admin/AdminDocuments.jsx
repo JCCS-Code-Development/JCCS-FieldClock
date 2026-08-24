@@ -571,7 +571,6 @@ function AnnualSummaryDoc({ employees, year, ein }) {
 function TimesheetRecordDoc({ emp, breakdown, start, end, ein }) {
   const CATEGORY_LABELS = {
     direct_labor:    'Working',
-    travel:          'Traveling',
     paid_lunch:      'Lunch',
     material_pickup: 'Material Run',
     waiting_time:    'Waiting',
