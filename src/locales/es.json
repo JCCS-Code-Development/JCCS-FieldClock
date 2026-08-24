@@ -63,7 +63,13 @@
     "clockInFailed": "Error al registrar entrada. Intenta de nuevo.",
     "switchJob": "Cambiar a Este Trabajo",
     "offSiteBadge": "Fuera del sitio",
-    "offSiteNotice": "Marcaste entrada, pero tu GPS muestra que estás a {{distance}} del sitio de trabajo seleccionado."
+    "offSiteNotice": "Marcaste entrada, pero tu GPS muestra que estás a {{distance}} del sitio de trabajo seleccionado.",
+    "clockOutModal": {
+      "title": "Confirmar Salida",
+      "location": "Ubicación que se registrará",
+      "noteLabel": "Nota (opcional)",
+      "notePlaceholder": "Algo que quieras anotar sobre hoy…"
+    }
   },
   "status": {
     "working": "Trabajando",
