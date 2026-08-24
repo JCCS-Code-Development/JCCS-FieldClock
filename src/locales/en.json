@@ -63,7 +63,13 @@
     "clockInFailed": "Clock-in failed. Try again.",
     "switchJob": "Switch to This Job",
     "offSiteBadge": "Off-site",
-    "offSiteNotice": "You're clocked in, but your GPS shows you're {{distance}} from the selected job site."
+    "offSiteNotice": "You're clocked in, but your GPS shows you're {{distance}} from the selected job site.",
+    "clockOutModal": {
+      "title": "Confirm Clock Out",
+      "location": "Location being recorded",
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": "Anything worth noting about today…"
+    }
   },
   "status": {
     "working": "Working",

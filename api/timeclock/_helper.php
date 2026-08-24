@@ -132,8 +132,11 @@ function transitionOpenWorkEntry(
     return $result;
 }
 
-// Close the current open entry and return its id (or null if none)
-function closeOpenEntry(PDO $pdo, int $userId, ?float $lat, ?float $lng, string $source = 'self_service'): ?int {
+// Close the current open entry and return its id (or null if none). $notes,
+// when given, is the employee's own clock-out note (e.g. from day-end.php) —
+// left null for every other caller (switching activities mid-shift, etc.) so
+// it never overwrites anything on those transitions.
+function closeOpenEntry(PDO $pdo, int $userId, ?float $lat, ?float $lng, string $source = 'self_service', ?string $notes = null): ?int {
     // day_end rows are permanent status markers, not active paid work. Never
     // close one when transitioning or ending a later shift.
     $stmt = $pdo->prepare(
@@ -144,8 +147,13 @@ function closeOpenEntry(PDO $pdo, int $userId, ?float $lat, ?float $lng, string 
     $stmt->execute([$userId]);
     $open = $stmt->fetch();
     if (!$open) return null;
-    $pdo->prepare('UPDATE time_entries SET end_time = NOW(), end_lat = ?, end_lng = ?, last_edited_by = ?, last_edited_at = NOW() WHERE id = ?')
-        ->execute([$lat, $lng, $userId, $open['id']]);
+    if ($notes !== null && $notes !== '') {
+        $pdo->prepare('UPDATE time_entries SET end_time = NOW(), end_lat = ?, end_lng = ?, notes = ?, last_edited_by = ?, last_edited_at = NOW() WHERE id = ?')
+            ->execute([$lat, $lng, $notes, $userId, $open['id']]);
+    } else {
+        $pdo->prepare('UPDATE time_entries SET end_time = NOW(), end_lat = ?, end_lng = ?, last_edited_by = ?, last_edited_at = NOW() WHERE id = ?')
+            ->execute([$lat, $lng, $userId, $open['id']]);
+    }
 
     $new = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
     $new->execute([$open['id']]);

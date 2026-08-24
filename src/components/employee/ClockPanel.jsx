@@ -153,6 +153,12 @@ export default function ClockPanel({ showHeader = true }) {
   // flow: the clock-in always succeeds, this is just a flag on top of it.
   const [offSiteNotice, setOffSiteNotice]   = useState(null)
 
+  // Clock-out confirmation: tapping the button no longer clocks out
+  // immediately — it opens this so the employee can see the location that's
+  // about to be recorded and optionally leave a note before confirming.
+  const [clockOutModal, setClockOutModal] = useState(false)
+  const [clockOutNote, setClockOutNote]   = useState('')
+
   const [myRequests, setMyRequests]   = useState([])
   const [detailSheet, setDetailSheet] = useState(null)
   const [corrModal, setCorrModal]     = useState(null)
@@ -244,13 +250,23 @@ export default function ClockPanel({ showHeader = true }) {
       }
       performClockIn()
     } else {
-      setLoading(true)
-      try {
-        await dayEnd({ lat: position?.lat, lng: position?.lng })
-        setTimeclockData({ statusLabel: 'done', currentEntry: null, activeJob: null, dayStarted: true })
-        setOffSiteNotice(null)
-      } finally { setLoading(false) }
+      setClockOutNote('')
+      setClockOutModal(true)
     }
+  }
+
+  const handleClockOut = async () => {
+    setLoading(true)
+    try {
+      await dayEnd({
+        lat: position?.lat, lng: position?.lng, accuracy: position?.accuracy,
+        notes: clockOutNote.trim() || undefined,
+      })
+      setTimeclockData({ statusLabel: 'done', currentEntry: null, activeJob: null, dayStarted: true })
+      setOffSiteNotice(null)
+      setClockOutModal(false)
+      setClockOutNote('')
+    } finally { setLoading(false) }
   }
 
   // Clocking in always registers the shift immediately — no separate
@@ -645,6 +661,43 @@ export default function ClockPanel({ showHeader = true }) {
           </div>
         )
       })()}
+
+      {/* ── Clock-out confirmation ─────────────────────────────── */}
+      <Modal isOpen={clockOutModal} onClose={() => !loading && setClockOutModal(false)} title={t('home.clockOutModal.title')}>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start gap-2.5 bg-gray-50 rounded-xl px-4 py-3">
+            <LocationPinIcon className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-0.5">
+                {t('home.clockOutModal.location')}
+              </p>
+              <p className="text-sm font-semibold text-gray-900">
+                {locationLabel ?? (gpsLoading ? t('home.locating') : t('home.locationUnavailable'))}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">{t('home.clockOutModal.noteLabel')}</label>
+            <textarea
+              value={clockOutNote}
+              onChange={(e) => setClockOutNote(e.target.value)}
+              placeholder={t('home.clockOutModal.notePlaceholder')}
+              rows={3}
+              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-100 resize-none"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="secondary" fullWidth size="lg" onClick={() => setClockOutModal(false)} disabled={loading}>
+              {t('common.cancel')}
+            </Button>
+            <Button fullWidth size="lg" loading={loading} onClick={handleClockOut}>
+              {t('home.clockOut')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* ── Modification questionnaire ─────────────────────────── */}
       <Modal isOpen={!!corrModal} onClose={() => setCorrModal(null)} title={t('pay.detail.requestModification')}>
