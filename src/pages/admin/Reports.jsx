@@ -7,7 +7,7 @@ import { formatCurrency, formatHours } from '../../utils/format'
 import { format, subDays } from 'date-fns'
 
 const COST_LABELS = {
-  travel: 'Travel', direct_labor: 'Direct Labor', paid_lunch: 'Paid Lunch',
+  direct_labor: 'Direct Labor', paid_lunch: 'Paid Lunch',
   waiting_time: 'Waiting', material_pickup: 'Material Run',
   admin_photos: 'Admin/Photos', rework: 'Rework',
 }

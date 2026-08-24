@@ -8,7 +8,6 @@ const variants = {
   on_hold:        'bg-purple-100 text-purple-800',
   cancelled:      'bg-gray-100 text-gray-500',
   // timeclock statuses
-  traveling:      'bg-sky-100 text-sky-800',
   working:        'bg-green-100 text-green-800',
   lunch:          'bg-amber-100 text-amber-800',
   material_run:   'bg-violet-100 text-violet-800',

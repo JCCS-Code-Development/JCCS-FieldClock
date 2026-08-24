@@ -70,7 +70,6 @@
     "lunch": "Almuerzo",
     "material_run": "Búsqueda de Material",
     "waiting": "Esperando",
-    "traveling": "Viajando",
     "done": "Finalizado"
   },
   "jobs": {
@@ -247,6 +246,7 @@
     "subtitle": "Inicia sesión en tu cuenta",
     "identifier": "Correo o Número de Teléfono",
     "identifierPlaceholder": "tu@correo.com o (555) 000-0000",
+    "next": "Siguiente",
     "password": "Contraseña",
     "passwordPlaceholder": "••••••••",
     "signIn": "Iniciar Sesión",

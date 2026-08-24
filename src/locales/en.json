@@ -70,7 +70,6 @@
     "lunch": "Lunch",
     "material_run": "Material Run",
     "waiting": "Waiting",
-    "traveling": "Traveling",
     "done": "Done"
   },
   "jobs": {
@@ -247,6 +246,7 @@
     "subtitle": "Sign in to your account",
     "identifier": "Email or Phone Number",
     "identifierPlaceholder": "you@example.com or (555) 000-0000",
+    "next": "Next",
     "password": "Password",
     "passwordPlaceholder": "••••••••",
     "signIn": "Sign In",

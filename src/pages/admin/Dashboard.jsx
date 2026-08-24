@@ -38,7 +38,7 @@ export default function AdminDashboard() {
   }, [])
 
   const STATUS_LABELS = {
-    traveling: t('status.traveling'), working: t('status.working'),
+    working: t('status.working'),
     lunch: t('status.lunch'), material_run: t('status.material_run'),
     waiting: t('status.waiting'), done: t('status.done'),
   }

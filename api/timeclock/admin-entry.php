@@ -21,7 +21,6 @@ requireAdmin($auth);
 $pdo  = getPDO();
 
 $COST_MAP = [
-    'traveling'    => 'travel',
     'working'      => 'direct_labor',
     'lunch'        => 'paid_lunch',
     'material_run' => 'material_pickup',
