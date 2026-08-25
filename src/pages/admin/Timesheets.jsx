@@ -390,7 +390,7 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
         <>
           {/* ── Mobile entry cards ── */}
           <div className="md:hidden divide-y divide-gray-50">
-            {entries.map(entry => {
+            {entries.filter(e => e.cost_category !== 'day_end').map(entry => {
               const mins     = entryMins(entry)
               const isDayEnd  = entry.cost_category === 'day_end'
               const isOffSite = entry.within_radius === false
@@ -451,7 +451,7 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {entries.map(entry => {
+                {entries.filter(e => e.cost_category !== 'day_end').map(entry => {
                   const mins     = entryMins(entry)
                   const isDayEnd  = entry.cost_category === 'day_end'
                   const isOffSite = entry.within_radius === false
