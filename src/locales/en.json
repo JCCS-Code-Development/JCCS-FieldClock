@@ -45,7 +45,7 @@
     "suggestedLocation": "You're at",
     "atThisLocation": "At this location",
     "selectJobSite": "— Select a job site —",
-    "notListed": "Not listed? Enter manually →",
+    "orTypeLocation": "Or type where you are",
     "typeSiteName": "Type the job site name…",
     "gpsCapture": "GPS captured: {{coords}}",
     "gpsUnavailable": "GPS unavailable — location will not be recorded.",
@@ -71,6 +71,16 @@
       "location": "Location being recorded",
       "noteLabel": "Note (optional)",
       "notePlaceholder": "Anything worth noting about today…"
+    },
+    "stops": {
+      "title": "Additional Stops Today",
+      "subtitle": "Log other places you visited — a suite, a room, a quick errand",
+      "add": "+ Add",
+      "namePlaceholder": "Where were you? e.g. Suite 204",
+      "notePlaceholder": "Note (optional)",
+      "save": "Save",
+      "nameRequired": "Enter where you were.",
+      "saveError": "Could not save. Try again."
     }
   },
   "status": {
@@ -104,7 +114,6 @@
     "selectVisitKind": "What kind of visit is this?",
     "selectEstimate": "Select an estimate",
     "noEstimates": "No estimates on file for this job yet.",
-    "pendingReviewNotice": "Saved — your admin will review and formally add this location soon.",
     "needsEstimateOrEmergency": "Needs an Estimate or is this an Emergency?",
     "confirm": "Confirm",
     "back": "← Back"
@@ -195,6 +204,16 @@
       "remaining": "Remaining",
       "paidAmount": "{{amount}} paid",
       "deductionNotice": "Loan deductions are processed each paycheck by your administrator."
+    },
+    "profile": {
+      "tab": "Profile",
+      "taxId": "Tax ID",
+      "birthDate": "Birth Date",
+      "emergencyContact": "Emergency Contact",
+      "bankRouting": "Bank Routing Number",
+      "bankAccount": "Bank Account Number",
+      "notOnFile": "Not on file",
+      "editNotice": "Managed by your administrator — contact them to update any of this."
     },
     "todayHours": "Today's Hours",
     "weekHours": "This Week",
