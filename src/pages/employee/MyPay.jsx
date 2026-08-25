@@ -325,6 +325,15 @@ export default function MyPay() {
                     const isSalary = data.pay_structure === 'salary'
                     const isW2     = data.pay_type === 'w2'
                     const rate     = data.pay_rate ?? 0
+
+                    // Bonus info and the full dollar breakdown stay hidden until this
+                    // period's paycheck is actually ready — an admin marks it
+                    // 'available' once checks are printed/received, so employees never
+                    // see a number that could still shift before they're paid.
+                    const periodPaycheck = paychecks.find(
+                      (pc) => pc.period_start === p.start && pc.period_end === p.end
+                    )
+                    const payAvailable = ['available', 'picked_up'].includes(periodPaycheck?.status)
                     return (
                       <>
                         {/* ── Stats — one card, 4 cells, no per-item chrome ── */}
@@ -334,7 +343,7 @@ export default function MyPay() {
                               [t('pay.todayHours'), formatHours(data.today_hours ?? 0), ClockIcon, 'bg-blue-50 text-blue-600'],
                               [selectedPeriod === 0 ? t('pay.weekHours') : t('pay.approvedHours'), formatHours(data.approved_hours ?? 0), CalendarIcon, 'bg-indigo-50 text-indigo-600'],
                               [t('pay.rate'), isSalary ? formatCurrency(rate) : `${formatCurrency(rate)}/hr`, RateIcon, 'bg-purple-50 text-purple-600'],
-                              [t('pay.estimatedGross'), formatCurrency(data.estimated_total ?? 0), GrossIcon, 'bg-green-50 text-green-600'],
+                              [t('pay.estimatedGross'), payAvailable ? formatCurrency(data.estimated_total ?? 0) : t('pay.pendingGross'), GrossIcon, 'bg-green-50 text-green-600'],
                             ].map(([label, value, icon, colorCls], i) => (
                               <div key={i} className="flex items-center gap-2.5 min-w-0">
                                 <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${colorCls}`}>
@@ -350,8 +359,20 @@ export default function MyPay() {
                         </div>
 
                         {/* ── Pie chart — always visible in the main view (only the
-                            itemized dollar breakdown below is collapsible) ── */}
-                        {(data.estimated_total ?? 0) > 0 && (
+                            itemized dollar breakdown below is collapsible) — but only
+                            once this period's paycheck is actually available; until
+                            then a pending notice stands in its place ── */}
+                        {!payAvailable ? (
+                          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+                            <span className="w-9 h-9 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                              {PendingIcon}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-gray-800">{t('pay.breakdownPending.title')}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">{t('pay.breakdownPending.message')}</p>
+                            </div>
+                          </div>
+                        ) : (data.estimated_total ?? 0) > 0 && (
                           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                             <PayPieChart
                               base={data.base_gross ?? 0}
@@ -364,7 +385,10 @@ export default function MyPay() {
                         )}
 
                         {/* ── Pay Breakdown — collapsed by default, same pattern as
-                            Today's Activity on the Clock page ── */}
+                            Today's Activity on the Clock page. Only once available;
+                            the pending notice above the pie chart already covers the
+                            "why isn't this here" question while it isn't. ── */}
+                        {payAvailable && (
                         <div ref={breakdownCardRef} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden scroll-mt-16 scroll-mb-36">
                           <button onClick={() => toggleSection(setBreakdownOpen, breakdownCardRef)}
                             className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left active:bg-gray-50 transition-colors">
@@ -419,6 +443,7 @@ export default function MyPay() {
                             </div>
                           )}
                         </div>
+                        )}
                       </>
                     )
                   })()}
@@ -858,6 +883,7 @@ const ClockIcon  = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stro
 const CalendarIcon = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="4" width="18" height="18" rx="2"/><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18"/></svg>
 const RateIcon   = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-2.21 0-4 .9-4 2s1.79 2 4 2 4 .9 4 2-1.79 2-4 2m0-8v1m0 9v1"/><circle cx="12" cy="12" r="9"/></svg>
 const GrossIcon  = <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><rect x="2" y="5" width="20" height="14" rx="2"/><path strokeLinecap="round" d="M2 10h20M6 15h4M14 15h4"/></svg>
+const PendingIcon = <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="12" r="9"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2"/></svg>
 
 function Row({ label, value, accent, bold, note }) {
   return (
