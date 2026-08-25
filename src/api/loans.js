@@ -2,6 +2,11 @@ import client from './client'
 import { useAuthStore } from '../store/authStore'
 
 export const listLoans            = (params) => client.get('/loans/index.php',   { params }).then((r) => r.data)
+
+// My Pay's "my loans" view — an admin is also an employee viewing their own
+// page here, so this must force self-scoping even though listLoans() alone
+// would return everyone for an admin caller. See api/loans/index.php.
+export const listMyLoans          = ()       => client.get('/loans/index.php',   { params: { mine: 1 } }).then((r) => r.data)
 export const getLoan              = (id)     => client.get('/loans/item.php',     { params: { id } }).then((r) => r.data)
 export const createLoan           = (data)   => client.post('/loans/index.php',   data).then((r) => r.data)
 export const updateLoan           = (data)   => client.put('/loans/item.php',     data).then((r) => r.data)
@@ -24,4 +29,4 @@ export const getPeriodLoanTotals     = (period_start, period_end) =>
   client.get('/loans/index.php', { params: { period_start, period_end } }).then((r) => r.data.period_loan_deductions ?? {})
 
 export const getMyPeriodLoanDeduction = (period_start, period_end) =>
-  client.get('/loans/index.php', { params: { period_start, period_end } }).then((r) => r.data.period_loan_deduction ?? 0)
+  client.get('/loans/index.php', { params: { period_start, period_end, mine: 1 } }).then((r) => r.data.period_loan_deduction ?? 0)

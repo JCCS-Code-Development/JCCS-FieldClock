@@ -14,12 +14,21 @@ $pdo  = getPDO();
 // ── GET: list loans ──────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
+    // An admin is also an employee with their own My Pay page, and that page
+    // calls this same endpoint to show "my loans" — with no params, same as
+    // the admin management page asking for everyone's. Role alone can't tell
+    // those two calls apart, so My Pay explicitly passes ?mine=1 to force
+    // self-scoping even for an admin. Never trust the client to *widen*
+    // scope, only to narrow it: a plain employee is always self-scoped
+    // regardless of this flag.
+    $mine = $auth['role'] !== 'admin' || !empty($_GET['mine']);
+
     // Optional: period_start + period_end → return deduction totals for that period
     if (!empty($_GET['period_start']) && !empty($_GET['period_end'])) {
         $ps = sanitizeString($_GET['period_start']);
         $pe = sanitizeString($_GET['period_end']);
 
-        if ($auth['role'] === 'admin') {
+        if (!$mine) {
             // Admin: all users grouped by user_id
             $stmt = $pdo->prepare(
                 'SELECT l.user_id, COALESCE(SUM(lp.amount), 0) AS period_deduction
@@ -35,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
             echo json_encode(['period_loan_deductions' => $byUser]);
         } else {
-            // Employee: own deduction only
+            // Employee (or admin viewing their own My Pay page): own deduction only
             $stmt = $pdo->prepare(
                 'SELECT COALESCE(SUM(lp.amount), 0) AS period_deduction
                  FROM loan_payments lp
@@ -58,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             JOIN users u ON u.id = l.user_id
             LEFT JOIN loan_payments lp ON lp.loan_id = l.id';
 
-    if ($auth['role'] === 'admin') {
+    if (!$mine) {
         $params = [];
         if (!empty($_GET['user_id'])) {
             $sql .= ' WHERE l.user_id = ?'; $params[] = (int)$_GET['user_id'];
