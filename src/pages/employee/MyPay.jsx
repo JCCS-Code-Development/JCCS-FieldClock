@@ -5,7 +5,7 @@ import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import { getMyPay } from '../../api/payroll'
 import { getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
-import { listLoans, getMyPeriodLoanDeduction } from '../../api/loans'
+import { listMyLoans, getMyPeriodLoanDeduction } from '../../api/loans'
 import { listPaychecks } from '../../api/paychecks'
 import { subscribeToPush, unsubscribeFromPush, getCurrentSubscription } from '../../api/push'
 import PayPieChart from '../../components/ui/PayPieChart'
@@ -100,7 +100,7 @@ export default function MyPay() {
 
   const loadLoans = () => {
     setLoadingLoans(true)
-    listLoans().catch(() => ({ loans: [] })).then(d => setMyLoans(d.loans ?? [])).finally(() => setLoadingLoans(false))
+    listMyLoans().catch(() => ({ loans: [] })).then(d => setMyLoans(d.loans ?? [])).finally(() => setLoadingLoans(false))
   }
 
   const togglePush = async () => {
