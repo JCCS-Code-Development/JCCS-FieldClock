@@ -8,6 +8,7 @@ import Input from '../../components/ui/Input'
 import Spinner from '../../components/ui/Spinner'
 import { listEmployees, createEmployee, updateEmployee, deactivateEmployee, reactivateEmployee, resetEmployeePassword } from '../../api/employees'
 import { listSalaryHistory, createSalaryHistory, deleteSalaryHistory } from '../../api/salaryHistory'
+import { getPersonalDetails, revealPersonalDetailField, savePersonalDetails } from '../../api/personalDetails'
 import { listDocuments, getDocumentUrl } from '../../api/documents'
 import { listJobs } from '../../api/jobs'
 import { groupJobsByCompany } from '../../utils/jobs'
@@ -66,6 +67,38 @@ const XCircle = () => (
   </svg>
 )
 
+// A sensitive field (Tax ID, bank account #) the server sends back masked
+// (last 4 only) — "Show" fetches the real value on demand rather than it
+// ever being included in the general fetch. Editing always goes through a
+// separate blank-by-default input so leaving it untouched can never save
+// the masked display text back over the real value.
+function MaskedField({ label, masked, revealedValue, revealing, onReveal, newValue, onNewValue, placeholder }) {
+  const shown = revealedValue ?? masked
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium text-gray-700">{label}</label>
+        {masked && revealedValue === undefined && (
+          <button type="button" onClick={onReveal} disabled={revealing}
+            className="text-xs font-semibold text-brand-600 hover:text-brand-700 disabled:opacity-50">
+            {revealing ? 'Loading…' : 'Show'}
+          </button>
+        )}
+      </div>
+      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 font-mono">
+        {shown || <span className="text-gray-400 font-sans italic">Not on file</span>}
+      </div>
+      <input
+        type="text"
+        value={newValue}
+        onChange={(e) => onNewValue(e.target.value)}
+        placeholder={masked ? `Enter to change — ${placeholder}` : placeholder}
+        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-brand-500"
+      />
+    </div>
+  )
+}
+
 export default function AdminEmployees() {
   const [employees, setEmployees]     = useState([])
   const [inactive, setInactive]       = useState([])
@@ -105,8 +138,10 @@ export default function AdminEmployees() {
       setShowAddRate(false)
       setRateError('')
       setRateForm({ pay_rate: '', pay_structure: modal.pay_structure ?? 'hourly', effective_date: nextPayPeriodStart(), note: '' })
+      loadPersonalDetails(modal.id)
     } else {
       setSalaryHistory([])
+      setPersonalDetails(null)
     }
   }, [modal])
 
@@ -134,6 +169,63 @@ export default function AdminEmployees() {
     if (!confirm('Delete this history entry?')) return
     await deleteSalaryHistory(id)
     loadSalaryHistory(modal.id)
+  }
+
+  // Personal details (Tax ID, birthdate, emergency contact, direct deposit —
+  // inside the Edit Employee modal, admin-only). tax_id and
+  // bank_account_number come back masked from the server; editing either
+  // uses a separate blank-by-default "new value" field so an untouched
+  // masked display never gets saved back over the real value.
+  const [personalDetails, setPersonalDetails]   = useState(null)
+  const [loadingPersonal, setLoadingPersonal]   = useState(false)
+  const [personalForm,    setPersonalForm]      = useState({
+    birth_date: '', emergency_contact_name: '', emergency_contact_phone: '', bank_routing_number: '',
+  })
+  const [newTaxId,        setNewTaxId]          = useState('')
+  const [newBankAccount,  setNewBankAccount]    = useState('')
+  const [revealed,        setRevealed]          = useState({}) // { tax_id: '123-45-6789', bank_account_number: '...' }
+  const [revealing,       setRevealing]         = useState('') // field currently being fetched
+  const [personalSaving,  setPersonalSaving]    = useState(false)
+  const [personalError,   setPersonalError]     = useState('')
+
+  const loadPersonalDetails = (userId) => {
+    setLoadingPersonal(true)
+    getPersonalDetails(userId).then((d) => {
+      const det = d.details ?? {}
+      setPersonalDetails(det)
+      setPersonalForm({
+        birth_date:              det.birth_date ?? '',
+        emergency_contact_name:  det.emergency_contact_name ?? '',
+        emergency_contact_phone: det.emergency_contact_phone ?? '',
+        bank_routing_number:     det.bank_routing_number ?? '',
+      })
+      setNewTaxId(''); setNewBankAccount(''); setRevealed({}); setPersonalError('')
+    }).finally(() => setLoadingPersonal(false))
+  }
+
+  const handleReveal = async (field) => {
+    setRevealing(field)
+    try {
+      const d = await revealPersonalDetailField(modal.id, field)
+      setRevealed((r) => ({ ...r, [field]: d.details?.[field] ?? '' }))
+    } catch {
+      setPersonalError('Could not reveal that field. Try again.')
+    } finally { setRevealing('') }
+  }
+
+  const handleSavePersonal = async () => {
+    setPersonalSaving(true); setPersonalError('')
+    try {
+      await savePersonalDetails({
+        user_id: modal.id,
+        ...personalForm,
+        ...(newTaxId.trim()       && { tax_id: newTaxId.trim() }),
+        ...(newBankAccount.trim() && { bank_account_number: newBankAccount.trim() }),
+      })
+      loadPersonalDetails(modal.id)
+    } catch (err) {
+      setPersonalError(err?.response?.data?.error ?? 'Could not save. Try again.')
+    } finally { setPersonalSaving(false) }
   }
 
   const load = () => {
@@ -556,6 +648,62 @@ export default function AdminEmployees() {
                     </div>
                   )
               }
+            </div>
+          )}
+
+          {modal && modal !== 'create' && (
+            <div className="border-t border-gray-100 pt-4">
+              <label className="text-sm font-medium text-gray-700 block mb-2">Personal Details</label>
+              {loadingPersonal ? (
+                <div className="flex justify-center py-4"><Spinner size="sm" /></div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <MaskedField
+                    label="Tax ID (SSN/EIN)"
+                    masked={personalDetails?.tax_id}
+                    revealedValue={revealed.tax_id}
+                    revealing={revealing === 'tax_id'}
+                    onReveal={() => handleReveal('tax_id')}
+                    newValue={newTaxId}
+                    onNewValue={setNewTaxId}
+                    placeholder="XXX-XX-XXXX"
+                  />
+                  <Input
+                    label="Birth Date" type="date"
+                    value={personalForm.birth_date}
+                    onChange={(e) => setPersonalForm((f) => ({ ...f, birth_date: e.target.value }))}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      label="Emergency Contact Name"
+                      value={personalForm.emergency_contact_name}
+                      onChange={(e) => setPersonalForm((f) => ({ ...f, emergency_contact_name: e.target.value }))}
+                    />
+                    <Input
+                      label="Emergency Contact Phone"
+                      value={personalForm.emergency_contact_phone}
+                      onChange={(e) => setPersonalForm((f) => ({ ...f, emergency_contact_phone: e.target.value }))}
+                    />
+                  </div>
+                  <Input
+                    label="Bank Routing Number"
+                    value={personalForm.bank_routing_number}
+                    onChange={(e) => setPersonalForm((f) => ({ ...f, bank_routing_number: e.target.value }))}
+                  />
+                  <MaskedField
+                    label="Bank Account Number"
+                    masked={personalDetails?.bank_account_number}
+                    revealedValue={revealed.bank_account_number}
+                    revealing={revealing === 'bank_account_number'}
+                    onReveal={() => handleReveal('bank_account_number')}
+                    newValue={newBankAccount}
+                    onNewValue={setNewBankAccount}
+                    placeholder="Account number"
+                  />
+                  {personalError && <p className="text-xs text-red-600">{personalError}</p>}
+                  <Button size="sm" loading={personalSaving} onClick={handleSavePersonal}>Save Personal Details</Button>
+                </div>
+              )}
             </div>
           )}
 

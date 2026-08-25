@@ -45,7 +45,7 @@
     "suggestedLocation": "Estás en",
     "atThisLocation": "En esta ubicación",
     "selectJobSite": "— Selecciona un sitio de trabajo —",
-    "notListed": "¿No está en la lista? Ingresar manualmente →",
+    "orTypeLocation": "O escribe dónde estás",
     "typeSiteName": "Escribe el nombre del sitio…",
     "gpsCapture": "GPS: {{coords}}",
     "gpsUnavailable": "GPS no disponible — la ubicación no se registrará.",
@@ -71,6 +71,16 @@
       "location": "Ubicación que se registrará",
       "noteLabel": "Nota (opcional)",
       "notePlaceholder": "Algo que quieras anotar sobre hoy…"
+    },
+    "stops": {
+      "title": "Otras Paradas de Hoy",
+      "subtitle": "Registra otros lugares que visitaste — una suite, un cuarto, un mandado rápido",
+      "add": "+ Agregar",
+      "namePlaceholder": "¿Dónde estuviste? ej. Suite 204",
+      "notePlaceholder": "Nota (opcional)",
+      "save": "Guardar",
+      "nameRequired": "Escribe dónde estuviste.",
+      "saveError": "No se pudo guardar. Intenta de nuevo."
     }
   },
   "status": {
@@ -104,7 +114,6 @@
     "selectVisitKind": "¿Qué tipo de visita es esta?",
     "selectEstimate": "Seleccione un presupuesto",
     "noEstimates": "Aún no hay presupuestos registrados para este trabajo.",
-    "pendingReviewNotice": "Guardado — su administrador revisará y agregará formalmente esta ubicación pronto.",
     "needsEstimateOrEmergency": "¿Necesita un presupuesto o es una emergencia?",
     "confirm": "Confirmar",
     "back": "← Atrás"
@@ -195,6 +204,16 @@
       "remaining": "Restante",
       "paidAmount": "{{amount}} pagado",
       "deductionNotice": "Las deducciones del préstamo se procesan en cada cheque de pago por tu administrador."
+    },
+    "profile": {
+      "tab": "Perfil",
+      "taxId": "Identificación Fiscal",
+      "birthDate": "Fecha de Nacimiento",
+      "emergencyContact": "Contacto de Emergencia",
+      "bankRouting": "Número de Ruta Bancaria",
+      "bankAccount": "Número de Cuenta Bancaria",
+      "notOnFile": "No registrado",
+      "editNotice": "Administrado por tu administrador — contáctalo para actualizar esta información."
     },
     "todayHours": "Horas de Hoy",
     "weekHours": "Esta Semana",
