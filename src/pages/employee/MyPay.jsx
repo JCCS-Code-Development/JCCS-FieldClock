@@ -7,6 +7,7 @@ import { getMyPay } from '../../api/payroll'
 import { getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
 import { listMyLoans, getMyPeriodLoanDeduction } from '../../api/loans'
 import { listPaychecks } from '../../api/paychecks'
+import { getPersonalDetails } from '../../api/personalDetails'
 import { subscribeToPush, unsubscribeFromPush, getCurrentSubscription } from '../../api/push'
 import PayPieChart from '../../components/ui/PayPieChart'
 import { getTimeOffRequests, createTimeOffRequest, reviewTimeOffRequest } from '../../api/timeoff'
@@ -57,6 +58,16 @@ export default function MyPay() {
   const [myLoans, setMyLoans]           = useState([])
   const [loadingLoans, setLoadingLoans] = useState(false)
   const [periodLoanDed, setPeriodLoanDed] = useState(0)
+
+  // Personal Details tab — own record only, returned in full (not masked;
+  // masking is only applied when an admin looks up someone else's — see
+  // api/employees/personal-details.php). Read-only here: admin-managed.
+  const [personalDetails, setPersonalDetails] = useState(null)
+  const [loadingPersonal, setLoadingPersonal] = useState(false)
+  const loadPersonalDetails = () => {
+    setLoadingPersonal(true)
+    getPersonalDetails().then((d) => setPersonalDetails(d.details ?? null)).finally(() => setLoadingPersonal(false))
+  }
 
   const [timeOffRequests, setTimeOffRequests] = useState([])
   const [toModal, setToModal]       = useState(false)
@@ -140,6 +151,7 @@ export default function MyPay() {
   }, [selectedPeriod])
 
   useEffect(() => { if (tab === 'loans') loadLoans() }, [tab])
+  useEffect(() => { if (tab === 'profile' && !personalDetails) loadPersonalDetails() }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const openCorrection = (entry) => {
     setCorrModal(entry)
@@ -197,6 +209,7 @@ export default function MyPay() {
     ['timeoff', t('timeoff.title')],
     // Only shown to employees who actually have a loan on record.
     ...(myLoans.length > 0 ? [['loans', t('nav.loans')]] : []),
+    ['profile', t('pay.profile.tab')],
   ]
 
   return (
@@ -569,6 +582,27 @@ export default function MyPay() {
                     })}
                     <p className="text-xs text-center text-gray-400 mt-1">{t('pay.loans.deductionNotice')}</p>
                   </div>
+          )}
+
+          {tab === 'profile' && (
+            loadingPersonal
+              ? <div className="flex justify-center py-12"><Spinner size="lg" /></div>
+              : (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-3">
+                  <Row label={t('pay.profile.taxId')}       value={personalDetails?.tax_id ?? t('pay.profile.notOnFile')} />
+                  <Row label={t('pay.profile.birthDate')}   value={personalDetails?.birth_date ? formatDate(personalDetails.birth_date) : t('pay.profile.notOnFile')} />
+                  <Row label={t('pay.profile.emergencyContact')} value={
+                    personalDetails?.emergency_contact_name
+                      ? `${personalDetails.emergency_contact_name}${personalDetails.emergency_contact_phone ? ' · ' + personalDetails.emergency_contact_phone : ''}`
+                      : t('pay.profile.notOnFile')
+                  } />
+                  <div className="border-t border-gray-100 pt-3 mt-1">
+                    <Row label={t('pay.profile.bankRouting')} value={personalDetails?.bank_routing_number ?? t('pay.profile.notOnFile')} />
+                    <Row label={t('pay.profile.bankAccount')} value={personalDetails?.bank_account_number ?? t('pay.profile.notOnFile')} />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{t('pay.profile.editNotice')}</p>
+                </div>
+              )
           )}
 
           {tab === 'timeoff' && (
