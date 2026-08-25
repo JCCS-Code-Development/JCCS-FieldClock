@@ -23,3 +23,9 @@ export const assignEmployees = (jobId, userIds) =>
 
 export const registerJob = (data) =>
   client.post('/jobs/register.php', data).then((r) => r.data)
+
+// Folds a pending-review location into an existing job — its time entries,
+// estimates, and any assignments move over and the pending placeholder is
+// removed.
+export const mergeJob = (pendingJobId, targetJobId) =>
+  client.post('/jobs/merge.php', { pending_job_id: pendingJobId, target_job_id: targetJobId }).then((r) => r.data)

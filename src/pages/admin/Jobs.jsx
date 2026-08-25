@@ -6,7 +6,7 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import Spinner from '../../components/ui/Spinner'
-import { listJobs, createJob, updateJob, deleteJob, assignEmployees } from '../../api/jobs'
+import { listJobs, createJob, updateJob, deleteJob, assignEmployees, mergeJob } from '../../api/jobs'
 import { listEmployees } from '../../api/employees'
 import { listEstimates, createEstimate, updateEstimate } from '../../api/estimates'
 import { listInvoices, getDownloadUrl } from '../../api/contractor'
@@ -38,6 +38,7 @@ export default function AdminJobs() {
   const [assignedIds, setAssignedIds] = useState([])
   const [saving, setSaving]         = useState(false)
   const [formError, setFormError]   = useState('')
+  const [mergeTargetId, setMergeTargetId] = useState('')
   const [suggestions, setSuggestions] = useState([])
   const [sugLoading, setSugLoading]   = useState(false)
   const [showSug, setShowSug]         = useState(false)
@@ -83,6 +84,7 @@ export default function AdminJobs() {
     setForm({ ...job })
     setAssignedIds(job.assigned_user_ids ?? [])
     setNewEstNumber(''); setNewEstDesc(''); setEstError(''); setFormError('')
+    setMergeTargetId('')
     loadEstimates(job.id)
     loadContractorInvs(job.id)
     setModal(job)
@@ -197,6 +199,22 @@ export default function AdminJobs() {
       load()
     } catch (err) {
       setFormError(err?.response?.data?.error ?? 'Could not reject. Try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleMerge = async () => {
+    if (!mergeTargetId) { setFormError('Select an existing location to merge into.'); return }
+    const target = jobs.find((j) => j.id === parseInt(mergeTargetId))
+    if (!confirm(`Merge "${modal.name}" into "${target?.name ?? 'the selected location'}"? Its time entries move over and this pending entry is removed.`)) return
+    setSaving(true); setFormError('')
+    try {
+      await mergeJob(modal.id, parseInt(mergeTargetId))
+      setModal(null)
+      load()
+    } catch (err) {
+      setFormError(err?.response?.data?.error ?? 'Could not merge. Try again.')
     } finally {
       setSaving(false)
     }
@@ -369,11 +387,12 @@ export default function AdminJobs() {
             </label>
           </div>
 
-          {/* Employee assignment */}
+          {/* Employee assignment — contractors invoice per job and never
+              clock in, so they're not assignable to a location here */}
           <div>
             <p className="text-sm font-medium text-gray-700 mb-2">Assign Employees</p>
             <div className="flex flex-col gap-2 max-h-40 overflow-y-auto">
-              {employees.map((emp) => (
+              {employees.filter((emp) => emp.role !== 'contractor').map((emp) => (
                 <label key={emp.id} className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -500,15 +519,50 @@ export default function AdminJobs() {
           {formError && <p className="text-sm text-red-600 font-medium">{formError}</p>}
 
           {modal && modal !== 'create' && modal.status === 'pending_review' ? (
-            <div className="flex flex-col gap-2 pt-2">
+            <div className="flex flex-col gap-3 pt-2">
               <p className="text-xs text-gray-400">
-                Confirm the client name/address/radius above, then approve this location so it appears
-                for everyone, or reject it if it was registered in error.
+                Is this the same place as a location you already have on file, or somewhere new?
               </p>
-              <div className="flex gap-3">
-                <Button variant="secondary" fullWidth onClick={handleReject} disabled={saving}>Reject</Button>
-                <Button fullWidth loading={saving} onClick={handleApprove}>Approve Location</Button>
+
+              <div className="rounded-xl border border-gray-200 p-3">
+                <p className="text-xs font-semibold text-gray-600 mb-2">Same as an existing location</p>
+                <div className="flex gap-2">
+                  <select
+                    value={mergeTargetId}
+                    onChange={(e) => setMergeTargetId(e.target.value)}
+                    className="flex-1 min-w-0 rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+                  >
+                    <option value="">— Select existing location —</option>
+                    {groupJobsByCompany(listedJobs).map(({ company, jobs: groupJobs }) => (
+                      <optgroup key={company} label={company}>
+                        {groupJobs.map((j) => (
+                          <option key={j.id} value={j.id}>{j.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <Button variant="secondary" loading={saving} disabled={!mergeTargetId || saving} onClick={handleMerge}>
+                    Merge
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  Moves this location's time entries to the one you pick — from now on it's a predetermined
+                  choice at clock-in instead of typed text, and this duplicate entry is removed.
+                </p>
               </div>
+
+              <div className="rounded-xl border border-gray-200 p-3">
+                <p className="text-xs font-semibold text-gray-600 mb-2">A genuinely new location</p>
+                <Button fullWidth loading={saving} disabled={saving} onClick={handleApprove}>Register as New Location</Button>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  Confirm the client name/address/radius above first — once registered, anyone within
+                  range can select it going forward instead of typing it in.
+                </p>
+              </div>
+
+              <Button variant="secondary" fullWidth onClick={handleReject} disabled={saving}>
+                Reject — registered in error
+              </Button>
             </div>
           ) : (
             <div className="flex gap-3 pt-2">
