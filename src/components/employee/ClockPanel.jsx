@@ -320,6 +320,15 @@ export default function ClockPanel({ showHeader = true }) {
     && currentEntry?.within_radius !== null && currentEntry?.within_radius !== undefined
     && Number(currentEntry.within_radius) === 0
 
+  // The nearest assigned job whose own clock-in geofence the employee is
+  // actually standing inside — not just "nearby" in the general sense used
+  // to populate the dropdown. `jobs` is already distance-sorted by
+  // nearby.php, so the first match is the closest one they're inside of.
+  const inRangeJob = jobs.find((j) =>
+    j.distance_meters != null && j.clock_in_radius_meters != null
+    && j.distance_meters <= j.clock_in_radius_meters
+  )
+
   return (
     <div ref={rootRef} className="flex flex-col gap-3.5 lg:grid lg:grid-cols-2 lg:gap-6 w-full scroll-mt-4">
 
@@ -449,6 +458,29 @@ export default function ClockPanel({ showHeader = true }) {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
+                {inRangeJob && (
+                  String(inRangeJob.id) === selectedJobId ? (
+                    <div className="flex items-center gap-2.5 bg-green-50 border-2 border-green-200 rounded-xl px-3 py-2.5">
+                      <span className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0 text-xs font-bold">✓</span>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide">{t('home.atThisLocation')}</p>
+                        <p className="text-sm font-bold text-green-800 truncate">{inRangeJob.name}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedJobId(String(inRangeJob.id)); setShowManual(false); setError('') }}
+                      className="flex items-center gap-2.5 bg-brand-50 border-2 border-brand-300 rounded-xl px-3 py-2.5 text-left animate-pulse hover:animate-none active:scale-[0.99] transition-transform"
+                    >
+                      <LocationPinIcon className="w-6 h-6 text-brand-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-brand-600 font-semibold uppercase tracking-wide">{t('home.suggestedLocation')}</p>
+                        <p className="text-sm font-bold text-brand-800 truncate">{inRangeJob.name}</p>
+                      </div>
+                    </button>
+                  )
+                )}
                 <div className="relative">
                   <select
                     value={selectedJobId}

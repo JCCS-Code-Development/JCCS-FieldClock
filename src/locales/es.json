@@ -42,6 +42,8 @@
     "changeStatus": "Cambiar Estado",
     "clockedInAt": "Registrado en",
     "selectLocation": "Seleccionar ubicación",
+    "suggestedLocation": "Estás en",
+    "atThisLocation": "En esta ubicación",
     "selectJobSite": "— Selecciona un sitio de trabajo —",
     "notListed": "¿No está en la lista? Ingresar manualmente →",
     "typeSiteName": "Escribe el nombre del sitio…",
@@ -199,7 +201,12 @@
     "rate": "Tarifa",
     "salariedPerWeek": "por semana (salario)",
     "estimatedGross": "Bruto Est.",
+    "pendingGross": "Pendiente",
     "breakdownDetail": "Desglose de Pago",
+    "breakdownPending": {
+      "title": "Detalles de Pago Pendientes",
+      "message": "La información de bonos y el desglose completo se desbloquean cuando los cheques de este período estén listos."
+    },
     "regularHours": "Regular",
     "overtimeHours": "Tiempo Extra",
     "loanDeduction": "Descuento de Préstamo",

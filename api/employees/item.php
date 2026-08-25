@@ -28,9 +28,10 @@ if ($id <= 0) {
 }
 
 // Verify employee exists
-$check = $pdo->prepare('SELECT id FROM users WHERE id = ? LIMIT 1');
+$check = $pdo->prepare('SELECT id, role FROM users WHERE id = ? LIMIT 1');
 $check->execute([$id]);
-if (!$check->fetch()) {
+$existing = $check->fetch();
+if (!$existing) {
     http_response_code(404);
     exit(json_encode(['error' => 'Employee not found']));
 }
@@ -52,6 +53,17 @@ if ($method === 'GET') {
     $before = $pdo->prepare('SELECT pay_rate, pay_structure FROM users WHERE id = ?');
     $before->execute([$id]);
     $beforeRow = $before->fetch();
+
+    // Contractors invoice per job and never clock in, so they're never
+    // assigned to a location — reject an explicit attempt to set one...
+    $finalRole = array_key_exists('role', $body) ? sanitizeString((string)$body['role']) : $existing['role'];
+    if ($finalRole === 'contractor' && array_key_exists('default_job_id', $body) && !empty($body['default_job_id'])) {
+        http_response_code(422);
+        exit(json_encode(['error' => 'Contractors cannot be assigned a default job site']));
+    }
+    // ...and if this request is switching someone to contractor, clear
+    // whatever default job site they already had as an employee/admin.
+    $becameContractor = $finalRole === 'contractor' && $existing['role'] !== 'contractor';
 
     $allowed = ['name', 'email', 'phone', 'address', 'role', 'pay_type', 'pay_rate', 'pay_structure', 'overtime_rate', 'gas_weekly_allowance', 'is_active', 'default_job_id'];
     $sets = []; $params = [];
@@ -102,6 +114,10 @@ if ($method === 'GET') {
         }
     }
 
+    if ($becameContractor && !array_key_exists('default_job_id', $body)) {
+        $sets[] = 'default_job_id = NULL';
+    }
+
     if (!$sets) {
         echo json_encode(['message' => 'Nothing to update']);
         exit;
@@ -110,11 +126,21 @@ if ($method === 'GET') {
     $params[] = $id;
     $pdo->prepare('UPDATE users SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
 
+    if ($becameContractor) {
+        $pdo->prepare('DELETE FROM job_assignments WHERE user_id = ?')->execute([$id]);
+    }
+
     // Auto-log to salary_history when the rate or structure actually changed.
-    // Effective the start of the NEXT Mon–Sun pay period, not the one already
-    // in progress — a change made mid-period shouldn't retroactively apply to
-    // hours already worked this period. (Backdating/future-dating beyond that
-    // default is done manually via POST /salary-history.)
+    // Effective the start of the CURRENT Mon–Sun pay period (this week), for
+    // both 1099 and W-2 — payRateForPeriod() picks the newest history row
+    // whose effective_date <= the period's start, so this makes the new rate
+    // apply to the whole week already in progress, not just going forward.
+    // That matters most for 1099: this app's own numbers directly drive
+    // their weekly check, so a change made any day this week shows up in
+    // that week's check (issued the following Friday). For W-2 it's mostly
+    // record-keeping since ADP runs their actual payroll, but the same rule
+    // is used for consistency. (Backdating/future-dating beyond that default
+    // is done manually via POST /salary-history.)
     $newRate = array_key_exists('pay_rate', $body)
         ? (($body['pay_rate'] === null || $body['pay_rate'] === '') ? null : (float)$body['pay_rate'])
         : $beforeRow['pay_rate'];
@@ -126,12 +152,12 @@ if ($method === 'GET') {
     if ($rateChanged) {
         $today = new DateTimeImmutable('today', new DateTimeZone(FIELDCLOCK_TIMEZONE));
         $dow   = (int)$today->format('N'); // 1 (Mon) .. 7 (Sun)
-        $nextPeriodStart = $today->modify('+' . (8 - $dow) . ' days')->format('Y-m-d');
+        $currentPeriodStart = $today->modify('-' . ($dow - 1) . ' days')->format('Y-m-d');
 
         $pdo->prepare(
             'INSERT INTO salary_history (user_id, pay_rate, pay_structure, effective_date, created_by)
              VALUES (?, ?, ?, ?, ?)'
-        )->execute([$id, $newRate, $newStruct, $nextPeriodStart, $auth['user_id']]);
+        )->execute([$id, $newRate, $newStruct, $currentPeriodStart, $auth['user_id']]);
     }
 
     echo json_encode(['message' => 'Updated']);

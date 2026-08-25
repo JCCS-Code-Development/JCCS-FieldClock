@@ -42,6 +42,8 @@
     "changeStatus": "Change Status",
     "clockedInAt": "Clocked in at",
     "selectLocation": "Select location",
+    "suggestedLocation": "You're at",
+    "atThisLocation": "At this location",
     "selectJobSite": "— Select a job site —",
     "notListed": "Not listed? Enter manually →",
     "typeSiteName": "Type the job site name…",
@@ -199,7 +201,12 @@
     "rate": "Pay Rate",
     "salariedPerWeek": "per week (salary)",
     "estimatedGross": "Est. Gross",
+    "pendingGross": "Pending",
     "breakdownDetail": "Pay Breakdown",
+    "breakdownPending": {
+      "title": "Pay Details Pending",
+      "message": "Your bonus info and full pay breakdown unlock once this period's checks are marked ready."
+    },
     "regularHours": "Regular",
     "overtimeHours": "Overtime",
     "loanDeduction": "Loan Deduction",

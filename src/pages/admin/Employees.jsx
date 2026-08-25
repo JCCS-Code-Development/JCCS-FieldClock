@@ -196,7 +196,9 @@ export default function AdminEmployees() {
         pay_structure: form.pay_structure,
         pay_rate:      parseFloat(form.pay_rate) || 0,
       }),
-      ...(modal !== 'create' && {
+      // Contractors invoice per job and never clock in, so they're never
+      // assigned a default job site.
+      ...(modal !== 'create' && form.role !== 'contractor' && {
         default_job_id: form.default_job_id || null,
       }),
     }
@@ -453,7 +455,7 @@ export default function AdminEmployees() {
             </>
           )}
 
-          {modal && modal !== 'create' && (
+          {modal && modal !== 'create' && form.role !== 'contractor' && (
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1">Default Job Site</label>
               <select
