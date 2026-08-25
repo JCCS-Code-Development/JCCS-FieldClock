@@ -10,7 +10,8 @@ import { useAuthStore } from '../../store/authStore'
 import { useGPS } from '../../hooks/useGPS'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { getStatus, dayStart, dayEnd, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
-import { getNearbyJobs, listJobs, registerJob } from '../../api/jobs'
+import { getNearbyJobs, listJobs } from '../../api/jobs'
+import { listVisitStops, createVisitStop, deleteVisitStop } from '../../api/visitStops'
 import { groupJobsByCompany } from '../../utils/jobs'
 import Spinner from '../ui/Spinner'
 import Modal from '../ui/Modal'
@@ -145,7 +146,6 @@ export default function ClockPanel({ showHeader = true }) {
   const [selectedJobId, setSelectedJobId]   = useState('')
   const [locationLabel, setLocationLabel]   = useState(null)
   const [loadingJobs, setLoadingJobs]       = useState(false)
-  const [showManual, setShowManual]         = useState(false)
   const [manualLocation, setManualLocation] = useState('')
   const [error, setError]                   = useState('')
   // Set right after a clock-in whose GPS doesn't match the selected job site —
@@ -158,6 +158,41 @@ export default function ClockPanel({ showHeader = true }) {
   // about to be recorded and optionally leave a note before confirming.
   const [clockOutModal, setClockOutModal] = useState(false)
   const [clockOutNote, setClockOutNote]   = useState('')
+
+  // Additional Stops Today — a quick, no-approval-needed log of the extra
+  // places (a suite, a room, a whole separate site) visited during the day
+  // that are too minor/specific to ever be a real Job. Purely informational,
+  // never touches job_id or pay — see api/visit-stops/.
+  const [stops, setStops]             = useState([])
+  const [loadingStops, setLoadingStops] = useState(false)
+  const [addingStop, setAddingStop]   = useState(false)
+  const [stopName, setStopName]       = useState('')
+  const [stopNote, setStopNote]       = useState('')
+  const [savingStop, setSavingStop]   = useState(false)
+  const [stopError, setStopError]     = useState('')
+
+  useEffect(() => {
+    const today = format(new Date(), 'yyyy-MM-dd')
+    setLoadingStops(true)
+    listVisitStops({ start: today, end: today }).then((d) => setStops(d.stops ?? [])).finally(() => setLoadingStops(false))
+  }, [])
+
+  const handleAddStop = async () => {
+    if (!stopName.trim()) { setStopError(t('home.stops.nameRequired')); return }
+    setSavingStop(true); setStopError('')
+    try {
+      const res = await createVisitStop({ name: stopName.trim(), note: stopNote.trim() || undefined })
+      setStops((s) => [res.stop, ...s])
+      setStopName(''); setStopNote(''); setAddingStop(false)
+    } catch (err) {
+      setStopError(err?.response?.data?.error ?? t('home.stops.saveError'))
+    } finally { setSavingStop(false) }
+  }
+
+  const handleDeleteStop = async (id) => {
+    setStops((s) => s.filter((x) => x.id !== id))
+    deleteVisitStop(id).catch(() => {})
+  }
 
   const [myRequests, setMyRequests]   = useState([])
   const [detailSheet, setDetailSheet] = useState(null)
@@ -195,6 +230,24 @@ export default function ClockPanel({ showHeader = true }) {
       .then((d) => setJobs(d.jobs ?? []))
       .finally(() => setLoadingJobs(false))
   }, [gpsLoading, position])
+
+  // Keep the set-location list current for anyone who leaves this page open —
+  // an admin adding/retiring one (e.g. a new permanent site) shouldn't require
+  // a reload to show up. Refreshes when the tab/app regains focus, plus a
+  // periodic fallback for a device that's just left sitting on this screen.
+  useEffect(() => {
+    const refresh = () => {
+      const fetchJobs = position
+        ? getNearbyJobs({ lat: position.lat, lng: position.lng, radius: 50 })
+            .catch(() => listJobs({ assigned: true, status: 'active' }))
+        : listJobs({ assigned: true, status: 'active' })
+      fetchJobs.then((d) => setJobs(d.jobs ?? [])).catch(() => {})
+    }
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh() }
+    document.addEventListener('visibilitychange', onVisible)
+    const interval = setInterval(refresh, 5 * 60 * 1000)
+    return () => { document.removeEventListener('visibilitychange', onVisible); clearInterval(interval) }
+  }, [position])
 
   useEffect(() => {
     if (activeJob?.id) setSelectedJobId(String(activeJob.id))
@@ -244,7 +297,6 @@ export default function ClockPanel({ showHeader = true }) {
     setError('')
     if (!isClockedIn) {
       if (!selectedJobId && !manualLocation.trim()) {
-        setShowManual(true)
         setError(t('home.noLocation'))
         return
       }
@@ -277,24 +329,20 @@ export default function ClockPanel({ showHeader = true }) {
     setLoading(true)
     setOffSiteNotice(null)
     try {
-      let jobId = selectedJobId ? parseInt(selectedJobId) : null
-      if (!jobId && manualLocation.trim()) {
-        const reg = await registerJob({
-          name:     manualLocation.trim(),
-          lat:      position?.lat      ?? null,
-          lng:      position?.lng      ?? null,
-          accuracy: position?.accuracy ?? null,
-        })
-        jobId = reg.id
-      }
+      const jobId = selectedJobId ? parseInt(selectedJobId) : null
+      // No job selected — instead of registering a new location that sits in
+      // an admin review queue, just clock in unassigned and keep what they
+      // typed as a note on the entry. Most one-off stops (a specific suite,
+      // an errand) were never really new job sites; this keeps the record
+      // without creating one.
       const data = await dayStart({
         job_id:   jobId,
         lat:      position?.lat      ?? null,
         lng:      position?.lng      ?? null,
         accuracy: position?.accuracy ?? null,
+        notes:    !jobId && manualLocation.trim() ? manualLocation.trim() : undefined,
       })
       setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
-      setShowManual(false)
       setManualLocation('')
       if (data.within_radius === false) {
         setOffSiteNotice({ distanceMeters: data.distance_meters })
@@ -470,7 +518,7 @@ export default function ClockPanel({ showHeader = true }) {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => { setSelectedJobId(String(inRangeJob.id)); setShowManual(false); setError('') }}
+                      onClick={() => { setSelectedJobId(String(inRangeJob.id)); setError('') }}
                       className="flex items-center gap-2.5 bg-brand-50 border-2 border-brand-300 rounded-xl px-3 py-2.5 text-left animate-pulse hover:animate-none active:scale-[0.99] transition-transform"
                     >
                       <LocationPinIcon className="w-6 h-6 text-brand-500 shrink-0" />
@@ -484,7 +532,7 @@ export default function ClockPanel({ showHeader = true }) {
                 <div className="relative">
                   <select
                     value={selectedJobId}
-                    onChange={(e) => { setSelectedJobId(e.target.value); setShowManual(false); setError('') }}
+                    onChange={(e) => { setSelectedJobId(e.target.value); setError('') }}
                     className="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-gray-800 outline-none focus:border-brand-500 appearance-none"
                   >
                     <option value="">{t('home.selectJobSite')}</option>
@@ -503,39 +551,106 @@ export default function ClockPanel({ showHeader = true }) {
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
                 </div>
                 {loadingJobs && <p className="text-xs text-gray-400">{t('home.loadingLocations')}</p>}
-                {(showManual || (!loadingJobs && jobs.length === 0)) ? (
-                  <div className="flex flex-col gap-1">
-                    <input
-                      type="text"
-                      placeholder={t('home.typeSiteName')}
-                      value={manualLocation}
-                      onChange={(e) => { setManualLocation(e.target.value); setError('') }}
-                      className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
-                      autoFocus={showManual}
-                    />
-                    {position ? (
-                      <p className="text-xs text-gray-400">
-                        {t('home.gpsCapture', { coords: `${position.lat.toFixed(4)}°, ${position.lng.toFixed(4)}°` })}
-                        {locationLabel && ` · ${locationLabel}`}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-amber-500">{t('home.gpsUnavailable')}</p>
-                    )}
-                    {manualLocation.trim() && (
-                      <p className="text-xs text-brand-500">{t('visitType.pendingReviewNotice')}</p>
-                    )}
-                  </div>
-                ) : (
-                  !selectedJobId && !loadingJobs && jobs.length > 0 && (
-                    <button onClick={() => setShowManual(true)}
-                      className="text-xs text-gray-400 hover:text-brand-500 transition-colors text-left">
-                      {t('home.notListed')}
-                    </button>
-                  )
-                )}
+                {/* Always available, not tucked behind a toggle — most stops are too
+                    specific (a suite, a room, an errand) to ever be one of the few
+                    set locations above. Typing here just leaves a note on the entry,
+                    it doesn't register a new location for review. */}
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">{t('home.orTypeLocation')}</p>
+                  <input
+                    type="text"
+                    placeholder={t('home.typeSiteName')}
+                    value={manualLocation}
+                    onChange={(e) => { setManualLocation(e.target.value); setError('') }}
+                    className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+                  />
+                  {position ? (
+                    <p className="text-xs text-gray-400">
+                      {t('home.gpsCapture', { coords: `${position.lat.toFixed(4)}°, ${position.lng.toFixed(4)}°` })}
+                      {locationLabel && ` · ${locationLabel}`}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-500">{t('home.gpsUnavailable')}</p>
+                  )}
+                </div>
               </div>
             )}
           </div>
+        </div>
+
+        {/* Additional Stops Today — quick, no-approval log of the extra
+            places visited (a suite, a room, a whole separate site) that
+            are too specific to ever be a real Job. Available any time of
+            day, not just while clocked in — typing it in at day's end is
+            exactly the point. */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="w-9 h-9 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+                <LocationPinIcon className="w-4 h-4" />
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-800">{t('home.stops.title')}</p>
+                  {stops.length > 0 && (
+                    <span className="text-[10px] font-bold bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full">{stops.length}</span>
+                  )}
+                </div>
+                {!addingStop && <p className="text-xs text-gray-400 mt-0.5">{t('home.stops.subtitle')}</p>}
+              </div>
+            </div>
+            {!addingStop && (
+              <button onClick={() => { setAddingStop(true); setStopError('') }}
+                className="text-xs font-semibold text-brand-600 hover:text-brand-700 shrink-0">
+                {t('home.stops.add')}
+              </button>
+            )}
+          </div>
+
+          {addingStop && (
+            <div className="px-4 pb-4 flex flex-col gap-2">
+              <input
+                type="text"
+                autoFocus
+                placeholder={t('home.stops.namePlaceholder')}
+                value={stopName}
+                onChange={(e) => { setStopName(e.target.value); setStopError('') }}
+                className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+              />
+              <input
+                type="text"
+                placeholder={t('home.stops.notePlaceholder')}
+                value={stopNote}
+                onChange={(e) => setStopNote(e.target.value)}
+                className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+              />
+              {stopError && <p className="text-xs text-red-600">{stopError}</p>}
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" fullWidth
+                  onClick={() => { setAddingStop(false); setStopName(''); setStopNote(''); setStopError('') }}>
+                  {t('common.cancel')}
+                </Button>
+                <Button size="sm" fullWidth loading={savingStop} onClick={handleAddStop}>
+                  {t('home.stops.save')}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {!addingStop && !loadingStops && stops.length > 0 && (
+            <div className="px-4 pb-4 flex flex-col gap-1.5">
+              {stops.map((s) => (
+                <div key={s.id} className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{s.name}</p>
+                    {s.note && <p className="text-xs text-gray-400 truncate">{s.note}</p>}
+                  </div>
+                  <button onClick={() => handleDeleteStop(s.id)}
+                    className="text-gray-300 hover:text-red-500 shrink-0 px-1 text-sm leading-none">✕</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Today's activity — its own card, collapsible, with a live preview so
