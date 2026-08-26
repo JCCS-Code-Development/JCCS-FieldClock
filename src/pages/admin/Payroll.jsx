@@ -143,6 +143,7 @@ export default function AdminPayroll() {
   const [pcError,        setPcError]        = useState('')
   const [pcStatusTarget, setPcStatusTarget] = useState(null)    // { paycheck, nextStatus }
   const [pcStatusSaving, setPcStatusSaving] = useState(false)
+  const [pcStatusError,  setPcStatusError]  = useState('')
   const [pcVoidTarget,   setPcVoidTarget]   = useState(null)    // paycheck being voided
   const [pcVoidReason,   setPcVoidReason]   = useState('')
   const [pcVoiding,      setPcVoiding]      = useState(false)
@@ -230,11 +231,17 @@ export default function AdminPayroll() {
   const handlePcStatus = async () => {
     if (!pcStatusTarget) return
     setPcStatusSaving(true)
+    setPcStatusError('')
     try {
       await updatePaycheck({ id: pcStatusTarget.paycheck.id, status: pcStatusTarget.nextStatus })
       setPcStatusTarget(null)
       loadPaychecks()
-    } catch {}
+    } catch (err) {
+      // Previously a silent no-op on failure — the Confirm button would spin
+      // briefly and then just... do nothing, with no way to tell it failed.
+      // Surface the actual error instead so it's visible in the modal.
+      setPcStatusError(err?.response?.data?.error ?? 'Failed to update paycheck status. Please try again.')
+    }
     setPcStatusSaving(false)
   }
 
@@ -1183,7 +1190,7 @@ export default function AdminPayroll() {
             <select value={frForm.user_id} onChange={(e) => setFrForm((f) => ({ ...f, user_id: e.target.value }))}
               className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
               <option value="">— Select employee —</option>
-              {employees.map((e) => (
+              {employees.filter((e) => e.role !== 'contractor').map((e) => (
                 <option key={e.id} value={e.id}>{e.name}</option>
               ))}
             </select>
@@ -1545,7 +1552,7 @@ export default function AdminPayroll() {
       </Modal>
 
       {/* Confirm status change */}
-      <Modal isOpen={!!pcStatusTarget} onClose={() => setPcStatusTarget(null)}
+      <Modal isOpen={!!pcStatusTarget} onClose={() => { setPcStatusTarget(null); setPcStatusError('') }}
         title={pcStatusTarget?.nextStatus === 'available' ? 'Mark Paycheck Available?' : 'Mark as Picked Up?'}>
         <div className="flex flex-col gap-4">
           <p className="text-sm text-gray-600">
@@ -1554,8 +1561,9 @@ export default function AdminPayroll() {
               : `This will mark ${pcStatusTarget?.paycheck?.employee_name}'s paycheck as picked up.`
             }
           </p>
+          {pcStatusError && <p className="text-sm text-red-600">{pcStatusError}</p>}
           <div className="flex gap-3">
-            <Button variant="secondary" fullWidth onClick={() => setPcStatusTarget(null)}>Cancel</Button>
+            <Button variant="secondary" fullWidth onClick={() => { setPcStatusTarget(null); setPcStatusError('') }}>Cancel</Button>
             <Button fullWidth loading={pcStatusSaving} onClick={handlePcStatus}>Confirm</Button>
           </div>
         </div>
