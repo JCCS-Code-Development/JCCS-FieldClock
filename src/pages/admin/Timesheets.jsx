@@ -619,7 +619,11 @@ export default function AdminTimesheets() {
     listEmployees().then(d => {
       const emps = d.employees ?? []
       setEmployees(emps)
-      if (emps.length > 0) setSelectedEmp(emps[0])
+      // Match the Salary-then-Hourly, alphabetical order the list itself
+      // renders in, so the auto-selected employee is whoever appears first.
+      const sorted = [...emps].sort((a, b) => a.name.localeCompare(b.name))
+      const first = sorted.find(e => e.pay_structure === 'salary') ?? sorted[0]
+      if (first) setSelectedEmp(first)
     })
     listJobs().then(d => setAllJobs(d.jobs ?? [])).catch(() => {})
     loadRequests()
@@ -693,6 +697,18 @@ export default function AdminTimesheets() {
       : { pay_rate: parseFloat(selectedEmp?.pay_rate ?? 0), pay_structure: selectedEmp?.pay_structure ?? 'hourly' }
   }, [salaryHistory, dateFrom, selectedEmp])
 
+  // Employee list, split into Salary / Hourly sub-sections, alphabetical
+  // within each — replaces the previous admin/employee/contractor grouping
+  // the API happens to return them in.
+  const salariedEmployees = useMemo(
+    () => employees.filter(e => e.pay_structure === 'salary').sort((a, b) => a.name.localeCompare(b.name)),
+    [employees]
+  )
+  const hourlyEmployees = useMemo(
+    () => employees.filter(e => e.pay_structure !== 'salary').sort((a, b) => a.name.localeCompare(b.name)),
+    [employees]
+  )
+
   const weekDays = useMemo(() => {
     const days = []
     let d = parseISO(dateFrom)
@@ -752,23 +768,28 @@ export default function AdminTimesheets() {
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Employees</p>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto py-1">
-            {employees.map(emp => (
-              <button key={emp.id} onClick={() => setSelectedEmp(emp)}
-                className={`w-full text-left px-4 py-2.5 flex items-center gap-2.5 transition-colors ${
-                  selectedEmp?.id === emp.id ? 'bg-brand-50 text-brand-700' : 'text-gray-700 hover:bg-gray-50'
-                }`}>
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                  selectedEmp?.id === emp.id ? 'bg-brand-500 text-white' : 'bg-gray-200 text-gray-600'
-                }`}>
-                  {emp.name?.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium leading-tight truncate">{emp.name}</p>
-                  <p className="text-xs text-gray-400 capitalize">
-                    {emp.pay_structure === 'salary' ? 'Salary' : emp.pay_type}
-                  </p>
-                </div>
-              </button>
+            {[['Salary', salariedEmployees], ['Hourly', hourlyEmployees]].map(([label, list]) => list.length > 0 && (
+              <div key={label}>
+                <p className="px-4 pt-2.5 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
+                {list.map(emp => (
+                  <button key={emp.id} onClick={() => setSelectedEmp(emp)}
+                    className={`w-full text-left px-4 py-2.5 flex items-center gap-2.5 transition-colors ${
+                      selectedEmp?.id === emp.id ? 'bg-brand-50 text-brand-700' : 'text-gray-700 hover:bg-gray-50'
+                    }`}>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                      selectedEmp?.id === emp.id ? 'bg-brand-500 text-white' : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {emp.name?.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium leading-tight truncate">{emp.name}</p>
+                      <p className="text-xs text-gray-400 capitalize">
+                        {emp.pay_structure === 'salary' ? 'Salary' : emp.pay_type}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
         </div>
@@ -777,23 +798,28 @@ export default function AdminTimesheets() {
           <div className="px-4 py-2.5 border-b border-gray-100">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Employees</p>
           </div>
-          <div className="flex gap-2 overflow-x-auto px-3 py-2.5" style={{ scrollbarWidth: 'none' }}>
-            {employees.map(emp => (
-              <button key={emp.id} onClick={() => setSelectedEmp(emp)}
-                className={`flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
-                  selectedEmp?.id === emp.id
-                    ? 'bg-brand-500 text-white border-brand-500'
-                    : 'bg-white text-gray-700 border-gray-200'
-                }`}>
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                  selectedEmp?.id === emp.id ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'
-                }`}>
-                  {emp.name?.charAt(0).toUpperCase()}
-                </span>
-                {emp.name.split(' ')[0]}
-              </button>
-            ))}
-          </div>
+          {[['Salary', salariedEmployees], ['Hourly', hourlyEmployees]].map(([label, list]) => list.length > 0 && (
+            <div key={label} className="border-b border-gray-50 last:border-b-0">
+              <p className="px-3 pt-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
+              <div className="flex gap-2 overflow-x-auto px-3 py-2.5" style={{ scrollbarWidth: 'none' }}>
+                {list.map(emp => (
+                  <button key={emp.id} onClick={() => setSelectedEmp(emp)}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                      selectedEmp?.id === emp.id
+                        ? 'bg-brand-500 text-white border-brand-500'
+                        : 'bg-white text-gray-700 border-gray-200'
+                    }`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                      selectedEmp?.id === emp.id ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {emp.name?.charAt(0).toUpperCase()}
+                    </span>
+                    {emp.name.split(' ')[0]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </aside>
 
