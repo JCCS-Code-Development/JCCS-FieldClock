@@ -930,6 +930,13 @@ export default function AdminDocuments() {
   }, [])
 
   const activeEmps = employees.filter((e) => e.is_active)
+  // Pay Stub, Annual Summary, and Timesheet Record are all employee-payroll
+  // documents — contractors don't have a pay rate, hours, or a timesheet to
+  // put on one (they invoice per job; that's what the 1099 Summary and
+  // Employment Letter's independent-contractor fields are for instead).
+  // The Employment Letter deliberately keeps contractors in activeEmps —
+  // see its own isIndependent branch below.
+  const activeEmpsNoContractor = activeEmps.filter((e) => e.role !== 'contractor')
 
   const generate = async () => {
     setError('')
@@ -1013,9 +1020,15 @@ export default function AdminDocuments() {
 
       } else if (selected === 'annual') {
         const data = await getAnnualSummary(year)
+        // getAnnualSummary returns everyone (it's shared with the 1099
+        // Summary doc, which needs contractors) — cross-reference against
+        // `employees` (which has role) to keep contractors out of the
+        // "All Employees" combined document too, not just the picker.
+        const contractorIds = new Set(employees.filter((e) => e.role === 'contractor').map((e) => e.id))
+        const nonContractorRows = (data.employees ?? []).filter((e) => !contractorIds.has(e.user_id))
         const emps = annualEmpId === 'all'
-          ? (data.employees ?? [])
-          : (data.employees ?? []).filter((e) => e.user_id === parseInt(annualEmpId))
+          ? nonContractorRows
+          : nonContractorRows.filter((e) => e.user_id === parseInt(annualEmpId))
         if (!emps.length) throw new Error('No earnings data found for the selected employee and year.')
         setPreview(<AnnualSummaryDoc employees={emps} year={year} ein={ein} />)
 
@@ -1128,7 +1141,7 @@ export default function AdminDocuments() {
               {selected === 'paystub' && (
                 <>
                   <FormSelect label="Employee" value={stubEmpId} onChange={setStubEmpId}>
-                    {activeEmps.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                    {activeEmpsNoContractor.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                   </FormSelect>
                   <div />
                   <FormInput label="Start Date" type="date" value={stubStart} onChange={setStubStart} />
@@ -1180,7 +1193,7 @@ export default function AdminDocuments() {
                 <>
                   <FormSelect label="Employee" value={annualEmpId} onChange={setAnnualEmpId}>
                     <option value="all">All Employees</option>
-                    {activeEmps.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                    {activeEmpsNoContractor.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                   </FormSelect>
                   <FormSelect label="Tax Year" value={year} onChange={(v) => setYear(parseInt(v))}>
                     {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
@@ -1192,7 +1205,7 @@ export default function AdminDocuments() {
               {selected === 'timesheet' && (
                 <>
                   <FormSelect label="Employee" value={tsEmpId} onChange={setTsEmpId}>
-                    {activeEmps.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                    {activeEmpsNoContractor.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                   </FormSelect>
                   <FormInput label="Start Date" type="date" value={tsStart} onChange={setTsStart} />
                   <FormInput label="End Date"   type="date" value={tsEnd}   onChange={setTsEnd} />

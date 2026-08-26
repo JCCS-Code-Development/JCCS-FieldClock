@@ -55,7 +55,7 @@ export default function AdminLayout() {
   ]
 
   const MORE = [
-    { to: '/admin/employees',  icon: <EmployeesIcon />, label: t('nav.employees') },
+    { to: '/admin/employees',  icon: <EmployeesIcon />, label: t('nav.users') },
     { to: '/admin/checks',     icon: <ChecksIcon />,    label: t('nav.checks') },
     { to: '/admin/loans',      icon: <LoansIcon />,     label: t('nav.loans') },
     { to: '/admin/vendors',    icon: <VendorsIcon />,   label: t('nav.vendors') },

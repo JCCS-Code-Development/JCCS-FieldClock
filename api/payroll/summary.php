@@ -48,8 +48,11 @@ foreach ($adjRows->fetchAll() as $adj) {
 }
 
 // User info
-// Include all users — even deactivated ones may have entries in this period
-$users = $pdo->query('SELECT id, name, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance, is_active FROM users')->fetchAll();
+// Include all users — even deactivated ones may have entries in this period.
+// Contractors invoice per job/estimate, not through this employee payroll
+// cycle, so they're excluded outright rather than just happening to have no
+// time entries to seed a row from.
+$users = $pdo->query("SELECT id, name, pay_type, pay_rate, pay_structure, overtime_rate, gas_weekly_allowance, is_active FROM users WHERE role != 'contractor'")->fetchAll();
 $userMap = [];
 foreach ($users as $u) { $userMap[$u['id']] = $u; }
 
