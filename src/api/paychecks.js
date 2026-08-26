@@ -7,3 +7,9 @@ export const deletePaycheck  = (id)     => client.delete(`/paychecks/item.php?id
 
 export const markAllAvailable = (periodStart, periodEnd) =>
   client.post('/paychecks/mark-available-bulk.php', { period_start: periodStart, period_end: periodEnd }).then((r) => r.data)
+
+// For catching up old backlog: checks that were already handed out in real
+// life but never got marked as such in the app. Skips the "available" push
+// notification on purpose — see mark-picked-up-bulk.php.
+export const markAllPickedUp = (periodStart, periodEnd) =>
+  client.post('/paychecks/mark-picked-up-bulk.php', { period_start: periodStart, period_end: periodEnd }).then((r) => r.data)
