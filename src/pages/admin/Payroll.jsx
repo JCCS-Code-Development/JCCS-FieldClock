@@ -11,7 +11,7 @@ import { listEmployees, createEmployee } from '../../api/employees'
 import { listInvoices, getInvoice, uploadInvoice, updateInvoiceStatus, getDownloadUrl } from '../../api/contractor'
 import { listEstimates } from '../../api/estimates'
 import { getPeriodLoanTotals } from '../../api/loans'
-import { listPaychecks, createPaycheck, updatePaycheck, deletePaycheck, markAllAvailable } from '../../api/paychecks'
+import { listPaychecks, createPaycheck, updatePaycheck, deletePaycheck, markAllAvailable, markAllPickedUp } from '../../api/paychecks'
 import PayPieChart from '../../components/ui/PayPieChart'
 import { formatCurrency, formatHours, formatDate } from '../../utils/format'
 import { format, startOfWeek, endOfWeek, subWeeks, startOfYear, differenceInWeeks } from 'date-fns'
@@ -154,6 +154,7 @@ export default function AdminPayroll() {
   const [pcVoidReason,   setPcVoidReason]   = useState('')
   const [pcVoiding,      setPcVoiding]      = useState(false)
   const [pcMarkingAll,   setPcMarkingAll]   = useState(false)
+  const [pcMarkingAllPickedUp, setPcMarkingAllPickedUp] = useState(false)
   const [employees,      setEmployees]      = useState([])
 
   const p = periods[period]
@@ -275,6 +276,18 @@ export default function AdminPayroll() {
       await markAllAvailable(p.start, p.end)
       loadPaychecks()
     } finally { setPcMarkingAll(false) }
+  }
+
+  // For catching up backlog: checks that were already physically handed
+  // out but never got marked as such — skips the "available" notification
+  // step entirely rather than sending a stale push for an old check.
+  const handleMarkAllPickedUp = async () => {
+    if (!window.confirm(`Mark all pending paychecks for ${p.label} as picked up? Use this only if these checks were already handed out — it does not send a notification.`)) return
+    setPcMarkingAllPickedUp(true)
+    try {
+      await markAllPickedUp(p.start, p.end)
+      loadPaychecks()
+    } finally { setPcMarkingAllPickedUp(false) }
   }
 
   // ── Drill-down ───────────────────────────────────────────────────
@@ -546,6 +559,9 @@ export default function AdminPayroll() {
   const pendingPcForPeriodCount = paychecks.filter((pc) =>
     pc.status === 'processing' && pc.period_start === p.start && pc.period_end === p.end
   ).length
+  const notPickedUpForPeriodCount = paychecks.filter((pc) =>
+    (pc.status === 'processing' || pc.status === 'available') && pc.period_start === p.start && pc.period_end === p.end
+  ).length
   const pendingFRCount = flatRatePayments.filter((fr) => fr.status === 'pending').length
 
   const TABS = [
@@ -574,6 +590,12 @@ export default function AdminPayroll() {
               ? <div className="flex gap-2">
                   <Button variant="secondary" loading={pcMarkingAll} disabled={pendingPcForPeriodCount === 0} onClick={handleMarkAllAvailable}>
                     Mark All Available ({pendingPcForPeriodCount})
+                  </Button>
+                  {/* For catching up an old period whose checks were already handed
+                      out in real life but never marked as such — skips straight to
+                      picked_up instead of sending a stale "check ready" push. */}
+                  <Button variant="secondary" loading={pcMarkingAllPickedUp} disabled={notPickedUpForPeriodCount === 0} onClick={handleMarkAllPickedUp}>
+                    Mark All Picked Up ({notPickedUpForPeriodCount})
                   </Button>
                   <Button onClick={() => { setPcForm({ user_id: '', amount: '', notes: '' }); setPcError(''); setPcModal(true) }}>+ Add Paycheck</Button>
                 </div>
