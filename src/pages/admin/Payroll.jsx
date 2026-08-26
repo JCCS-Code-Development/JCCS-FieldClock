@@ -137,6 +137,12 @@ export default function AdminPayroll() {
   // Paychecks
   const [paychecks,      setPaychecks]      = useState([])
   const [loadingPay,     setLoadingPay]     = useState(false)
+  // Defaults to 'processing' — that's the backlog admins actually need to
+  // work through, and it's what the tab's badge count reflects. The list
+  // isn't scoped to the selected pay period (paychecks spans all periods),
+  // so without this filter a large backlog is buried among every already-
+  // resolved record ever created.
+  const [pcStatusFilter, setPcStatusFilter] = useState('processing')
   const [pcModal,        setPcModal]        = useState(false)   // create modal
   const [pcForm,         setPcForm]         = useState({ user_id: '', amount: '', notes: '' })
   const [pcSaving,       setPcSaving]       = useState(false)
@@ -589,7 +595,11 @@ export default function AdminPayroll() {
       </div>
 
       {/* 3-tab switcher */}
-      <div className="flex gap-1 mb-5 bg-gray-100 rounded-xl p-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      {/* overflow-x-auto also clips vertically (overflow-x != visible implies
+          overflow-y: auto), so the badges' -top-1.5 overshoot above the
+          buttons needs real top padding here, not just the shorthand p-1 —
+          otherwise their tops get cut off by the container's own clip box. */}
+      <div className="flex gap-1 mb-5 bg-gray-100 rounded-xl px-1 pb-1 pt-2.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
         {TABS.map(({ key, label, badge }) => (
           <button key={key} onClick={() => setTab(key)}
             className={`relative px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors ${
@@ -1457,13 +1467,34 @@ export default function AdminPayroll() {
       {/* ── Paychecks tab content ───────────────────────────────────── */}
       {tab === 'paychecks' && (
         <div className="space-y-4 mt-4">
+          {/* Status filter — paychecks span every period ever created, so
+              without this the processing backlog is buried among records
+              that are already resolved. Counts update live as the filter
+              changes status, e.g. after marking one available. */}
+          <div className="flex gap-1.5 flex-wrap">
+            {['processing', 'available', 'picked_up', 'voided', 'all'].map((s) => {
+              const count = s === 'all' ? paychecks.length : paychecks.filter((pc) => pc.status === s).length
+              const labels = { processing: 'Processing', available: 'Available', picked_up: 'Picked Up', voided: 'Voided', all: 'All' }
+              return (
+                <button key={s} onClick={() => setPcStatusFilter(s)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    pcStatusFilter === s ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:text-gray-700'
+                  }`}>
+                  {labels[s]} ({count})
+                </button>
+              )
+            })}
+          </div>
+
           {loadingPay
             ? <div className="flex justify-center py-16"><Spinner size="lg" /></div>
             : paychecks.length === 0
               ? <div className="text-center py-16 text-gray-400 text-sm">No paycheck records yet. Click "+ Add Paycheck" to create one.</div>
+              : (pcStatusFilter === 'all' ? paychecks : paychecks.filter((pc) => pc.status === pcStatusFilter)).length === 0
+                ? <div className="text-center py-16 text-gray-400 text-sm">No {pcStatusFilter.replace('_', ' ')} paychecks.</div>
               : (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
-                  {paychecks.map((pc) => {
+                  {(pcStatusFilter === 'all' ? paychecks : paychecks.filter((pc) => pc.status === pcStatusFilter)).map((pc) => {
                     const statusCfg = {
                       processing: { label: 'Processing', color: 'bg-amber-100 text-amber-700', next: 'available',  nextLabel: 'Mark Available' },
                       available:  { label: 'Available',  color: 'bg-green-100 text-green-700',  next: 'picked_up', nextLabel: 'Mark Picked Up' },
