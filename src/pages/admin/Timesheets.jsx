@@ -617,7 +617,9 @@ export default function AdminTimesheets() {
 
   useEffect(() => {
     listEmployees().then(d => {
-      const emps = d.employees ?? []
+      // Contractors invoice per job/estimate and never clock in — they
+      // don't have a timesheet to show here.
+      const emps = (d.employees ?? []).filter(e => e.role !== 'contractor')
       setEmployees(emps)
       // Match the Salary-then-Hourly, alphabetical order the list itself
       // renders in, so the auto-selected employee is whoever appears first.
