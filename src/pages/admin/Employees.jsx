@@ -102,6 +102,11 @@ function MaskedField({ label, masked, revealedValue, revealing, onReveal, newVal
 export default function AdminEmployees() {
   const [employees, setEmployees]     = useState([])
   const [inactive, setInactive]       = useState([])
+  // Two subtabs: 'employees' (admins + employees) vs 'contractors' — kept
+  // as a completely separate view since contractors behave differently
+  // throughout (no login, no pay rate/timesheet, invoice-based Documents
+  // action instead of Reset Password, etc).
+  const [userTab, setUserTab]         = useState('employees')
   const [jobs, setJobs]               = useState([])
   const [loading, setLoading]         = useState(true)
   const [modal, setModal]             = useState(null)
@@ -240,7 +245,14 @@ export default function AdminEmployees() {
   }
   useEffect(() => { load() }, [])
 
-  const openCreate = () => { setForm(EMPTY); setError(''); setModal('create') }
+  const openCreate = () => {
+    // Default the new user's role to match whichever subtab they're adding
+    // from, so "+ Add" on the Contractors tab doesn't start you off on the
+    // Employees defaults (w2/hourly) that don't apply to a contractor.
+    setForm(userTab === 'contractors' ? { ...EMPTY, role: 'contractor' } : EMPTY)
+    setError('')
+    setModal('create')
+  }
   const openEdit   = (emp) => {
     setForm({
       name:     emp.name     ?? '',
@@ -423,25 +435,51 @@ export default function AdminEmployees() {
 
   const ROLE_ORDER = ['admin', 'employee', 'contractor']
   const ROLE_LABELS = { admin: 'Admins', employee: 'Employees', contractor: 'Contractors' }
-  const grouped = ROLE_ORDER.map(role => ({
+  // Contractors get their own subtab entirely — admins fold in with regular
+  // employees on the "Employees" side since they aren't contractors either.
+  const rolesForTab = userTab === 'contractors' ? ['contractor'] : ['admin', 'employee']
+  const grouped = rolesForTab.map(role => ({
     role,
     label: ROLE_LABELS[role],
     rows: employees.filter(e => e.role === role),
   })).filter(g => g.rows.length > 0)
+  const inactiveForTab = inactive.filter(e =>
+    userTab === 'contractors' ? e.role === 'contractor' : e.role !== 'contractor'
+  )
+
+  const USER_TABS = [
+    { key: 'employees',   label: 'Employees' },
+    { key: 'contractors', label: 'Contractors' },
+  ]
 
   return (
     <div className="w-full">
       <PageHeader
-        title="Employees"
+        title="Users"
         subtitle="Manage team members and pay settings"
-        actions={<Button onClick={openCreate}>+ Add Employee</Button>}
+        actions={<Button onClick={openCreate}>{userTab === 'contractors' ? '+ Add Contractor' : '+ Add Employee'}</Button>}
       />
+
+      {/* Employees / Contractors subtab switcher */}
+      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-full sm:w-auto sm:inline-flex">
+        {USER_TABS.map(({ key, label }) => (
+          <button key={key} onClick={() => setUserTab(key)}
+            className={`flex-1 sm:flex-none px-5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+              userTab === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
       {loading
         ? <div className="flex justify-center py-16"><Spinner size="lg" /></div>
         : (
           <div className="flex flex-col gap-8">
             {grouped.length === 0 && (
-              <p className="text-center text-gray-400 py-16 text-sm">No employees yet.</p>
+              <p className="text-center text-gray-400 py-16 text-sm">
+                {userTab === 'contractors' ? 'No contractors yet.' : 'No employees yet.'}
+              </p>
             )}
             {grouped.map(({ role, label, rows }) => (
               <div key={role}>
@@ -449,12 +487,12 @@ export default function AdminEmployees() {
                 <DataTable columns={columns} data={rows} fixed />
               </div>
             ))}
-            {inactive.length > 0 && (
+            {inactiveForTab.length > 0 && (
               <div>
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">
-                  Deactivated Employees
+                  {userTab === 'contractors' ? 'Deactivated Contractors' : 'Deactivated Employees'}
                 </h3>
-                <DataTable columns={inactiveColumns} data={inactive} fixed />
+                <DataTable columns={inactiveColumns} data={inactiveForTab} fixed />
               </div>
             )}
           </div>
@@ -462,7 +500,9 @@ export default function AdminEmployees() {
       }
 
       {/* Create / Edit modal */}
-      <Modal isOpen={!!modal} onClose={() => setModal(null)} title={modal === 'create' ? 'Add Employee' : 'Edit Employee'}>
+      <Modal isOpen={!!modal} onClose={() => setModal(null)} title={
+        (modal === 'create' ? 'Add ' : 'Edit ') + (form.role === 'contractor' ? 'Contractor' : 'Employee')
+      }>
         <div className="flex flex-col gap-4">
           <Input label="Full Name *" value={form.name} onChange={set('name')} />
           <Input

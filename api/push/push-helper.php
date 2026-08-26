@@ -107,15 +107,29 @@ function send_push(array $sub, string $type = 'paycheck', string $lang = 'en'): 
 
 /**
  * Send push to all subscriptions for a given user_id.
+ *
+ * Callers use this as a side effect of a real state change (e.g. marking a
+ * paycheck available) that has already been committed to the database by
+ * the time this runs. A push failure — missing table, a dead subscription,
+ * a network hiccup to the push service — must never bubble up and abort
+ * the response, or the caller's real work looks like it silently failed
+ * even though it actually succeeded. So every failure mode here is caught
+ * and swallowed (not re-thrown) by design.
  */
 function push_to_user(PDO $pdo, int $user_id, string $type = 'paycheck'): void {
-    $langStmt = $pdo->prepare('SELECT preferred_language FROM users WHERE id = ?');
-    $langStmt->execute([$user_id]);
-    $lang = $langStmt->fetch()['preferred_language'] ?? 'en';
+    try {
+        $langStmt = $pdo->prepare('SELECT preferred_language FROM users WHERE id = ?');
+        $langStmt->execute([$user_id]);
+        $lang = $langStmt->fetch()['preferred_language'] ?? 'en';
 
-    $stmt = $pdo->prepare('SELECT endpoint, p256dh, auth_key FROM push_subscriptions WHERE user_id = ?');
-    $stmt->execute([$user_id]);
-    foreach ($stmt->fetchAll() as $sub) send_push($sub, $type, $lang);
+        $stmt = $pdo->prepare('SELECT endpoint, p256dh, auth_key FROM push_subscriptions WHERE user_id = ?');
+        $stmt->execute([$user_id]);
+        foreach ($stmt->fetchAll() as $sub) {
+            try { send_push($sub, $type, $lang); } catch (\Throwable $e) { error_log('[push] send_push failed: ' . $e->getMessage()); }
+        }
+    } catch (\Throwable $e) {
+        error_log('[push] push_to_user failed for user_id=' . $user_id . ': ' . $e->getMessage());
+    }
 }
 
 /**
