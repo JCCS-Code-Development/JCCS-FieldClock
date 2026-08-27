@@ -12,7 +12,6 @@ import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { getStatus, dayStart, dayEnd, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
 import { getNearbyJobs, listJobs } from '../../api/jobs'
 import { listVisitStops, createVisitStop, deleteVisitStop } from '../../api/visitStops'
-import { groupJobsByCompany } from '../../utils/jobs'
 import Spinner from '../ui/Spinner'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
@@ -217,7 +216,7 @@ export default function ClockPanel({ showHeader = true }) {
     if (!position) return
     reverseGeocode(position.lat, position.lng).then(setLocationLabel)
     setLoadingJobs(true)
-    getNearbyJobs({ lat: position.lat, lng: position.lng, radius: 50 })
+    getNearbyJobs({ lat: position.lat, lng: position.lng, radius: 1 })
       .then((d) => setJobs(d.jobs ?? []))
       .catch(() => listJobs({ assigned: true, status: 'active' }).then((d) => setJobs(d.jobs ?? [])))
       .finally(() => setLoadingJobs(false))
@@ -238,7 +237,7 @@ export default function ClockPanel({ showHeader = true }) {
   useEffect(() => {
     const refresh = () => {
       const fetchJobs = position
-        ? getNearbyJobs({ lat: position.lat, lng: position.lng, radius: 50 })
+        ? getNearbyJobs({ lat: position.lat, lng: position.lng, radius: 1 })
             .catch(() => listJobs({ assigned: true, status: 'active' }))
         : listJobs({ assigned: true, status: 'active' })
       fetchJobs.then((d) => setJobs(d.jobs ?? [])).catch(() => {})
@@ -253,8 +252,8 @@ export default function ClockPanel({ showHeader = true }) {
     if (activeJob?.id) setSelectedJobId(String(activeJob.id))
   }, [activeJob])
 
-  // Auto-select this person's default job site (e.g. office staff who always
-  // clock in from the same place) — still fully overridable via the dropdown.
+  // Auto-select this person's home job site (fixed or suggested) — still
+  // overridable via the dropdown / the in-range card below.
   useEffect(() => {
     if (isClockedIn || selectedJobId || !user?.default_job_id) return
     if (jobs.some((j) => String(j.id) === String(user.default_job_id))) {
@@ -368,14 +367,19 @@ export default function ClockPanel({ showHeader = true }) {
     && currentEntry?.within_radius !== null && currentEntry?.within_radius !== undefined
     && Number(currentEntry.within_radius) === 0
 
-  // The nearest assigned job whose own clock-in geofence the employee is
-  // actually standing inside — not just "nearby" in the general sense used
-  // to populate the dropdown. `jobs` is already distance-sorted by
-  // nearby.php, so the first match is the closest one they're inside of.
-  const inRangeJob = jobs.find((j) =>
+  // The nearest job whose own clock-in geofence the employee is actually
+  // standing inside — not just "nearby" in the general sense used to populate
+  // the dropdown. `jobs` is already distance-sorted by nearby.php, so the
+  // first match is the closest one they're inside of.
+  const inGeofence = (j) =>
     j.distance_meters != null && j.clock_in_radius_meters != null
     && j.distance_meters <= j.clock_in_radius_meters
-  )
+  const inRangeJob = jobs.find(inGeofence)
+  // Is the person's own home site one of the sites they're standing at? If so,
+  // and they're "fixed", we don't nudge them toward a co-located job — see the
+  // in-range card below.
+  const atHomeSite = !!user?.default_job_id
+    && jobs.some((j) => String(j.id) === String(user.default_job_id) && inGeofence(j))
 
   return (
     <div ref={rootRef} className="flex flex-col gap-3.5 lg:grid lg:grid-cols-2 lg:gap-6 w-full scroll-mt-4">
@@ -506,7 +510,12 @@ export default function ClockPanel({ showHeader = true }) {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                {inRangeJob && (
+                {/* "Fixed" staff standing at their home site don't get nudged
+                    toward a co-located job (e.g. Oficina + Carpinteria 1200 at
+                    one building) — they can still pick it from the list for an
+                    emergency. Everyone else (suggested staff, or a fixed person
+                    who's actually somewhere else) gets the full nudge. */}
+                {inRangeJob && (String(inRangeJob.id) === selectedJobId || !(user?.default_job_fixed && atHomeSite)) && (
                   String(inRangeJob.id) === selectedJobId ? (
                     <div className="flex items-center gap-2.5 bg-green-50 border-2 border-green-200 rounded-xl px-3 py-2.5">
                       <span className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0 text-xs font-bold">✓</span>
@@ -536,17 +545,28 @@ export default function ClockPanel({ showHeader = true }) {
                     className="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-gray-800 outline-none focus:border-brand-500 appearance-none"
                   >
                     <option value="">{t('home.selectJobSite')}</option>
-                    {groupJobsByCompany(jobs).map(({ company, jobs: groupJobs }) => (
-                      <optgroup key={company} label={company}>
-                        {groupJobs.map((j) => (
-                          <option key={j.id} value={j.id}>
-                            {j.name}{j.distance_meters != null
-                              ? ` · ${j.distance_meters < 1000 ? Math.round(j.distance_meters) + 'm' : (j.distance_meters / 1000).toFixed(1) + 'km'}`
-                              : ''}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
+                    {/* Grouped by proximity, not company — when standing at a
+                        building with more than one active job (e.g. Oficina +
+                        Carpinteria 1200) all of them show under "At this
+                        location" so the choice is obvious. */}
+                    {(() => {
+                      const fmtDist = (m) => m == null ? '' : ` · ${m < 1000 ? Math.round(m) + 'm' : (m / 1000).toFixed(1) + 'km'}`
+                      const inRange = jobs.filter((j) =>
+                        j.distance_meters != null && j.clock_in_radius_meters != null
+                        && j.distance_meters <= j.clock_in_radius_meters)
+                      const inRangeIds = new Set(inRange.map((j) => j.id))
+                      const rest = jobs.filter((j) => !inRangeIds.has(j.id))
+                      return [
+                        [t('home.atThisLocation'), inRange],
+                        [t('home.nearbyJobs'), rest],
+                      ].filter(([, list]) => list.length > 0).map(([label, list]) => (
+                        <optgroup key={label} label={label}>
+                          {list.map((j) => (
+                            <option key={j.id} value={j.id}>{j.name}{fmtDist(j.distance_meters)}</option>
+                          ))}
+                        </optgroup>
+                      ))
+                    })()}
                   </select>
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
                 </div>

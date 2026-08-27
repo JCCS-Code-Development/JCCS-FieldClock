@@ -87,6 +87,7 @@ echo json_encode([
         'pay_type'           => $user['pay_type'],
         'pay_structure'      => $user['pay_structure'],
         'default_job_id'     => $user['default_job_id'],
+        'default_job_fixed'  => (bool)($user['default_job_fixed'] ?? false),
         'preferred_language' => $user['preferred_language'] ?? 'es',
     ],
 ]);

@@ -10,7 +10,10 @@ $auth = requireAuth();
 
 $lat    = isset($_GET['lat'])    ? (float)$_GET['lat']    : null;
 $lng    = isset($_GET['lng'])    ? (float)$_GET['lng']    : null;
-$radius = isset($_GET['radius']) ? min((float)$_GET['radius'], 50) : 10;
+// Distance is in MILES. "Nearby" means actually at the site, not the same
+// metro area — default half a mile, hard cap of 2. (An earlier version
+// accepted up to 50, which returned effectively every job.)
+$radius = isset($_GET['radius']) ? min(max((float)$_GET['radius'], 0.1), 2.0) : 0.5;
 
 if ($lat === null || $lng === null) { echo json_encode(['jobs' => []]); exit; }
 
@@ -19,11 +22,15 @@ $pdo = getPDO();
 $latDelta = $radius / 69.0;
 $lngDelta = $radius / (69.0 * cos(deg2rad($lat)));
 
+// Every active job near the phone, not just the ones this person is assigned
+// to — anyone standing at a site can clock into it. `assigned` is kept only so
+// the UI can label / group ("Your site" vs "Nearby"); it is not a filter.
 $stmt = $pdo->prepare(
-    'SELECT j.* FROM jobs j
-     JOIN job_assignments ja ON ja.job_id = j.id
-     WHERE ja.user_id = :uid
-       AND j.status = "active"
+    'SELECT j.*,
+            EXISTS(SELECT 1 FROM job_assignments ja
+                   WHERE ja.job_id = j.id AND ja.user_id = :uid) AS assigned
+     FROM jobs j
+     WHERE j.status = "active"
        AND j.latitude  BETWEEN :latMin AND :latMax
        AND j.longitude BETWEEN :lngMin AND :lngMax'
 );
@@ -41,6 +48,7 @@ foreach ($rows as $job) {
     if (!$job['latitude'] || !$job['longitude']) continue;
     $dist = haversine($lat, $lng, (float)$job['latitude'], (float)$job['longitude']);
     if ($dist <= $radius) {
+        $job['assigned']        = (bool)$job['assigned'];
         $job['distance_miles']  = round($dist, 2);
         $job['distance_meters'] = (int)round($dist * 1609.34);
         $results[] = $job;
