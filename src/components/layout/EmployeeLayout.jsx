@@ -138,13 +138,19 @@ export default function EmployeeLayout() {
         <div className="lg:hidden h-[52px] shrink-0" />
 
         <PullToRefresh className="flex-1 flex flex-col scrollbar-hide"
-          style={{ paddingBottom: 'max(76px, calc(64px + env(safe-area-inset-bottom)))' }}
           onRefresh={() => setRefreshKey(k => k + 1)}>
           {/* Document reminder — sits right under the header; renders a spacer
               here (in-flow) plus the actual fixed banner via portal */}
           <PendingDocsBanner />
           <div key={refreshKey} className="max-w-4xl mx-auto w-full flex-1 flex flex-col px-4 pt-7 pb-4 lg:p-6">
             <Outlet />
+            {/* Just enough room to scroll the last card clear of the fixed
+                mobile bottom nav. Kept as an in-flow element rather than
+                padding-bottom on the scroll container — some mobile browsers
+                don't count that padding as scrollable height, which left the
+                last card (e.g. Today's Activity) stranded behind the nav. */}
+            <div className="lg:hidden shrink-0"
+              style={{ height: 'max(80px, calc(64px + env(safe-area-inset-bottom)))' }} />
           </div>
         </PullToRefresh>
 

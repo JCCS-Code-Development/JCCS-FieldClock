@@ -21,22 +21,37 @@ import i18n from '../../i18n'
 // instead of always rendering in English.
 const dfLocale = () => (i18n.language?.startsWith('es') ? esLocale : enUS)
 
-const buildPeriods = (t) => Array.from({ length: 4 }, (_, i) => {
-  const w     = i + 1 // start from last week, skip current week
-  const now   = new Date()
-  const start = startOfWeek(subWeeks(now, w), { weekStartsOn: 1 })
-  const end   = endOfWeek(subWeeks(now, w), { weekStartsOn: 1 })
-  return {
-    label: i === 0 ? t('pay.lastWeek') : `${format(start, 'MMM d', { locale: dfLocale() })} – ${format(end, 'MMM d', { locale: dfLocale() })}`,
-    start: format(start, 'yyyy-MM-dd'),
-    end:   format(end,   'yyyy-MM-dd'),
+// periods[0] is the in-progress current week — hours worked so far, with pay
+// still pending. periods[1..4] are the last four completed weeks.
+const buildPeriods = (t) => {
+  const now = new Date()
+  const current = {
+    label:   t('pay.thisWeek'),
+    start:   format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
+    end:     format(endOfWeek(now,   { weekStartsOn: 1 }), 'yyyy-MM-dd'),
+    current: true,
   }
-})
+  const past = Array.from({ length: 4 }, (_, i) => {
+    const w     = i + 1
+    const start = startOfWeek(subWeeks(now, w), { weekStartsOn: 1 })
+    const end   = endOfWeek(subWeeks(now, w), { weekStartsOn: 1 })
+    return {
+      label: i === 0 ? t('pay.lastWeek') : `${format(start, 'MMM d', { locale: dfLocale() })} – ${format(end, 'MMM d', { locale: dfLocale() })}`,
+      start: format(start, 'yyyy-MM-dd'),
+      end:   format(end,   'yyyy-MM-dd'),
+    }
+  })
+  return [current, ...past]
+}
 
 export default function MyPay() {
   const { t } = useTranslation()
   const periods = buildPeriods(t)
 
+  // Land on This Week (index 0) so the hours tiles show the in-progress
+  // running total. The pie chart + Pay Breakdown only appear once the
+  // selected period's own paycheck is available, so This Week shows just
+  // hours + the pending notice, never an unfinished breakdown.
   const [selectedPeriod, setSelectedPeriod] = useState(0)
   const [periodSheetOpen, setPeriodSheetOpen] = useState(false)
   const [data, setData]           = useState(null)
@@ -339,10 +354,12 @@ export default function MyPay() {
                     const isW2     = data.pay_type === 'w2'
                     const rate     = data.pay_rate ?? 0
 
-                    // Bonus info and the full dollar breakdown stay hidden until this
-                    // period's paycheck is actually ready — an admin marks it
-                    // 'available' once checks are printed/received, so employees never
-                    // see a number that could still shift before they're paid.
+                    // The pie chart + full dollar breakdown stay hidden until THIS
+                    // period's own paycheck is actually ready — an admin marks it
+                    // 'available' once checks are printed/received. So the default
+                    // in-progress "This Week" view (no paycheck yet) never shows a
+                    // breakdown; only the Paycheck Status card above reflects the
+                    // most recent finalized check.
                     const periodPaycheck = paychecks.find(
                       (pc) => pc.period_start === p.start && pc.period_end === p.end
                     )
@@ -354,7 +371,13 @@ export default function MyPay() {
                           <div className="grid grid-cols-2 gap-x-3 gap-y-4">
                             {[
                               [t('pay.todayHours'), formatHours(data.today_hours ?? 0), ClockIcon, 'bg-blue-50 text-blue-600'],
-                              [selectedPeriod === 0 ? t('pay.weekHours') : t('pay.approvedHours'), formatHours(data.approved_hours ?? 0), CalendarIcon, 'bg-indigo-50 text-indigo-600'],
+                              [
+                                p.current ? t('pay.weekHours') : t('pay.approvedHours'),
+                                // In-progress week: nothing is approved yet, so show
+                                // all hours worked so far (approved + pending).
+                                formatHours(p.current ? (data.approved_hours ?? 0) + (data.pending_hours ?? 0) : (data.approved_hours ?? 0)),
+                                CalendarIcon, 'bg-indigo-50 text-indigo-600',
+                              ],
                               [t('pay.rate'), isSalary ? formatCurrency(rate) : `${formatCurrency(rate)}/hr`, RateIcon, 'bg-purple-50 text-purple-600'],
                               [t('pay.estimatedGross'), payAvailable ? formatCurrency(data.estimated_total ?? 0) : t('pay.pendingGross'), GrossIcon, 'bg-green-50 text-green-600'],
                             ].map(([label, value, icon, colorCls], i) => (
@@ -874,11 +897,6 @@ export default function MyPay() {
         </div>
       )}
 
-      {/* Extra trailing room so the last card's expanded content (e.g. Pay
-          Breakdown) can scroll fully clear of the fixed bottom nav — the
-          page-level bottom padding alone isn't enough once a card near the
-          end of the page grows taller. */}
-      <div className="h-24 shrink-0" />
     </div>
   )
 }
