@@ -24,7 +24,7 @@ if ($method === 'GET') {
     $active = isset($_GET['active']) ? (int)$_GET['active'] : 1;
     $stmt   = $pdo->prepare(
         'SELECT u.id, u.name, u.email, u.phone, u.address, u.role, u.pay_type, u.pay_rate, u.pay_structure, u.overtime_rate,
-                u.gas_weekly_allowance, u.is_active, u.deactivated_at, u.default_job_id, j.name as default_job_name
+                u.gas_weekly_allowance, u.is_active, u.deactivated_at, u.default_job_id, u.default_job_fixed, j.name as default_job_name
          FROM users u
          LEFT JOIN jobs j ON j.id = u.default_job_id
          WHERE u.is_active = ?

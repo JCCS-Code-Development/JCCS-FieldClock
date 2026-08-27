@@ -41,7 +41,7 @@ function annotateSalaryHistory(history) {
 
 const EMPTY = {
   name: '', email: '', phone: '', address: '', role: 'employee',
-  pay_type: 'w2', pay_structure: 'hourly', pay_rate: '', default_job_id: '',
+  pay_type: 'w2', pay_structure: 'hourly', pay_rate: '', default_job_id: '', default_job_fixed: false,
 }
 
 const DOC_LABELS = {
@@ -264,6 +264,7 @@ export default function AdminEmployees() {
       pay_structure: emp.pay_structure ?? 'hourly',
       pay_rate:      emp.pay_rate      ?? '',
       default_job_id: emp.default_job_id ?? '',
+      default_job_fixed: !!Number(emp.default_job_fixed),
     })
     setError('')
     setModal(emp)
@@ -304,6 +305,7 @@ export default function AdminEmployees() {
       // assigned a default job site.
       ...(modal !== 'create' && form.role !== 'contractor' && {
         default_job_id: form.default_job_id || null,
+        default_job_fixed: form.default_job_id ? (form.default_job_fixed ? 1 : 0) : 0,
       }),
     }
     try {
@@ -604,6 +606,28 @@ export default function AdminEmployees() {
                 ))}
               </select>
               <p className="text-xs text-gray-400 mt-1">Auto-selected when this person clocks in — they can still change it</p>
+
+              {form.default_job_id && (
+                <div className="mt-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      ['suggested', 'Suggested', 'Home base — but nearby jobs are shown too, for staff who get sent elsewhere'],
+                      ['fixed',     'Fixed',     'Always here. Stays selected even when standing at another site; still overridable for an emergency'],
+                    ].map(([val, title, desc]) => {
+                      const active = (val === 'fixed') === !!form.default_job_fixed
+                      return (
+                        <button key={val} type="button"
+                          onClick={() => setForm((f) => ({ ...f, default_job_fixed: val === 'fixed' }))}
+                          className={`text-left px-3 py-2.5 rounded-xl border-2 transition-colors ${
+                            active ? 'border-brand-500 bg-brand-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                          <p className={`text-sm font-semibold ${active ? 'text-brand-700' : 'text-gray-700'}`}>{title}</p>
+                          <p className="text-[11px] text-gray-400 leading-tight mt-0.5">{desc}</p>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

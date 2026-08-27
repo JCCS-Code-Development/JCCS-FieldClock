@@ -19,8 +19,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $params = [];
 
     if ($assigned) {
-        $sql .= ' JOIN job_assignments ja2 ON ja2.job_id = j.id AND ja2.user_id = :uid';
-        $params[':uid'] = $auth['user_id'];
+        // Jobs this person is assigned to, plus their own home/default site even
+        // if they aren't formally assigned to it (used as the no-GPS fallback on
+        // the clock-in screen).
+        $sql .= ' JOIN (SELECT job_id FROM job_assignments WHERE user_id = :uid
+                        UNION
+                        SELECT default_job_id AS job_id FROM users
+                        WHERE id = :uid_d AND default_job_id IS NOT NULL) mine
+                       ON mine.job_id = j.id';
+        $params[':uid']   = $auth['user_id'];
+        $params[':uid_d'] = $auth['user_id'];
     }
     $sql .= ' LEFT JOIN job_assignments ja ON ja.job_id = j.id';
     $sql .= ' LEFT JOIN users ru ON ru.id = j.registered_by';
