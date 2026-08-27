@@ -19,7 +19,9 @@
     "documents": "Documents",
     "myDocuments": "My Docs",
     "hrDocs": "HR Docs",
-    "language": "Language"
+    "language": "Language",
+    "adminView": "Admin View",
+    "employeeView": "Employee View"
   },
   "role": {
     "admin": "Admin",
