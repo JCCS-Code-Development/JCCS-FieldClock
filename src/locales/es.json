@@ -19,7 +19,9 @@
     "documents": "Documentos",
     "myDocuments": "Mis Docs",
     "hrDocs": "RRHH",
-    "language": "Idioma"
+    "language": "Idioma",
+    "adminView": "Vista de Administrador",
+    "employeeView": "Vista de Empleado"
   },
   "role": {
     "admin": "Administrador",

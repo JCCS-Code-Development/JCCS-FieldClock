@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import OfflineBanner from '../OfflineBanner'
 import PullToRefresh from '../ui/PullToRefresh'
 import LangSwitcher from '../ui/LangSwitcher'
+import ViewSwitch from './ViewSwitch'
 import { useAuthStore } from '../../store/authStore'
 import { logout as logoutAPI } from '../../api/auth'
 import LiveClock from '../ui/LiveClock'
@@ -93,6 +94,7 @@ export default function AdminLayout() {
           {[...PRIMARY, ...MORE].map(item => <SidebarItem key={item.to} {...item} />)}
         </nav>
         <div className="border-t border-brand-700/60">
+          <ViewSwitch target="employee" variant="sidebar" />
           <div className="px-5 py-3">
             <LangSwitcher className="text-brand-400/70 hover:text-brand-100" />
           </div>
@@ -114,7 +116,8 @@ export default function AdminLayout() {
             <img src="/jccs-logo.jpg" alt="JCCS" className="h-7 w-auto"
               style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <ViewSwitch target="employee" variant="topbar" />
             <LiveClock className="text-white/60 text-xs" />
             <button onClick={() => setProfileOpen(true)}
               className="w-8 h-8 rounded-full bg-brand-500 flex items-center justify-center text-white text-sm font-bold shrink-0 active:bg-brand-400 transition-colors">
@@ -182,6 +185,10 @@ export default function AdminLayout() {
                 </div>
               </div>
 
+              <div className="px-4 pt-3">
+                <ViewSwitch target="employee" variant="sheet" onNavigate={() => setMoreOpen(false)} />
+              </div>
+
               {/* Nav grid — 3 columns */}
               <div className="grid grid-cols-3 gap-2 p-4">
                 {MORE.map(item => (
@@ -233,6 +240,7 @@ export default function AdminLayout() {
                 </div>
               </div>
               <div className="px-5 py-4 flex flex-col gap-3">
+                <ViewSwitch target="employee" variant="sheet" onNavigate={() => setProfileOpen(false)} />
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-700">Language</span>
                   <LangSwitcher className="text-gray-500" />
