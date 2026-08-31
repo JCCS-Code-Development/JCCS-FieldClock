@@ -12,6 +12,7 @@ $allowedOrigins = [
     'https://fieldclock.jccs-services.com',
     'https://inventory.jccs-services.com',
     'https://projects.jccs-services.com',
+    'https://calendar.jccs-services.com',
 ];
 $origin      = $_SERVER['HTTP_ORIGIN'] ?? '';
 $allowOrigin = in_array($origin, $allowedOrigins, true) ? $origin : FRONTEND_ORIGIN;
