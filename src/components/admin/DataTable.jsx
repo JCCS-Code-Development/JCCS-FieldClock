@@ -1,7 +1,7 @@
-export default function DataTable({ columns, data, onRowClick, emptyMessage = 'No records found.', fixed = false }) {
+export default function DataTable({ columns, data, onRowClick, emptyMessage = 'No records found.', fixed = false, card = false }) {
   if (!data?.length) {
     return (
-      <div className="text-center py-12 text-gray-400 text-sm">{emptyMessage}</div>
+      <div className={`text-center py-12 text-gray-400 text-sm ${card ? 'bg-white rounded-2xl shadow-sm border border-gray-100' : ''}`}>{emptyMessage}</div>
     )
   }
 
@@ -49,29 +49,29 @@ export default function DataTable({ columns, data, onRowClick, emptyMessage = 'N
       </div>
 
       {/* ── Desktop: table ─────────────────────────────────────── */}
-      <div className="hidden md:block overflow-x-auto -mx-1">
+      <div className={`hidden md:block overflow-x-auto ${card ? 'bg-white rounded-2xl shadow-sm border border-gray-100' : '-mx-1'}`}>
         <table className={`w-full text-sm ${fixed ? 'table-fixed' : ''}`}>
-          <thead>
-            <tr className="border-b border-gray-100">
+          <thead className={card ? 'bg-gray-50 border-b border-gray-100' : ''}>
+            <tr className={card ? '' : 'border-b border-gray-100'}>
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className={`text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-2 whitespace-nowrap ${col.className ?? ''}`}
+                  className={`text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap ${card ? 'px-5 py-3' : 'px-3 py-2'} ${col.className ?? ''}`}
                 >
                   {col.label}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className={card ? 'divide-y divide-gray-50' : ''}>
             {data.map((row, i) => (
               <tr
                 key={row.id ?? i}
-                className={`border-b border-gray-50 ${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                className={`${card ? 'transition-colors' : 'border-b border-gray-50'} ${onRowClick ? 'cursor-pointer hover:bg-gray-50' : card ? 'hover:bg-gray-50' : ''}`}
                 onClick={() => onRowClick?.(row)}
               >
                 {columns.map((col) => (
-                  <td key={col.key} className={`px-3 py-3 align-top ${col.className ?? ''}`}>
+                  <td key={col.key} className={`${card ? 'px-5 py-3.5 align-middle' : 'px-3 py-3 align-top'} ${col.className ?? ''}`}>
                     {col.render ? col.render(row[col.key], row) : row[col.key] ?? '—'}
                   </td>
                 ))}
