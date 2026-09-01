@@ -12,6 +12,7 @@ import SetupPassword from './pages/auth/SetupPassword'
 import Home from './pages/employee/Home'
 import MyPay from './pages/employee/MyPay'
 import MyDocuments from './pages/employee/MyDocuments'
+import MyProfile from './pages/employee/MyProfile'
 
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminJobs from './pages/admin/Jobs'
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/my-pay" element={<MyPay />} />
             <Route path="/my-docs" element={<MyDocuments />} />
+            <Route path="/profile" element={<MyProfile />} />
           </Route>
         </Route>
 

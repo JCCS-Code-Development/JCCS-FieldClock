@@ -21,7 +21,8 @@
     "hrDocs": "RRHH",
     "language": "Idioma",
     "adminView": "Vista de Administrador",
-    "employeeView": "Vista de Empleado"
+    "employeeView": "Vista de Empleado",
+    "profile": "Perfil"
   },
   "role": {
     "admin": "Administrador",
@@ -211,6 +212,11 @@
     },
     "profile": {
       "tab": "Perfil",
+      "account": "Cuenta",
+      "personal": "Datos Personales",
+      "name": "Nombre",
+      "email": "Correo",
+      "phone": "Teléfono",
       "taxId": "Identificación Fiscal",
       "birthDate": "Fecha de Nacimiento",
       "emergencyContact": "Contacto de Emergencia",

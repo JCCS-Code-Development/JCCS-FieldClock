@@ -21,7 +21,8 @@
     "hrDocs": "HR Docs",
     "language": "Language",
     "adminView": "Admin View",
-    "employeeView": "Employee View"
+    "employeeView": "Employee View",
+    "profile": "Profile"
   },
   "role": {
     "admin": "Admin",
@@ -211,6 +212,11 @@
     },
     "profile": {
       "tab": "Profile",
+      "account": "Account",
+      "personal": "Personal Details",
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
       "taxId": "Tax ID",
       "birthDate": "Birth Date",
       "emergencyContact": "Emergency Contact",
