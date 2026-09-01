@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import PageHeader from '../../components/admin/PageHeader'
 import DataTable from '../../components/admin/DataTable'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -13,6 +12,7 @@ import { listDocuments, getDocumentUrl } from '../../api/documents'
 import { listJobs } from '../../api/jobs'
 import { groupJobsByCompany } from '../../utils/jobs'
 import { formatCurrency } from '../../utils/format'
+import { useAuthStore } from '../../store/authStore'
 import { format, parseISO, addDays, subDays } from 'date-fns'
 
 // Weeks run Monday–Sunday (matches Payroll.jsx). A rate change made mid-period
@@ -100,6 +100,7 @@ function MaskedField({ label, masked, revealedValue, revealing, onReveal, newVal
 }
 
 export default function AdminEmployees() {
+  const me = useAuthStore((s) => s.user)
   const [employees, setEmployees]     = useState([])
   const [inactive, setInactive]       = useState([])
   // Two subtabs: 'employees' (admins + employees) vs 'contractors' — kept
@@ -373,27 +374,35 @@ export default function AdminEmployees() {
   // Employees/Contractors tables — each a separate <table> — line up with each
   // other regardless of what content each section happens to contain.
   const columns = [
-    { key: 'name',      label: 'Name',  className: 'w-[13%]' },
-    { key: 'email',     label: 'Email', className: 'w-[19%]' },
-    { key: 'phone',     label: 'Phone', className: 'w-[10%]', render: (v) => v || '—' },
     {
-      key: 'role', label: 'Role', className: 'w-[8%]',
+      key: 'name', label: 'Name', className: 'w-[15%]',
+      render: (v, row) => (
+        <span className="font-medium text-gray-900">
+          {v}
+          {row.id === me?.id && <span className="ml-2 text-xs font-medium text-brand-500">(you)</span>}
+        </span>
+      ),
+    },
+    { key: 'email',     label: 'Email', className: 'w-[17%]' },
+    { key: 'phone',     label: 'Phone', className: 'w-[9%]', render: (v) => <span className="block truncate">{v || '—'}</span> },
+    {
+      key: 'role', label: 'Role', className: 'w-[9%]',
       render: (v) => (
         <Badge variant={v === 'admin' ? 'active' : v === 'contractor' ? 'pending' : 'approved'}>
           {v}
         </Badge>
       ),
     },
-    { key: 'pay_type',  label: 'Type', className: 'w-[6%]',   render: (v) => <span className="font-mono text-xs font-semibold">{v?.toUpperCase()}</span> },
+    { key: 'pay_type',  label: 'Type', className: 'w-[5%]',   render: (v) => <span className="font-mono text-xs font-semibold">{v?.toUpperCase()}</span> },
     {
       key: 'pay_rate', label: 'Rate', className: 'w-[7%]',
       render: (v, row) => v ? `${formatCurrency(v)}${row.pay_structure === 'salary' ? '/wk' : '/hr'}` : '—',
     },
-    { key: 'is_active', label: 'Status', className: 'w-[7%]', render: (v) => <Badge variant={v ? 'approved' : 'rejected'}>{v ? 'Active' : 'Inactive'}</Badge> },
+    { key: 'is_active', label: 'Status', className: 'w-[8%]', render: (v) => <Badge variant={v ? 'approved' : 'rejected'}>{v ? 'Active' : 'Inactive'}</Badge> },
     {
-      key: 'id', label: '',
+      key: 'id', label: 'Actions', className: 'text-right w-[31%]',
       render: (_, row) => (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 justify-end">
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(row) }}>Edit</Button>
           {row.role !== 'contractor' && (
             <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openPwModal(row) }}>Reset Password</Button>
@@ -425,9 +434,9 @@ export default function AdminEmployees() {
       render: (v) => v ? format(parseISO(v), 'MMM d, yyyy') : '—',
     },
     {
-      key: 'id', label: '',
+      key: 'id', label: 'Actions', className: 'text-right w-[31%]',
       render: (_, row) => (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 justify-end">
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(row) }}>Edit</Button>
           <Button size="sm" onClick={(e) => { e.stopPropagation(); handleReactivate(row) }}>Reactivate</Button>
         </div>
@@ -454,13 +463,19 @@ export default function AdminEmployees() {
     { key: 'contractors', label: 'Contractors' },
   ]
 
+  const accountCount = grouped.reduce((n, g) => n + g.rows.length, 0) + inactiveForTab.length
+
   return (
     <div className="w-full">
-      <PageHeader
-        title="Users"
-        subtitle="Manage team members and pay settings"
-        actions={<Button onClick={openCreate}>{userTab === 'contractors' ? '+ Add Contractor' : '+ Add Employee'}</Button>}
-      />
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">Users</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {accountCount} {accountCount === 1 ? 'account' : 'accounts'}
+          </p>
+        </div>
+        <Button onClick={openCreate}>{userTab === 'contractors' ? '+ Add Contractor' : '+ Add Employee'}</Button>
+      </div>
 
       {/* Employees / Contractors subtab switcher */}
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-full sm:w-auto sm:inline-flex">
@@ -486,7 +501,7 @@ export default function AdminEmployees() {
             {grouped.map(({ role, label, rows }) => (
               <div key={role}>
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">{label}</h3>
-                <DataTable columns={columns} data={rows} fixed />
+                <DataTable columns={columns} data={rows} fixed card />
               </div>
             ))}
             {inactiveForTab.length > 0 && (
@@ -494,7 +509,7 @@ export default function AdminEmployees() {
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">
                   {userTab === 'contractors' ? 'Deactivated Contractors' : 'Deactivated Employees'}
                 </h3>
-                <DataTable columns={inactiveColumns} data={inactiveForTab} fixed />
+                <DataTable columns={inactiveColumns} data={inactiveForTab} fixed card />
               </div>
             )}
           </div>
