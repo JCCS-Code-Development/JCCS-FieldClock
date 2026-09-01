@@ -354,6 +354,15 @@ export default function MyPay() {
                     const isW2     = data.pay_type === 'w2'
                     const rate     = data.pay_rate ?? 0
 
+                    // Live running gross for the in-progress week so an employee
+                    // can watch it build through the week — every hour logged so
+                    // far (approved + still pending) times the rate. Salary is a
+                    // fixed weekly amount, so that's just the rate. Excludes
+                    // gas/bonus adjustments, which aren't entered until the
+                    // period closes.
+                    const weekHoursSoFar = (data.approved_hours ?? 0) + (data.pending_hours ?? 0)
+                    const weekGrossSoFar = isSalary ? rate : weekHoursSoFar * rate
+
                     // The pie chart + full dollar breakdown stay hidden until THIS
                     // period's own paycheck is actually ready — an admin marks it
                     // 'available' once checks are printed/received. So the default
@@ -375,11 +384,17 @@ export default function MyPay() {
                                 p.current ? t('pay.weekHours') : t('pay.approvedHours'),
                                 // In-progress week: nothing is approved yet, so show
                                 // all hours worked so far (approved + pending).
-                                formatHours(p.current ? (data.approved_hours ?? 0) + (data.pending_hours ?? 0) : (data.approved_hours ?? 0)),
+                                formatHours(p.current ? weekHoursSoFar : (data.approved_hours ?? 0)),
                                 CalendarIcon, 'bg-indigo-50 text-indigo-600',
                               ],
                               [t('pay.rate'), isSalary ? formatCurrency(rate) : `${formatCurrency(rate)}/hr`, RateIcon, 'bg-purple-50 text-purple-600'],
-                              [t('pay.estimatedGross'), payAvailable ? formatCurrency(data.estimated_total ?? 0) : t('pay.pendingGross'), GrossIcon, 'bg-green-50 text-green-600'],
+                              [
+                                t('pay.estimatedGross'),
+                                p.current
+                                  ? formatCurrency(weekGrossSoFar)
+                                  : (payAvailable ? formatCurrency(data.estimated_total ?? 0) : t('pay.pendingGross')),
+                                GrossIcon, 'bg-green-50 text-green-600',
+                              ],
                             ].map(([label, value, icon, colorCls], i) => (
                               <div key={i} className="flex items-center gap-2.5 min-w-0">
                                 <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${colorCls}`}>
