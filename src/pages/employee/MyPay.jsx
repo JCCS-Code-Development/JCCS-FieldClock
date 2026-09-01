@@ -7,7 +7,6 @@ import { getMyPay } from '../../api/payroll'
 import { getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
 import { listMyLoans, getMyPeriodLoanDeduction } from '../../api/loans'
 import { listPaychecks } from '../../api/paychecks'
-import { getPersonalDetails } from '../../api/personalDetails'
 import { subscribeToPush, unsubscribeFromPush, getCurrentSubscription } from '../../api/push'
 import PayPieChart from '../../components/ui/PayPieChart'
 import { getTimeOffRequests, createTimeOffRequest, reviewTimeOffRequest } from '../../api/timeoff'
@@ -74,16 +73,6 @@ export default function MyPay() {
   const [loadingLoans, setLoadingLoans] = useState(false)
   const [periodLoanDed, setPeriodLoanDed] = useState(0)
 
-  // Personal Details tab — own record only, returned in full (not masked;
-  // masking is only applied when an admin looks up someone else's — see
-  // api/employees/personal-details.php). Read-only here: admin-managed.
-  const [personalDetails, setPersonalDetails] = useState(null)
-  const [loadingPersonal, setLoadingPersonal] = useState(false)
-  const loadPersonalDetails = () => {
-    setLoadingPersonal(true)
-    getPersonalDetails().then((d) => setPersonalDetails(d.details ?? null)).finally(() => setLoadingPersonal(false))
-  }
-
   const [timeOffRequests, setTimeOffRequests] = useState([])
   const [toModal, setToModal]       = useState(false)
   const [toType, setToType]         = useState('vacation')
@@ -97,10 +86,8 @@ export default function MyPay() {
   const [paychecks,   setPaychecks]   = useState([])
   const [pushSub,     setPushSub]     = useState(null)
   const [pushLoading, setPushLoading] = useState(false)
-  const [paycheckHistoryOpen, setPaycheckHistoryOpen] = useState(false)
   const [breakdownOpen, setBreakdownOpen] = useState(false)
   const rootRef = useRef(null)
-  const paycheckCardRef = useRef(null)
   const breakdownCardRef = useRef(null)
 
   // Same pattern as Today's Activity on the Clock page: expanding scrolls
@@ -166,7 +153,6 @@ export default function MyPay() {
   }, [selectedPeriod])
 
   useEffect(() => { if (tab === 'loans') loadLoans() }, [tab])
-  useEffect(() => { if (tab === 'profile' && !personalDetails) loadPersonalDetails() }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const openCorrection = (entry) => {
     setCorrModal(entry)
@@ -224,7 +210,6 @@ export default function MyPay() {
     ['timeoff', t('timeoff.title')],
     // Only shown to employees who actually have a loan on record.
     ...(myLoans.length > 0 ? [['loans', t('nav.loans')]] : []),
-    ['profile', t('pay.profile.tab')],
   ]
 
   return (
@@ -266,19 +251,20 @@ export default function MyPay() {
         <>
           {tab === 'pay' && (
             <>
-              {/* ── Paycheck status — compact; history tucked behind a tap ── */}
+              {/* ── Paycheck status — for the selected week only ── */}
               {(() => {
-                const latest = paychecks[0] ?? null
+                const periodCheck = paychecks.find(
+                  (pc) => pc.period_start === p.start && pc.period_end === p.end
+                ) ?? null
                 const statusCfg = {
                   processing: { label: t('pay.paycheck.processing'), color: 'text-amber-700 bg-amber-50 border-amber-200' },
                   available:  { label: t('pay.paycheck.available'),  color: 'text-green-700 bg-green-50 border-green-200'  },
                   picked_up:  { label: t('pay.paycheck.pickedUp'),   color: 'text-gray-600  bg-gray-50  border-gray-200'   },
                   voided:     { label: t('pay.paycheck.voided'),     color: 'text-red-700   bg-red-50   border-red-200'   },
                 }
-                const cfg = latest ? (statusCfg[latest.status] ?? statusCfg.processing) : null
-                const hasHistory = paychecks.length > 1
+                const cfg = periodCheck ? (statusCfg[periodCheck.status] ?? statusCfg.processing) : null
                 return (
-                  <div ref={paycheckCardRef} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden scroll-mt-16 scroll-mb-36">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden scroll-mt-16 scroll-mb-36">
                     <div className="flex items-center justify-between gap-2 px-4 pt-3.5 pb-1">
                       <h2 className="text-sm font-semibold text-gray-900">{t('pay.paycheck.title')}</h2>
                       <button
@@ -292,50 +278,23 @@ export default function MyPay() {
                         </svg>
                       </button>
                     </div>
-                    {!latest
+                    {!periodCheck
                       ? <p className="text-sm text-gray-400 px-4 pb-4">{t('pay.paycheck.none')}</p>
                       : (
-                        <>
-                          <button
-                            onClick={() => hasHistory && toggleSection(setPaycheckHistoryOpen, paycheckCardRef)}
-                            disabled={!hasHistory}
-                            className="w-full flex items-center gap-2 px-4 pb-4 text-left disabled:cursor-default">
-                            <div className={`flex-1 flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${cfg.color}`}>
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold truncate">{cfg.label}</p>
-                                <p className="text-xs opacity-70 mt-0.5 truncate">
-                                  {formatDate(latest.period_start)} – {formatDate(latest.period_end)}
-                                  {latest.amount ? ` · ${formatCurrency(parseFloat(latest.amount))}` : ''}
-                                </p>
-                              </div>
-                              {latest.status === 'available' && (
-                                <span className="text-xl shrink-0 ml-2" title={t('pay.paycheck.available')}>🎉</span>
-                              )}
+                        <div className="px-4 pb-4">
+                          <div className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${cfg.color}`}>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold truncate">{cfg.label}</p>
+                              <p className="text-xs opacity-70 mt-0.5 truncate">
+                                {formatDate(periodCheck.period_start)} – {formatDate(periodCheck.period_end)}
+                                {periodCheck.amount ? ` · ${formatCurrency(parseFloat(periodCheck.amount))}` : ''}
+                              </p>
                             </div>
-                            {hasHistory && (
-                              <svg className={`w-4 h-4 text-gray-300 shrink-0 transition-transform ${paycheckHistoryOpen ? 'rotate-180' : ''}`}
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
-                              </svg>
+                            {periodCheck.status === 'available' && (
+                              <span className="text-xl shrink-0 ml-2" title={t('pay.paycheck.available')}>🎉</span>
                             )}
-                          </button>
-                          {paycheckHistoryOpen && hasHistory && (
-                            <div className="px-4 pb-4 border-t border-gray-50 pt-3">
-                              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{t('pay.paycheck.history')}</p>
-                              <div className="space-y-1.5">
-                                {paychecks.slice(1, 5).map((pc) => {
-                                  const c = statusCfg[pc.status] ?? statusCfg.processing
-                                  return (
-                                    <div key={pc.id} className="flex items-center justify-between text-sm text-gray-600">
-                                      <span>{formatDate(pc.period_start)} – {formatDate(pc.period_end)}</span>
-                                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c.color}`}>{c.label}</span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </>
+                          </div>
+                        </div>
                       )
                     }
                   </div>
@@ -620,27 +579,6 @@ export default function MyPay() {
                     })}
                     <p className="text-xs text-center text-gray-400 mt-1">{t('pay.loans.deductionNotice')}</p>
                   </div>
-          )}
-
-          {tab === 'profile' && (
-            loadingPersonal
-              ? <div className="flex justify-center py-12"><Spinner size="lg" /></div>
-              : (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-3">
-                  <Row label={t('pay.profile.taxId')}       value={personalDetails?.tax_id ?? t('pay.profile.notOnFile')} />
-                  <Row label={t('pay.profile.birthDate')}   value={personalDetails?.birth_date ? formatDate(personalDetails.birth_date) : t('pay.profile.notOnFile')} />
-                  <Row label={t('pay.profile.emergencyContact')} value={
-                    personalDetails?.emergency_contact_name
-                      ? `${personalDetails.emergency_contact_name}${personalDetails.emergency_contact_phone ? ' · ' + personalDetails.emergency_contact_phone : ''}`
-                      : t('pay.profile.notOnFile')
-                  } />
-                  <div className="border-t border-gray-100 pt-3 mt-1">
-                    <Row label={t('pay.profile.bankRouting')} value={personalDetails?.bank_routing_number ?? t('pay.profile.notOnFile')} />
-                    <Row label={t('pay.profile.bankAccount')} value={personalDetails?.bank_account_number ?? t('pay.profile.notOnFile')} />
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">{t('pay.profile.editNotice')}</p>
-                </div>
-              )
           )}
 
           {tab === 'timeoff' && (

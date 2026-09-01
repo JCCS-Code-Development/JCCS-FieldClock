@@ -86,10 +86,11 @@ export default function AdminLayout() {
           </button>
           <p className="text-brand-400 text-xs font-bold mt-2 tracking-widest uppercase">{t('nav.fieldclock')}</p>
         </div>
-        <div className="px-5 py-2.5 border-b border-brand-700/40">
+        <button onClick={() => navigate('/profile')}
+          className="w-full text-left px-5 py-2.5 border-b border-brand-700/40 hover:bg-brand-700/40 transition-colors">
           <p className="text-brand-100 text-sm font-semibold">{t('home.welcome', { name: user?.name?.split(' ')[0] })}</p>
           <p className="text-brand-400/60 text-xs">{t('role.admin')}</p>
-        </div>
+        </button>
         <nav className="flex-1 py-3 overflow-y-auto">
           {[...PRIMARY, ...MORE].map(item => <SidebarItem key={item.to} {...item} />)}
         </nav>
@@ -230,15 +231,19 @@ export default function AdminLayout() {
               <div className="flex justify-center pt-3 pb-2">
                 <div className="w-10 h-1 rounded-full bg-gray-300" />
               </div>
-              <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+              <button
+                onClick={() => { setProfileOpen(false); navigate('/profile') }}
+                className="w-full flex items-center gap-3 px-5 py-4 border-b border-gray-100 text-left active:bg-gray-50 transition-colors">
                 <div className="w-11 h-11 rounded-full bg-brand-500 flex items-center justify-center text-white text-base font-bold shrink-0">
                   {user?.name?.charAt(0).toUpperCase()}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-gray-900 truncate">{user?.name}</p>
                   <p className="text-xs text-gray-400">{t('role.admin')}</p>
                 </div>
-              </div>
+                <span className="text-xs font-semibold text-brand-600 shrink-0">{t('nav.profile')}</span>
+                <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+              </button>
               <div className="px-5 py-4 flex flex-col gap-3">
                 <ViewSwitch target="employee" variant="sheet" onNavigate={() => setProfileOpen(false)} />
                 <div className="flex items-center justify-between py-2">
