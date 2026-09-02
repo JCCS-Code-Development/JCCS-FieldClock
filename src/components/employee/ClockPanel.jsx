@@ -484,7 +484,10 @@ export default function ClockPanel({ showHeader = true }) {
                 scrollWheelZoom={false} doubleClickZoom={false}
                 style={{ height: '100%', width: '100%' }}
               >
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                {/* OpenStreetMap tiles — free, no API key. CARTO's basemaps
+                    now require a registered key and were serving an
+                    "API KEY REQUIRED" placeholder image instead of tiles. */}
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} />
                 <Marker position={mapPos} icon={dotMarker} />
               </MapContainer>
             ) : (
