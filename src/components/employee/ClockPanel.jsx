@@ -484,10 +484,14 @@ export default function ClockPanel({ showHeader = true }) {
                 scrollWheelZoom={false} doubleClickZoom={false}
                 style={{ height: '100%', width: '100%' }}
               >
-                {/* OpenStreetMap tiles — free, no API key. CARTO's basemaps
-                    now require a registered key and were serving an
-                    "API KEY REQUIRED" placeholder image instead of tiles. */}
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} />
+                {/* Esri's light-grey canvas — the muted look CARTO's light_all
+                    gave us, but still free without an API key (CARTO's now
+                    serves an "API KEY REQUIRED" placeholder instead of tiles).
+                    Note the {z}/{y}/{x} order and single host. */}
+                <TileLayer
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+                  maxZoom={16}
+                />
                 <Marker position={mapPos} icon={dotMarker} />
               </MapContainer>
             ) : (
