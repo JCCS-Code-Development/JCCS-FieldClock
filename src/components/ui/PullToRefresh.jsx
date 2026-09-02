@@ -50,7 +50,12 @@ export default function PullToRefresh({ children, className = '', style, onRefre
   return (
     <div
       ref={ref}
-      className={`overflow-y-auto ${className}`}
+      // overflow-x-hidden: setting overflow-y to auto otherwise promotes
+      // overflow-x to auto too, so anything a hair wider than the viewport
+      // (e.g. the pulsing halo behind the clock button) lets the whole page
+      // slide sideways. Nested scrollers (admin tables, the pay sub-tabs)
+      // keep their own overflow-x-auto.
+      className={`overflow-y-auto overflow-x-hidden ${className}`}
       style={{ ...style, overscrollBehavior: 'contain' }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
