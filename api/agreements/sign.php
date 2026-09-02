@@ -1,4 +1,12 @@
 <?php
+// Surface a real message instead of a bare 500 when something goes wrong —
+// the client only has a generic "Could not save" fallback otherwise.
+set_exception_handler(function ($e) {
+    http_response_code(500);
+    echo json_encode(['error' => $e->getMessage()]);
+    exit;
+});
+
 require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
@@ -38,7 +46,13 @@ if ($existing && $existing['signed_at']) {
 }
 
 $formData = isset($body['form_data']) ? json_encode($body['form_data']) : null;
-$ip       = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? null;
+
+// Behind a proxy/CDN, X-Forwarded-For is often a comma-separated list
+// ("client, proxy1, proxy2") that blows past the 45-char ip_address column
+// and fails the whole insert. Keep just the originating client IP.
+$rawIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+$ip    = trim(explode(',', $rawIp)[0]);
+$ip    = $ip !== '' ? substr($ip, 0, 45) : null;
 
 // UPSERT: insert or update (only if not yet signed)
 $stmt = $pdo->prepare(
