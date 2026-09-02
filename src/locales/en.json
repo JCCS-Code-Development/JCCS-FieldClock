@@ -344,7 +344,7 @@
     "signed": "Signed",
     "pending": "Pending",
     "signedOn": "Signed {{date}}",
-    "printPdf": "Print / PDF",
+    "printPdf": "Download PDF",
     "close": "Close",
     "signatureOnFile": "Signature on File",
     "drawSignature": "Draw Your Signature",

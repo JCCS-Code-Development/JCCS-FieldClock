@@ -22,6 +22,12 @@ header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Content-Type: application/json; charset=utf-8');
 
+// Every endpoint returns per-user, per-request data — none of it is
+// cacheable. iOS Safari / the installed PWA will otherwise serve a stale
+// GET after a write (e.g. a just-signed document still shows as pending).
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;

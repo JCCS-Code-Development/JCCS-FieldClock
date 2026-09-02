@@ -428,10 +428,17 @@ export default function MyDocuments() {
     d.required_for.includes('all') || (d.required_for.includes('w2') && user?.pay_type === 'w2')
   )
 
+  // Always ask for our own record by user_id. Without it, an admin viewing
+  // their own /my-docs hits the HR-overview branch of index.php (which
+  // returns { employees: [...] }, not { agreements: [...] }), so nothing
+  // ever shows as signed and the progress bar stays at zero.
   const load = useCallback(() => {
+    if (!user?.id) return
     setLoading(true)
-    listAgreements().then((d) => setAgreements(d.agreements ?? [])).finally(() => setLoading(false))
-  }, [])
+    listAgreements({ user_id: user.id })
+      .then((d) => setAgreements(d.agreements ?? []))
+      .finally(() => setLoading(false))
+  }, [user?.id])
 
   useEffect(() => { load() }, [load])
 
