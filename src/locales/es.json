@@ -344,7 +344,7 @@
     "signed": "Firmado",
     "pending": "Pendiente",
     "signedOn": "Firmado el {{date}}",
-    "printPdf": "Imprimir / PDF",
+    "printPdf": "Descargar PDF",
     "close": "Cerrar",
     "signatureOnFile": "Firma Registrada",
     "drawSignature": "Dibuja Tu Firma",
