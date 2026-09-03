@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $from = $cur['status'];
             $ok = [
                 'draft'   => ['printed', 'voided'],
-                'printed' => ['cleared', 'voided'],
+                'printed' => ['draft', 'cleared', 'voided'],
                 'cleared' => ['voided'],
                 'voided'  => [],
             ];
@@ -66,7 +66,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 exit(json_encode(['error' => "Can't move a $from check to $to."]));
             }
 
-            if ($to === 'printed') {
+            if ($to === 'draft') {
+                // "Undo mark printed" — the check wasn't actually issued. Drop the
+                // number so it can be reused; pull any paycheck back to processing.
+                $pdo->prepare('UPDATE check_registry SET status = "draft", check_number = NULL, status_updated_by = ?, status_updated_at = NOW() WHERE id = ?')
+                    ->execute([$auth['user_id'], $id]);
+                $pdo->prepare('UPDATE paychecks SET status = "processing" WHERE check_registry_id = ? AND status = "available"')->execute([$id]);
+            } elseif ($to === 'printed') {
                 $num = sanitizeString($body['check_number'] ?? $cur['check_number'] ?? '');
                 if ($num === '') { $pdo->rollBack(); http_response_code(422); exit(json_encode(['error' => 'A check number is required to mark it printed.'])); }
                 $dup = $pdo->prepare('SELECT id FROM check_registry WHERE check_number = ? AND id <> ?');
