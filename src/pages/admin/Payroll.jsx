@@ -439,7 +439,7 @@ export default function AdminPayroll() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-bold text-gray-900">{formatCurrency(tab === 'w2' ? (emp.base_gross ?? 0) : (emp.estimated_total ?? 0))}</p>
+                        <p className="font-bold text-gray-900">{formatCurrency(tab === 'w2' ? (emp.base_gross ?? 0) : Math.max((emp.estimated_total ?? 0) - loan, 0))}</p>
                         {tab === 'w2' && (gas + bonus) > 0
                           ? <p className="text-xs text-amber-600 mt-0.5">+{formatCurrency(gas + bonus)} → 1099</p>
                           : tab !== 'w2' && <p className="text-xs text-gray-400 mt-0.5">{formatCurrency(emp.base_gross ?? 0)} base</p>
@@ -477,7 +477,7 @@ export default function AdminPayroll() {
                     <span className="text-sm font-semibold text-gray-700">Totals</span>
                     <div className="text-right">
                       <p className="font-bold text-brand-500">
-                        {formatCurrency(filtered.reduce((s, e) => s + ((tab === 'w2' ? e.base_gross : e.estimated_total) ?? 0), 0))}
+                        {formatCurrency(filtered.reduce((s, e) => s + (e.pay_type === 'w2' ? (e.base_gross ?? 0) : Math.max((e.estimated_total ?? 0) - (loanDeductions[e.user_id] ?? 0), 0)), 0))}
                       </p>
                       {tab !== 'w2' && (
                         <p className="text-xs text-gray-400">{formatCurrency(filtered.reduce((s, e) => s + (e.base_gross ?? 0), 0))} base</p>
@@ -528,7 +528,7 @@ export default function AdminPayroll() {
                           <td className="px-4 py-3 text-right text-green-600 font-medium">
                             {bonus > 0 ? formatCurrency(bonus) : <span className="text-gray-300">—</span>}
                           </td>
-                          <td className="px-5 py-3 text-right font-bold text-gray-900">{formatCurrency(tab === 'w2' ? (emp.base_gross ?? 0) : (emp.estimated_total ?? 0))}</td>
+                          <td className="px-5 py-3 text-right font-bold text-gray-900">{formatCurrency(tab === 'w2' ? (emp.base_gross ?? 0) : Math.max((emp.estimated_total ?? 0) - loan, 0))}</td>
                         </tr>
                       )
                     })}
@@ -570,7 +570,7 @@ export default function AdminPayroll() {
                         <td className="px-4 py-3 text-right text-amber-600">{formatCurrency(filtered.reduce((s, e) => s + (gasByUser[e.user_id] ?? 0), 0))}</td>
                         <td className="px-4 py-3 text-right text-red-500">−{formatCurrency(filtered.reduce((s, e) => s + (loanDeductions[e.user_id] ?? 0), 0))}</td>
                         <td className="px-4 py-3 text-right text-green-600">{formatCurrency(filtered.reduce((s, e) => s + (bonusByUser[e.user_id] ?? 0), 0))}</td>
-                        <td className="px-5 py-3 text-right text-brand-500">{formatCurrency(filtered.reduce((s, e) => s + ((tab === 'w2' ? e.base_gross : e.estimated_total) ?? 0), 0))}</td>
+                        <td className="px-5 py-3 text-right text-brand-500">{formatCurrency(filtered.reduce((s, e) => s + (e.pay_type === 'w2' ? (e.base_gross ?? 0) : Math.max((e.estimated_total ?? 0) - (loanDeductions[e.user_id] ?? 0), 0)), 0))}</td>
                       </tr>
                     )}
                   </tbody>
