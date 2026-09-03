@@ -948,7 +948,8 @@ function ContractorDirectory() {
 
   return (
     <>
-      <div className="flex justify-end mb-4">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contractor Directory</p>
         <Button onClick={openCreate}>+ Add Contractor</Button>
       </div>
 
@@ -1070,7 +1071,8 @@ function VendorDirectory() {
 
   return (
     <>
-      <div className="flex justify-end mb-4">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Vendor Directory</p>
         <Button onClick={openCreate}>+ Add Vendor</Button>
       </div>
 
@@ -1151,7 +1153,7 @@ export default function VendorsContractors() {
   const [view, setView] = useState('directory')     // directory | invoices
 
   return (
-    <div className="w-full max-w-5xl">
+    <div className="w-full">
       <PageHeader
         title="Vendors & Contractors"
         subtitle="Directories and invoices for the people and companies we pay. Cut checks from the Checks hub."
@@ -1181,10 +1183,6 @@ export default function VendorsContractors() {
           ))}
         </div>
       </div>
-
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-        {party === 'contractors' ? 'Contractors' : 'Vendors'} · {view === 'directory' ? 'Directory' : 'Invoices'}
-      </p>
 
       {party === 'contractors' && view === 'directory' && <ContractorDirectory />}
       {party === 'contractors' && view === 'invoices'  && <ContractorsPanel />}
