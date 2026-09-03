@@ -15,10 +15,9 @@ import { groupJobsByCompany } from '../../utils/jobs'
 import { formatCurrency, formatDate } from '../../utils/format'
 
 const INV_STATUS = {
-  submitted:    { label: 'Submitted',    color: 'bg-amber-100 text-amber-700' },
-  under_review: { label: 'Under Review', color: 'bg-blue-100 text-blue-700' },
-  check_ready:  { label: 'Check Ready',  color: 'bg-green-100 text-green-700' },
-  paid:         { label: 'Paid',         color: 'bg-gray-100 text-gray-600' },
+  draft:   { label: 'Draft',   color: 'bg-amber-100 text-amber-700' },
+  printed: { label: 'Printed', color: 'bg-blue-100 text-blue-700' },
+  voided:  { label: 'Voided',  color: 'bg-red-100 text-red-700' },
 }
 
 const EMPTY = { name: '', client_name: '', company: '', address: '', latitude: '', longitude: '', clock_in_radius_meters: 300, status: 'active', notes: '', is_recurring_maintenance: false }
@@ -465,7 +464,7 @@ export default function AdminJobs() {
                 <>
                   {(() => {
                     const totalInvoiced = contractorInvs.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0)
-                    const totalPaid     = contractorInvs.filter((i) => i.status === 'paid').reduce((s, i) => s + (parseFloat(i.amount) || 0), 0)
+                    const totalPaid     = contractorInvs.filter((i) => i.status === 'printed').reduce((s, i) => s + (parseFloat(i.amount) || 0), 0)
                     return (
                       <div className="grid grid-cols-3 gap-2 mb-3">
                         <div className="bg-gray-50 rounded-xl px-3 py-2 text-center">
@@ -485,7 +484,7 @@ export default function AdminJobs() {
                   })()}
                   <div className="flex flex-col gap-2 max-h-56 overflow-y-auto">
                     {contractorInvs.map((inv) => {
-                      const meta = INV_STATUS[inv.status] ?? INV_STATUS.submitted
+                      const meta = INV_STATUS[inv.status] ?? INV_STATUS.draft
                       return (
                         <div key={inv.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2">
                           <div className="flex-1 min-w-0">

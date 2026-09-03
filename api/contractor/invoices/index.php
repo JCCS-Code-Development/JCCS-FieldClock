@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'INSERT INTO contractor_invoices
            (user_id, estimate_id, estimate_number, job_location, invoice_number, period_start, period_end,
             file_path, file_original_name, file_type, amount, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'submitted\')'
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'draft\')'
     )->execute([
         $userId, $estimateId, $estimateNumber, $jobLocation, $invoiceNumber, $periodStart, $periodEnd,
         $filePath, $origName, $fileType, $amount,

@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     $sets = []; $params = [];
 
     if (array_key_exists('status', $body)) {
-        $allowed = ['submitted', 'under_review', 'check_ready', 'paid'];
+        $allowed = ['draft', 'printed', 'voided'];
         $status  = sanitizeString($body['status']);
         if (!in_array($status, $allowed)) {
             http_response_code(422);

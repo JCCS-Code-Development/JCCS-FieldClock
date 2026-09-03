@@ -4,7 +4,7 @@ import { formatCurrency } from '../../utils/format'
 import { format } from 'date-fns'
 import { amountToWords, CHECK_CON, SEC, CutLine, ES, esH, esC, SectionOverlays, printStylesheet } from './checkPrintKit'
 
-const PAYEE_TYPE_LABELS = { vendor: 'Vendor/Provider', employee: '1099 Employee', contractor: 'Contractor' }
+const PAYEE_TYPE_LABELS = { vendor: 'Vendor/Provider', employee: 'Employee', contractor: 'Contractor', other: 'Payee' }
 
 // ── Adjustment/compensation pay stub — same table/typography as every
 // other check type in the app. This is a one-off check independent of any

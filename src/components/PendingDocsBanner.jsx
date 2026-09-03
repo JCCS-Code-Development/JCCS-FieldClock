@@ -26,8 +26,11 @@ export default function PendingDocsBanner() {
   const { t }     = useTranslation()
 
   const checkPending = () => {
-    if (!user) return
-    listAgreements().then((d) => {
+    if (!user?.id) return
+    // Must scope to our own record by user_id — without it an admin hits the
+    // HR-overview branch, which returns { employees } instead of { agreements },
+    // so nothing reads as signed and the count is stuck at the full total.
+    listAgreements({ user_id: user.id }).then((d) => {
       const signed = new Set((d.agreements ?? []).filter((a) => a.signed_at).map((a) => a.agreement_type))
       const required = [
         ...REQUIRED_ALL,

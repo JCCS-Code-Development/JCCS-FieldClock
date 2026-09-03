@@ -8,7 +8,6 @@ import Spinner from '../../components/ui/Spinner'
 import { listEmployees, createEmployee, updateEmployee, deactivateEmployee, reactivateEmployee, resetEmployeePassword } from '../../api/employees'
 import { listSalaryHistory, createSalaryHistory, deleteSalaryHistory } from '../../api/salaryHistory'
 import { getPersonalDetails, revealPersonalDetailField, savePersonalDetails } from '../../api/personalDetails'
-import { listDocuments, getDocumentUrl } from '../../api/documents'
 import { listJobs } from '../../api/jobs'
 import { groupJobsByCompany } from '../../utils/jobs'
 import { formatCurrency } from '../../utils/format'
@@ -41,31 +40,9 @@ function annotateSalaryHistory(history) {
 
 const EMPTY = {
   name: '', email: '', phone: '', address: '', role: 'employee',
-  pay_type: 'w2', pay_structure: 'hourly', pay_rate: '', default_job_id: '', default_job_fixed: false,
+  pay_type: 'w2', pay_structure: 'hourly', pay_rate: '', gas_weekly_allowance: '',
+  default_job_id: '', default_job_fixed: false,
 }
-
-const DOC_LABELS = {
-  w9:           { label: 'W-9',                   color: 'bg-purple-100 text-purple-700' },
-  workers_comp: { label: "Worker's Comp",          color: 'bg-blue-100 text-blue-700' },
-}
-
-const ExternalIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-3.5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-  </svg>
-)
-
-const CheckCircle = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-4 text-green-500 flex-shrink-0">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-)
-
-const XCircle = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-4 text-amber-400 flex-shrink-0">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-  </svg>
-)
 
 // A sensitive field (Tax ID, bank account #) the server sends back masked
 // (last 4 only) — "Show" fetches the real value on demand rather than it
@@ -103,11 +80,6 @@ export default function AdminEmployees() {
   const me = useAuthStore((s) => s.user)
   const [employees, setEmployees]     = useState([])
   const [inactive, setInactive]       = useState([])
-  // Two subtabs: 'employees' (admins + employees) vs 'contractors' — kept
-  // as a completely separate view since contractors behave differently
-  // throughout (no login, no pay rate/timesheet, invoice-based Documents
-  // action instead of Reset Password, etc).
-  const [userTab, setUserTab]         = useState('employees')
   const [jobs, setJobs]               = useState([])
   const [loading, setLoading]         = useState(true)
   const [modal, setModal]             = useState(null)
@@ -120,11 +92,6 @@ export default function AdminEmployees() {
   const [pwInput,    setPwInput]    = useState('')
   const [pwSaving,   setPwSaving]   = useState(false)
   const [pwError,    setPwError]    = useState('')
-
-  // Contractor documents modal
-  const [docsModal,    setDocsModal]    = useState(null)  // employee row | null
-  const [docs,         setDocs]         = useState([])
-  const [loadingDocs,  setLoadingDocs]  = useState(false)
 
   // Salary history (inside the Edit Employee modal)
   const [salaryHistory,  setSalaryHistory]  = useState([])
@@ -247,10 +214,7 @@ export default function AdminEmployees() {
   useEffect(() => { load() }, [])
 
   const openCreate = () => {
-    // Default the new user's role to match whichever subtab they're adding
-    // from, so "+ Add" on the Contractors tab doesn't start you off on the
-    // Employees defaults (w2/hourly) that don't apply to a contractor.
-    setForm(userTab === 'contractors' ? { ...EMPTY, role: 'contractor' } : EMPTY)
+    setForm(EMPTY)
     setError('')
     setModal('create')
   }
@@ -264,19 +228,12 @@ export default function AdminEmployees() {
       pay_type:      emp.pay_type      ?? 'w2',
       pay_structure: emp.pay_structure ?? 'hourly',
       pay_rate:      emp.pay_rate      ?? '',
+      gas_weekly_allowance: emp.gas_weekly_allowance ?? '',
       default_job_id: emp.default_job_id ?? '',
       default_job_fixed: !!Number(emp.default_job_fixed),
     })
     setError('')
     setModal(emp)
-  }
-
-  const openDocs = async (emp) => {
-    setDocsModal(emp); setDocs([]); setLoadingDocs(true)
-    try {
-      const data = await listDocuments({ user_id: emp.id })
-      setDocs(data.documents ?? [])
-    } finally { setLoadingDocs(false) }
   }
 
   const handleSave = async () => {
@@ -301,6 +258,7 @@ export default function AdminEmployees() {
         pay_type:      form.pay_type,
         pay_structure: form.pay_structure,
         pay_rate:      parseFloat(form.pay_rate) || 0,
+        gas_weekly_allowance: form.gas_weekly_allowance === '' ? 0 : (parseFloat(form.gas_weekly_allowance) || 0),
       }),
       // Contractors invoice per job and never clock in, so they're never
       // assigned a default job site.
@@ -366,10 +324,6 @@ export default function AdminEmployees() {
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
-  // Per doc_type: most recent upload
-  const mostRecent = (type) => docs.filter((d) => d.doc_type === type)[0] ?? null
-  const docHistory = (type) => docs.filter((d) => d.doc_type === type)
-
   // Explicit shared widths (rather than per-table auto-sizing) so the Admins/
   // Employees/Contractors tables — each a separate <table> — line up with each
   // other regardless of what content each section happens to contain.
@@ -404,12 +358,7 @@ export default function AdminEmployees() {
       render: (_, row) => (
         <div className="flex flex-wrap gap-2 justify-end">
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(row) }}>Edit</Button>
-          {row.role !== 'contractor' && (
-            <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openPwModal(row) }}>Reset Password</Button>
-          )}
-          {row.role === 'contractor' && (
-            <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openDocs(row) }}>Documents</Button>
-          )}
+          <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openPwModal(row) }}>Reset Password</Button>
           {row.is_active && (
             <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDeactivate(row) }}>Deactivate</Button>
           )}
@@ -444,49 +393,26 @@ export default function AdminEmployees() {
     },
   ]
 
-  const ROLE_ORDER = ['admin', 'employee', 'contractor']
-  const ROLE_LABELS = { admin: 'Admins', employee: 'Employees', contractor: 'Contractors' }
-  // Contractors get their own subtab entirely — admins fold in with regular
-  // employees on the "Employees" side since they aren't contractors either.
-  const rolesForTab = userTab === 'contractors' ? ['contractor'] : ['admin', 'employee']
-  const grouped = rolesForTab.map(role => ({
+  const ROLE_LABELS = { admin: 'Admins', employee: 'Employees' }
+  const grouped = ['admin', 'employee'].map(role => ({
     role,
     label: ROLE_LABELS[role],
     rows: employees.filter(e => e.role === role),
   })).filter(g => g.rows.length > 0)
-  const inactiveForTab = inactive.filter(e =>
-    userTab === 'contractors' ? e.role === 'contractor' : e.role !== 'contractor'
-  )
+  const inactiveEmployees = inactive.filter(e => e.role !== 'contractor')
 
-  const USER_TABS = [
-    { key: 'employees',   label: 'Employees' },
-    { key: 'contractors', label: 'Contractors' },
-  ]
-
-  const accountCount = grouped.reduce((n, g) => n + g.rows.length, 0) + inactiveForTab.length
+  const accountCount = grouped.reduce((n, g) => n + g.rows.length, 0) + inactiveEmployees.length
 
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">Users</h1>
+          <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">Employees</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {accountCount} {accountCount === 1 ? 'account' : 'accounts'}
           </p>
         </div>
-        <Button onClick={openCreate}>{userTab === 'contractors' ? '+ Add Contractor' : '+ Add Employee'}</Button>
-      </div>
-
-      {/* Employees / Contractors subtab switcher */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-full sm:w-auto sm:inline-flex">
-        {USER_TABS.map(({ key, label }) => (
-          <button key={key} onClick={() => setUserTab(key)}
-            className={`flex-1 sm:flex-none px-5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
-              userTab === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}>
-            {label}
-          </button>
-        ))}
+        <Button onClick={openCreate}>+ Add Employee</Button>
       </div>
 
       {loading
@@ -494,9 +420,7 @@ export default function AdminEmployees() {
         : (
           <div className="flex flex-col gap-8">
             {grouped.length === 0 && (
-              <p className="text-center text-gray-400 py-16 text-sm">
-                {userTab === 'contractors' ? 'No contractors yet.' : 'No employees yet.'}
-              </p>
+              <p className="text-center text-gray-400 py-16 text-sm">No employees yet.</p>
             )}
             {grouped.map(({ role, label, rows }) => (
               <div key={role}>
@@ -504,12 +428,12 @@ export default function AdminEmployees() {
                 <DataTable columns={columns} data={rows} fixed card />
               </div>
             ))}
-            {inactiveForTab.length > 0 && (
+            {inactiveEmployees.length > 0 && (
               <div>
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">
-                  {userTab === 'contractors' ? 'Deactivated Contractors' : 'Deactivated Employees'}
+                  Deactivated Employees
                 </h3>
-                <DataTable columns={inactiveColumns} data={inactiveForTab} fixed card />
+                <DataTable columns={inactiveColumns} data={inactiveEmployees} fixed card />
               </div>
             )}
           </div>
@@ -541,23 +465,11 @@ export default function AdminEmployees() {
             >
               <option value="employee">Employee</option>
               <option value="admin">Admin</option>
-              <option value="contractor">Contractor</option>
             </select>
+            <p className="text-xs text-gray-400 mt-1">Contractors are managed under Vendors &amp; Contractors.</p>
           </div>
 
-          {form.role === 'contractor' ? (
-            <>
-              <p className="text-xs text-gray-500 bg-blue-50 rounded-xl px-4 py-3">
-                Contractors don't log in to the app — invoices, estimates, and checks are all managed here by an admin (Payroll → Contractors). Pay rates are handled per invoice, not as a fixed rate.
-              </p>
-              <Input
-                label="Mailing Address"
-                value={form.address} onChange={set('address')}
-                placeholder="Street, City, State ZIP"
-                helperText="Shown on printed checks"
-              />
-            </>
-          ) : (
+          {(
             <>
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1">Pay Type</label>
@@ -600,6 +512,14 @@ export default function AdminEmployees() {
                 value={form.pay_rate} onChange={set('pay_rate')}
                 placeholder="0.00"
                 helperText={form.pay_structure === 'salary' ? 'Paid each week regardless of hours clocked' : undefined}
+              />
+
+              <Input
+                label="Standing Weekly Gas Allowance"
+                type="number" inputMode="decimal"
+                value={form.gas_weekly_allowance} onChange={set('gas_weekly_allowance')}
+                placeholder="0.00"
+                helperText="Pre-checks this employee (at this amount) in Payroll → Review Gas Allowances. Leave blank for none."
               />
             </>
           )}
@@ -828,88 +748,6 @@ export default function AdminEmployees() {
           {pwError && <p className="text-sm text-red-600 font-medium">{pwError}</p>}
           <Button variant="secondary" fullWidth onClick={() => setPwModal(null)}>Cancel</Button>
         </div>
-      </Modal>
-
-      {/* Contractor documents modal */}
-      <Modal
-        isOpen={!!docsModal}
-        onClose={() => setDocsModal(null)}
-        title={`Legal Documents — ${docsModal?.name ?? ''}`}
-        size="lg"
-      >
-        {loadingDocs ? (
-          <div className="flex justify-center py-10"><Spinner /></div>
-        ) : (
-          <div className="flex flex-col gap-5">
-            <p className="text-sm text-gray-500">
-              Required contractor documents on file. These cannot be deleted once uploaded.
-            </p>
-
-            {['w9', 'workers_comp'].map((type) => {
-              const latest  = mostRecent(type)
-              const history = docHistory(type)
-              const meta    = DOC_LABELS[type]
-
-              return (
-                <div key={type} className="bg-gray-50 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {latest ? <CheckCircle /> : <XCircle />}
-                      <span className="font-semibold text-sm text-gray-900">{meta.label}</span>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${meta.color}`}>
-                        {latest ? 'On file' : 'Missing'}
-                      </span>
-                    </div>
-                    {latest && (
-                      <span className="text-xs text-gray-400">
-                        Last uploaded {format(parseISO(latest.uploaded_at), 'MMM d, yyyy')}
-                      </span>
-                    )}
-                  </div>
-
-                  {!latest && (
-                    <p className="text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">
-                      Contractor has not uploaded this document yet.
-                    </p>
-                  )}
-
-                  {history.length > 0 && (
-                    <div className="space-y-1.5">
-                      {history.map((doc, i) => (
-                        <div key={doc.id} className="flex items-center justify-between bg-white rounded-xl px-3 py-2.5 border border-gray-200">
-                          <div className="flex items-center gap-2 min-w-0">
-                            {i === 0 && (
-                              <span className="text-[10px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded uppercase tracking-wide flex-shrink-0">
-                                Current
-                              </span>
-                            )}
-                            <span className="text-sm text-gray-700 truncate">{doc.file_original_name}</span>
-                          </div>
-                          <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                            <span className="text-xs text-gray-400 hidden sm:block">
-                              {format(parseISO(doc.uploaded_at), 'MMM d, yyyy')}
-                            </span>
-                            <a
-                              href={getDocumentUrl(doc.id)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-brand-500 hover:text-brand-700 text-xs font-medium transition-colors"
-                            >
-                              <ExternalIcon />
-                              View
-                            </a>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-
-            <Button variant="secondary" fullWidth onClick={() => setDocsModal(null)}>Close</Button>
-          </div>
-        )}
       </Modal>
     </div>
   )
