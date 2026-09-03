@@ -702,6 +702,7 @@ export default function AdminChecks() {
                 {c.status === 'draft' && (
                   <>
                     <Button size="sm" variant="secondary" onClick={() => setModal({ kind: 'edit', check: c })}>Edit</Button>
+                    <Button size="sm" variant="secondary" onClick={() => doPrint(c)}>Print</Button>
                     <Button size="sm" onClick={() => setModal({ kind: 'printed', check: c })}>Mark printed</Button>
                     <Button size="sm" variant="danger" onClick={() => doDelete(c)}>Delete</Button>
                   </>
