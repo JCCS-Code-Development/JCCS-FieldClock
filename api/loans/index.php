@@ -23,21 +23,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     // regardless of this flag.
     $mine = $auth['role'] !== 'admin' || !empty($_GET['mine']);
 
-    // Optional: period_start + period_end → return deduction totals for that period
+    // Optional: period_start + period_end → return loan deduction per user for
+    // that pay period. A recorded loan_payment overlapping the period is
+    // authoritative; otherwise, for an active loan whose schedule has started
+    // and still has a balance, fall back to the scheduled weekly_deduction
+    // (capped at the remaining balance) so payroll withholds it automatically.
     if (!empty($_GET['period_start']) && !empty($_GET['period_end'])) {
         $ps = sanitizeString($_GET['period_start']);
         $pe = sanitizeString($_GET['period_end']);
 
+        $deductionExpr =
+            "CASE
+                WHEN COALESCE(rec.paid, 0) > 0 THEN rec.paid
+                WHEN l.status = 'active'
+                     AND l.weekly_deduction > 0
+                     AND l.deduction_start_date IS NOT NULL
+                     AND l.deduction_start_date <= ?
+                     AND (l.amount - COALESCE(pd.paid_ever, 0)) > 0
+                  THEN LEAST(l.weekly_deduction, l.amount - COALESCE(pd.paid_ever, 0))
+                ELSE 0
+             END";
+
+        $from =
+            "FROM employee_loans l
+             LEFT JOIN (
+                 SELECT loan_id, SUM(amount) AS paid FROM loan_payments
+                 WHERE period_start <= ? AND period_end >= ?
+                 GROUP BY loan_id
+             ) rec ON rec.loan_id = l.id
+             LEFT JOIN (
+                 SELECT loan_id, SUM(amount) AS paid_ever FROM loan_payments GROUP BY loan_id
+             ) pd ON pd.loan_id = l.id";
+
         if (!$mine) {
             // Admin: all users grouped by user_id
             $stmt = $pdo->prepare(
-                'SELECT l.user_id, COALESCE(SUM(lp.amount), 0) AS period_deduction
-                 FROM loan_payments lp
-                 JOIN employee_loans l ON l.id = lp.loan_id
-                 WHERE lp.period_start <= ? AND lp.period_end >= ?
-                 GROUP BY l.user_id'
+                "SELECT l.user_id, COALESCE(SUM($deductionExpr), 0) AS period_deduction
+                 $from
+                 GROUP BY l.user_id
+                 HAVING period_deduction > 0"
             );
-            $stmt->execute([$pe, $ps]);
+            // placeholder order: deduction_start_date<=?, rec.period_start<=?, rec.period_end>=?
+            $stmt->execute([$ps, $pe, $ps]);
             $byUser = [];
             foreach ($stmt->fetchAll() as $r) {
                 $byUser[(int)$r['user_id']] = (float)$r['period_deduction'];
@@ -46,12 +73,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         } else {
             // Employee (or admin viewing their own My Pay page): own deduction only
             $stmt = $pdo->prepare(
-                'SELECT COALESCE(SUM(lp.amount), 0) AS period_deduction
-                 FROM loan_payments lp
-                 JOIN employee_loans l ON l.id = lp.loan_id
-                 WHERE lp.period_start <= ? AND lp.period_end >= ? AND l.user_id = ?'
+                "SELECT COALESCE(SUM($deductionExpr), 0) AS period_deduction
+                 $from
+                 WHERE l.user_id = ?"
             );
-            $stmt->execute([$pe, $ps, $auth['user_id']]);
+            $stmt->execute([$ps, $pe, $ps, $auth['user_id']]);
             $row = $stmt->fetch();
             echo json_encode(['period_loan_deduction' => (float)($row['period_deduction'] ?? 0)]);
         }
