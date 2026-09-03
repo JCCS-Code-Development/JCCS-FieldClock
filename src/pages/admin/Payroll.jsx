@@ -1,15 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import PageHeader from '../../components/admin/PageHeader'
 import PrintChecks from '../../components/admin/PrintChecks'
-import PrintContractorCheck from '../../components/admin/PrintContractorCheck'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Spinner from '../../components/ui/Spinner'
 import Input from '../../components/ui/Input'
-import { getSummary, getBreakdown, listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment, listFlatRatePayments, createFlatRatePayment, updateFlatRatePayment, deleteFlatRatePayment } from '../../api/payroll'
-import { listEmployees, createEmployee } from '../../api/employees'
-import { listInvoices, getInvoice, uploadInvoice, updateInvoiceStatus, getDownloadUrl } from '../../api/contractor'
-import { listEstimates } from '../../api/estimates'
+import { getSummary, getBreakdown, listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment } from '../../api/payroll'
+import { listEmployees } from '../../api/employees'
 import { getPeriodLoanTotals } from '../../api/loans'
 import { listPaychecks, createPaycheck, updatePaycheck, deletePaycheck, markAllAvailable, markAllPickedUp } from '../../api/paychecks'
 import PayPieChart from '../../components/ui/PayPieChart'
@@ -39,13 +36,6 @@ const ADJ_TYPES = [
 ]
 const adjColor = (t) => ADJ_TYPES.find((a) => a.value === t)?.color ?? 'bg-gray-100 text-gray-600'
 const adjLabel = (t) => ADJ_TYPES.find((a) => a.value === t)?.label ?? t
-
-const INV_STATUS = {
-  submitted:    { label: 'Submitted',    color: 'bg-amber-100 text-amber-700' },
-  under_review: { label: 'Under Review', color: 'bg-blue-100 text-blue-700' },
-  check_ready:  { label: 'Check Ready',  color: 'bg-green-100 text-green-700' },
-  paid:         { label: 'Paid',         color: 'bg-gray-100 text-gray-600' },
-}
 
 const EditIcon = () => (
   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -85,54 +75,13 @@ export default function AdminPayroll() {
 
   const [printOpen, setPrintOpen] = useState(false)
 
-  // Contractor invoices
-  const [contractorInvs, setContractorInvs] = useState([])
-  const [loadingInvs,    setLoadingInvs]    = useState(false)
-  const [statusModal,    setStatusModal]    = useState(null)
-  const [statusValue,    setStatusValue]    = useState('')
-  const [statusNote,     setStatusNote]     = useState('')
-  const [statusEstimateNumber, setStatusEstimateNumber] = useState('')
-  const [statusJobLocation,    setStatusJobLocation]    = useState('')
-  const [statusInvNum,   setStatusInvNum]   = useState('')
-  const [statusAmount,   setStatusAmount]   = useState('')
-  const [statusSaving,   setStatusSaving]   = useState(false)
-  const [statusError,    setStatusError]    = useState('')
-
-  // Upload invoice (admin, on behalf of a contractor)
-  const [invModal,      setInvModal]      = useState(false)
-  const [invForm,       setInvForm]       = useState({ user_id: '', estimate_number: '', job_location: '', invoice_number: '', amount: '', file: null })
-  const [invSaving,     setInvSaving]     = useState(false)
-  const [invError,      setInvError]      = useState('')
-  const invFileRef = useRef(null)
-
-  // Contractor combobox (Upload Invoice modal) — type-to-filter registered
-  // contractors, or register a brand new one inline without leaving the modal
-  const [invContractorQuery, setInvContractorQuery] = useState('')
-  const [invContractorOpen,  setInvContractorOpen]  = useState(false)
-  const [quickAddContractor, setQuickAddContractor] = useState(null) // { name, address } | null
-  const [qacSaving,          setQacSaving]           = useState(false)
-  const [qacError,           setQacError]            = useState('')
-
-  // Print contractor check(s)
-  const [printInvoices, setPrintInvoices] = useState(null) // array of full invoice detail | null
-  const [printLoading,  setPrintLoading]  = useState(false)
-  const [selectedInvIds, setSelectedInvIds] = useState(new Set()) // invoice ids picked for one combined print run
-
   // Gas review
   const [gasModal,     setGasModal]     = useState(false)
   const [gasEmployees, setGasEmployees] = useState([])
   const [gasAmounts,   setGasAmounts]   = useState({})
   const [gasChecked,   setGasChecked]   = useState({})
+  const [gasPaid,      setGasPaid]      = useState(() => new Set())  // already got gas this period
   const [gasSaving,    setGasSaving]    = useState(false)
-
-  // Flat rate payments
-  const [flatRatePayments, setFlatRatePayments] = useState([])
-  const [loadingFR,        setLoadingFR]        = useState(false)
-  const [frModal,          setFrModal]          = useState(false)
-  const [frForm,           setFrForm]           = useState({ user_id: '', amount: '', description: '' })
-  const [frSaving,         setFrSaving]         = useState(false)
-  const [frError,          setFrError]          = useState('')
-  const [frPrintOpen,      setFrPrintOpen]      = useState(false)
 
   // Paychecks
   const [paychecks,      setPaychecks]      = useState([])
@@ -162,7 +111,7 @@ export default function AdminPayroll() {
   const loadSummary = () => {
     setLoading(true)
     getSummary({ start: p.start, end: p.end })
-      .then((d) => setSummary(d.summary ?? []))
+      .then((d) => setSummary((d.summary ?? []).slice().sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))))
       .finally(() => setLoading(false))
   }
 
@@ -173,20 +122,6 @@ export default function AdminPayroll() {
       .finally(() => setLoadingAdj(false))
   }
 
-  const loadFlatRatePayments = () => {
-    setLoadingFR(true)
-    listFlatRatePayments({ period_start: p.start, period_end: p.end })
-      .then((d) => setFlatRatePayments(d.flat_rate_payments ?? []))
-      .finally(() => setLoadingFR(false))
-  }
-
-  const loadContractorInvoices = () => {
-    setLoadingInvs(true)
-    listInvoices({ period_start: p.start, period_end: p.end })
-      .then((d) => setContractorInvs(d.invoices ?? []))
-      .finally(() => setLoadingInvs(false))
-  }
-
   const loadPaychecks = () => {
     setLoadingPay(true)
     listPaychecks().then((d) => setPaychecks(d.paychecks ?? [])).finally(() => setLoadingPay(false))
@@ -195,22 +130,16 @@ export default function AdminPayroll() {
   useEffect(() => {
     loadSummary()
     loadAdjustments()
-    loadContractorInvoices()
-    loadFlatRatePayments()
     getPeriodLoanTotals(p.start, p.end).then(setLoanDeductions).catch(() => setLoanDeductions({}))
-    setFrPrintOpen(false)  // close flat rate print if period changes mid-open
-    setSelectedInvIds(new Set()) // a prior period's selection shouldn't carry over
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period])
 
   useEffect(() => {
     loadPaychecks()
     // /employees/index.php has no server-side role filter, so this holds
-    // every active user (admins, employees, and contractors) — callers
-    // filter by role themselves at each picker's render site, since
-    // different pickers here need different subsets (e.g. the contractor
-    // invoice picker further down needs contractors; the paycheck/flat-rate
-    // pickers don't).
+    // every active user (admins, employees, and contractors) — the paycheck
+    // and flat-rate pickers below filter out contractors themselves at their
+    // render sites.
     listEmployees({ active: 1 }).then((d) => setEmployees(d.employees ?? [])).catch(() => {})
   }, [])
 
@@ -335,187 +264,35 @@ export default function AdminPayroll() {
     } finally { setDeletingAdj(false) }
   }
 
-  // ── Flat rate payments CRUD ──────────────────────────────────────
-  const handleCreateFlatRate = async (e) => {
-    e.preventDefault()
-    if (!frForm.user_id)    { setFrError('Select an employee.'); return }
-    if (!frForm.amount || isNaN(parseFloat(frForm.amount))) { setFrError('Enter a valid amount.'); return }
-    if (!frForm.description.trim()) { setFrError('Enter a description.'); return }
-    setFrSaving(true); setFrError('')
-    try {
-      await createFlatRatePayment({
-        user_id:      parseInt(frForm.user_id),
-        amount:       parseFloat(frForm.amount),
-        description:  frForm.description.trim(),
-        period_start: p.start,
-        period_end:   p.end,
-      })
-      setFrModal(false)
-      setFrForm({ user_id: '', amount: '', description: '' })
-      loadFlatRatePayments()
-    } catch (err) {
-      setFrError(err?.response?.data?.error ?? 'Could not save. Try again.')
-    } finally {
-      setFrSaving(false)
-    }
-  }
-
-  const handleFrMarkIssued = async (fr) => {
-    try {
-      await updateFlatRatePayment(fr.id, { status: 'issued' })
-      loadFlatRatePayments()
-    } catch (err) {
-      alert(err?.response?.data?.error ?? 'Could not mark as issued. Try again.')
-    }
-  }
-
-  const handleDeleteFlatRate = async (fr) => {
-    if (!window.confirm(`Delete flat rate payment for ${fr.user_name}?`)) return
-    try {
-      await deleteFlatRatePayment(fr.id)
-      loadFlatRatePayments()
-    } catch (err) {
-      alert(err?.response?.data?.error ?? 'Could not delete. Try again.')
-    }
-  }
-
-  // ── Contractor invoice status / estimate assignment ───────────────
-  const openStatusModal = (inv) => {
-    setStatusModal(inv)
-    setStatusValue(inv.status)
-    setStatusNote(inv.admin_note ?? '')
-    setStatusEstimateNumber(inv.resolved_estimate_number ?? inv.estimate_number ?? '')
-    setStatusJobLocation(inv.job_name ?? inv.job_location ?? '')
-    setStatusInvNum(inv.invoice_number ?? '')
-    setStatusAmount(inv.amount != null ? String(parseFloat(inv.amount)) : '')
-    setStatusError('')
-  }
-
-  // Looks up the typed estimate # against existing estimates on blur — if it
-  // matches an existing one, autofills the job/location field (still
-  // editable) so the invoice links up with that project's tracking.
-  const handleEstimateNumberBlur = async (estimateNumber, setJobLocation) => {
-    const trimmed = estimateNumber.trim()
-    if (!trimmed) return
-    try {
-      const d = await listEstimates({ estimate_number: trimmed })
-      if (d.estimate) setJobLocation(d.estimate.job_name)
-    } catch { /* no match, or lookup failed — leave job/location as typed */ }
-  }
-
-  const handleSaveStatus = async () => {
-    setStatusSaving(true); setStatusError('')
-    try {
-      await updateInvoiceStatus({
-        id: statusModal.id,
-        status: statusValue,
-        admin_note: statusNote,
-        estimate_number: statusEstimateNumber.trim() || null,
-        job_location: statusJobLocation.trim() || null,
-        invoice_number: statusInvNum.trim() || null,
-        amount: statusAmount !== '' ? parseFloat(statusAmount) : null,
-      })
-      setStatusModal(null); loadContractorInvoices()
-    } catch (err) {
-      setStatusError(err?.response?.data?.error ?? 'Could not update. Try again.')
-    }
-    setStatusSaving(false)
-  }
-
-  // ── Upload invoice (admin, on behalf of a contractor) ──────────────
-  const openInvoiceModal = () => {
-    setInvForm({ user_id: '', estimate_number: '', job_location: '', invoice_number: '', amount: '', file: null })
-    setInvContractorQuery(''); setInvContractorOpen(false)
-    setInvError('')
-    if (invFileRef.current) invFileRef.current.value = ''
-    setInvModal(true)
-  }
-
-  const contractorMatches = invContractorQuery.trim()
-    ? employees.filter((e) =>
-        e.role === 'contractor' && e.is_active &&
-        e.name.toLowerCase().includes(invContractorQuery.trim().toLowerCase())
-      )
-    : []
-
-  const handleQuickAddContractor = async () => {
-    const name = quickAddContractor.name.trim()
-    if (!name) { setQacError('Enter a name.'); return }
-    setQacSaving(true); setQacError('')
-    try {
-      const { id } = await createEmployee({
-        name,
-        role: 'contractor',
-        address: quickAddContractor.address.trim() || undefined,
-      })
-      setEmployees((prev) => [...prev, { id, name, role: 'contractor', is_active: true, pay_type: null }])
-      setInvForm((f) => ({ ...f, user_id: String(id) }))
-      setInvContractorQuery(name)
-      setQuickAddContractor(null)
-    } catch (err) {
-      setQacError(err?.response?.data?.error ?? 'Could not register. Try again.')
-    }
-    setQacSaving(false)
-  }
-
-  const handleUploadInvoice = async () => {
-    if (!invForm.user_id) { setInvError('Select a contractor.'); return }
-    if (!invForm.file)    { setInvError('Attach a picture or PDF of the invoice.'); return }
-    setInvSaving(true); setInvError('')
-    try {
-      const form = new FormData()
-      form.append('user_id', invForm.user_id)
-      form.append('period_start', p.start)
-      form.append('period_end', p.end)
-      if (invForm.estimate_number.trim()) form.append('estimate_number', invForm.estimate_number.trim())
-      if (invForm.job_location.trim())    form.append('job_location', invForm.job_location.trim())
-      if (invForm.invoice_number.trim()) form.append('invoice_number', invForm.invoice_number.trim())
-      if (invForm.amount)               form.append('amount', invForm.amount)
-      form.append('file', invForm.file)
-
-      await uploadInvoice(form)
-      setInvModal(false)
-      loadContractorInvoices()
-    } catch (err) {
-      setInvError(err?.response?.data?.error ?? 'Could not upload. Try again.')
-    }
-    setInvSaving(false)
-  }
-
-  // Invoices for the same contractor selected together print as one
-  // combined check (see PrintContractorCheck, which groups by contractor)
-  // instead of a separate physical check per project.
-  const toggleInvSelected = (id) => setSelectedInvIds((prev) => {
-    const next = new Set(prev)
-    next.has(id) ? next.delete(id) : next.add(id)
-    return next
-  })
-
-  // ── Print contractor check(s) ───────────────────────────────────────
-  const printContractorChecks = async (invs) => {
-    setPrintLoading(true)
-    try {
-      const full = await Promise.all(invs.map((inv) => getInvoice(inv.id).then((d) => d.invoice)))
-      setPrintInvoices(full)
-    } catch {
-      alert('Could not load invoice details for printing.')
-    }
-    setPrintLoading(false)
-  }
-
   // ── Gas review ───────────────────────────────────────────────────
   const openGasReview = async () => {
     const d = await listEmployees()
-    const active = (d.employees ?? []).filter((e) => e.is_active)
+    // Gas allowance is a payroll adjustment — employees only, no contractors.
+    const active = (d.employees ?? []).filter((e) => e.is_active && e.role !== 'contractor')
+    // Anyone who already has a gas allowance logged for this period.
+    const paid = new Set(adjustments.filter((a) => a.type === 'gas_allowance').map((a) => a.user_id))
     const amounts = {}; const checked = {}
-    active.forEach((e) => { amounts[e.id] = e.gas_weekly_allowance ?? 70; checked[e.id] = false })
-    setGasEmployees(active); setGasAmounts(amounts); setGasChecked(checked); setGasModal(true)
+    active.forEach((e) => {
+      const standing = parseFloat(e.gas_weekly_allowance) || 0
+      amounts[e.id] = standing > 0 ? standing : 70
+      // Pre-check the standard weekly recipients who haven't been paid yet this period.
+      checked[e.id] = standing > 0 && !paid.has(e.id)
+    })
+    // Standing-allowance employees first, then the rest — each alphabetical.
+    const sorted = [...active].sort((a, b) => {
+      const sa = (parseFloat(a.gas_weekly_allowance) || 0) > 0
+      const sb = (parseFloat(b.gas_weekly_allowance) || 0) > 0
+      if (sa !== sb) return sa ? -1 : 1
+      return (a.name ?? '').localeCompare(b.name ?? '')
+    })
+    setGasPaid(paid)
+    setGasEmployees(sorted); setGasAmounts(amounts); setGasChecked(checked); setGasModal(true)
   }
 
   const handleApplyGas = async () => {
     setGasSaving(true)
     try {
-      for (const emp of gasEmployees.filter((e) => gasChecked[e.id])) {
+      for (const emp of gasEmployees.filter((e) => gasChecked[e.id] && !gasPaid.has(e.id))) {
         await createAdjustment({
           user_id: emp.id, period_start: p.start, period_end: p.end,
           type: 'gas_allowance', amount: parseFloat(gasAmounts[emp.id]) || 70,
@@ -529,8 +306,6 @@ export default function AdminPayroll() {
   // ── Derived ──────────────────────────────────────────────────────
   const filtered  = summary.filter((e) => e.pay_type === tab)
   const adjTotal  = adjustments.reduce((s, a) => s + parseFloat(a.amount ?? 0), 0)
-  const pendingInvCount = contractorInvs.filter((i) => i.status === 'submitted').length
-  const checkReadyInvs  = contractorInvs.filter((i) => i.status === 'check_ready' && i.amount && parseFloat(i.amount) > 0)
 
   // Per-employee breakdown from adjustments list
   const gasByUser   = {}
@@ -562,14 +337,11 @@ export default function AdminPayroll() {
   const notPickedUpForPeriodCount = paychecks.filter((pc) =>
     (pc.status === 'processing' || pc.status === 'available') && pc.period_start === p.start && pc.period_end === p.end
   ).length
-  const pendingFRCount = flatRatePayments.filter((fr) => fr.status === 'pending').length
 
   const TABS = [
     { key: 'w2',          label: 'W-2 Employees' },
     { key: '1099',        label: '1099 Employees' },
-    { key: 'flat_rate',   label: 'Flat Rate', badge: pendingFRCount || null },
     { key: 'paychecks',   label: 'Paychecks', badge: pendingPcCount || null },
-    { key: 'contractors', label: 'Contractors', badge: pendingInvCount || null },
   ]
 
   return (
@@ -581,11 +353,6 @@ export default function AdminPayroll() {
                 <Button variant="secondary" onClick={openGasReview}>Review Gas Allowances</Button>
                 <Button onClick={() => setPrintOpen(true)}>Print Checks</Button>
               </div>
-            : tab === 'flat_rate'
-              ? <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => setFrPrintOpen(true)} disabled={flatRatePayments.length === 0}>Print Flat Rate Checks</Button>
-                  <Button onClick={() => { setFrForm({ user_id: '', amount: '', description: '' }); setFrError(''); setFrModal(true) }}>+ Add Payment</Button>
-                </div>
             : tab === 'paychecks'
               ? <div className="flex gap-2">
                   <Button variant="secondary" loading={pcMarkingAll} disabled={pendingPcForPeriodCount === 0} onClick={handleMarkAllAvailable}>
@@ -916,186 +683,6 @@ export default function AdminPayroll() {
         </>
       )}
 
-      {/* ── Flat Rate tab content ─────────────────────────────────── */}
-      {tab === 'flat_rate' && (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-900">Flat Rate Payments</h3>
-            <p className="text-xs text-gray-400 mt-0.5">{p.label} · Separate checks for specific contracted work</p>
-          </div>
-
-          {loadingFR ? (
-            <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-          ) : flatRatePayments.length === 0 ? (
-            <div className="py-16 text-center">
-              <p className="text-sm text-gray-400 mb-3">No flat rate payments for this period.</p>
-              <Button size="sm" variant="secondary" onClick={() => { setFrForm({ user_id: '', amount: '', description: '' }); setFrError(''); setFrModal(true) }}>
-                Add one
-              </Button>
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                  <th className="text-left px-5 py-3">Employee</th>
-                  <th className="text-left px-4 py-3">Description</th>
-                  <th className="text-right px-4 py-3">Amount</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="px-5 py-3 w-40" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {flatRatePayments.map((fr) => (
-                  <tr key={fr.id} className="hover:bg-gray-50">
-                    <td className="px-5 py-3 font-medium text-gray-900">{fr.user_name}</td>
-                    <td className="px-4 py-3 text-gray-600 text-xs max-w-[200px] truncate">{fr.description}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatCurrency(fr.amount)}</td>
-                    <td className="px-4 py-3">
-                      {fr.status === 'issued'
-                        ? <span className="inline-flex px-2 py-0.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-500">Issued</span>
-                        : <span className="inline-flex px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-100 text-amber-700">Pending</span>
-                      }
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-3 justify-end">
-                        {fr.status === 'pending' && (
-                          <button onClick={() => handleFrMarkIssued(fr)}
-                            className="text-xs font-semibold text-brand-500 hover:text-brand-700 transition-colors">
-                            Mark Issued
-                          </button>
-                        )}
-                        <button onClick={() => handleDeleteFlatRate(fr)}
-                          className="text-xs text-red-400 hover:text-red-600 transition-colors">
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              {flatRatePayments.length > 0 && (
-                <tfoot>
-                  <tr className="bg-gray-50 border-t border-gray-100">
-                    <td colSpan={2} className="px-5 py-3 text-sm font-semibold text-gray-600">Total</td>
-                    <td className="px-4 py-3 text-right font-bold text-gray-900">
-                      {formatCurrency(flatRatePayments.reduce((s, fr) => s + parseFloat(fr.amount ?? 0), 0))}
-                    </td>
-                    <td colSpan={2} />
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          )}
-        </div>
-      )}
-
-      {/* ── Contractors tab content ────────────────────────────────── */}
-      {tab === 'contractors' && (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 gap-3 flex-wrap">
-            <div>
-              <h3 className="font-semibold text-gray-900">Contractor Invoices</h3>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {p.label} · check the box on multiple invoices for the same contractor to combine them into one check
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {pendingInvCount > 0 && (
-                <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2.5 py-1 rounded-full">
-                  {pendingInvCount} pending review
-                </span>
-              )}
-              {selectedInvIds.size > 0 && (
-                <Button size="sm" loading={printLoading}
-                  onClick={() => printContractorChecks(contractorInvs.filter((i) => selectedInvIds.has(i.id)))}>
-                  Print Selected ({selectedInvIds.size})
-                </Button>
-              )}
-              {checkReadyInvs.length > 0 && (
-                <Button size="sm" variant="secondary" loading={printLoading}
-                  onClick={() => printContractorChecks(checkReadyInvs)}>
-                  Print All Check-Ready ({checkReadyInvs.length})
-                </Button>
-              )}
-              <Button size="sm" onClick={openInvoiceModal}>+ Upload Invoice</Button>
-            </div>
-          </div>
-
-          {loadingInvs ? (
-            <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-          ) : contractorInvs.length === 0 ? (
-            <div className="py-16 text-center text-sm text-gray-400">No contractor invoices for this period.</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                  <th className="px-5 py-3 w-8" />
-                  <th className="text-left px-5 py-3">Contractor</th>
-                  <th className="text-left px-4 py-3">Invoice File</th>
-                  <th className="text-left px-4 py-3">Paying Toward</th>
-                  <th className="text-left px-4 py-3">Invoice #</th>
-                  <th className="text-right px-4 py-3">Amount</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="px-5 py-3 w-52" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {contractorInvs.map((inv) => {
-                  const meta = INV_STATUS[inv.status] ?? INV_STATUS.submitted
-                  const hasAmount = inv.amount && parseFloat(inv.amount) > 0
-                  return (
-                    <tr key={inv.id} className="hover:bg-gray-50">
-                      <td className="px-5 py-3">
-                        <input type="checkbox" checked={selectedInvIds.has(inv.id)} disabled={!hasAmount}
-                          onChange={() => toggleInvSelected(inv.id)}
-                          title={hasAmount ? 'Select to combine into one check with other selected invoices' : 'Add an amount before this can be selected'}
-                          className="w-4 h-4 rounded border-gray-300 accent-brand-500 disabled:opacity-30" />
-                      </td>
-                      <td className="px-5 py-3 font-medium text-gray-900">{inv.contractor_name}</td>
-                      <td className="px-4 py-3">
-                        <a href={getDownloadUrl(inv.id)} target="_blank" rel="noopener noreferrer"
-                          className="text-brand-500 hover:underline text-xs max-w-[180px] block truncate">
-                          {inv.file_original_name}
-                        </a>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-600 max-w-[160px] truncate">
-                        {(() => {
-                          const estNum = inv.resolved_estimate_number ?? inv.estimate_number
-                          const jobRef = inv.job_name ?? inv.job_location
-                          return estNum
-                            ? <>Est. #{estNum}{jobRef && <span className="text-gray-400"> — {jobRef}</span>}</>
-                            : <span className="text-gray-300">—</span>
-                        })()}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-600">{inv.invoice_number || <span className="text-gray-300">—</span>}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">
-                        {inv.amount ? formatCurrency(inv.amount) : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${meta.color}`}>
-                          {meta.label}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="secondary" loading={printLoading} disabled={!hasAmount}
-                            onClick={() => printContractorChecks([inv])}>
-                            Print Check
-                          </Button>
-                          <Button size="sm" variant="secondary" onClick={() => openStatusModal(inv)}>
-                            Update
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
       {/* ── Modals ────────────────────────────────────────────────── */}
 
       {/* Drill-down */}
@@ -1214,229 +801,6 @@ export default function AdminPayroll() {
         </div>
       </Modal>
 
-      {/* Add flat rate payment */}
-      <Modal isOpen={frModal} onClose={() => setFrModal(false)} title={`Add Flat Rate Payment — ${p.label}`}>
-        <form onSubmit={handleCreateFlatRate} className="flex flex-col gap-4">
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Employee</label>
-            <select value={frForm.user_id} onChange={(e) => setFrForm((f) => ({ ...f, user_id: e.target.value }))}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
-              <option value="">— Select employee —</option>
-              {employees.filter((e) => e.role !== 'contractor').map((e) => (
-                <option key={e.id} value={e.id}>{e.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Description</label>
-            <input type="text" value={frForm.description}
-              onChange={(e) => setFrForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="e.g. Office cleaning — Week of Jul 7"
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Amount ($)</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
-              <input type="number" min="0" step="0.01" value={frForm.amount}
-                onChange={(e) => setFrForm((f) => ({ ...f, amount: e.target.value }))}
-                placeholder="0.00"
-                className="w-full rounded-xl border border-gray-300 pl-7 pr-4 py-2.5 text-sm outline-none focus:border-brand-500" />
-            </div>
-          </div>
-          <div className="bg-gray-50 rounded-xl px-4 py-3 text-xs text-gray-500">
-            This creates a <strong>separate check</strong> for the employee. It does not affect their regular hourly pay for this period.
-          </div>
-          {frError && <p className="text-sm text-red-600">{frError}</p>}
-          <div className="flex gap-3 pt-1">
-            <Button type="button" variant="secondary" fullWidth onClick={() => setFrModal(false)}>Cancel</Button>
-            <Button type="submit" fullWidth loading={frSaving}>Add Payment</Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Contractor invoice status / estimate assignment */}
-      <Modal isOpen={!!statusModal} onClose={() => setStatusModal(null)}
-        title={`Update Invoice — ${statusModal?.contractor_name ?? ''}`}>
-        <div className="flex flex-col gap-4">
-          <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm">
-            <p className="text-gray-500">File: <span className="font-medium text-gray-800">{statusModal?.file_original_name}</span></p>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Status</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { value: 'submitted',    label: 'Submitted',    style: 'text-amber-700 border-amber-300 bg-amber-50' },
-                { value: 'under_review', label: 'Under Review', style: 'text-blue-700 border-blue-300 bg-blue-50' },
-                { value: 'check_ready',  label: 'Check Ready',  style: 'text-green-700 border-green-300 bg-green-50' },
-                { value: 'paid',         label: 'Paid',         style: 'text-gray-600 border-gray-300 bg-gray-50' },
-              ].map((opt) => (
-                <button key={opt.value} onClick={() => setStatusValue(opt.value)}
-                  className={`px-3 py-2.5 rounded-xl text-sm font-semibold border-2 transition-colors text-left ${
-                    statusValue === opt.value ? opt.style + ' border-current' : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                  }`}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Amount</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
-              <input type="number" min="0" step="0.01" value={statusAmount}
-                onChange={(e) => setStatusAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full rounded-xl border border-gray-300 pl-7 pr-4 py-2.5 text-sm outline-none focus:border-brand-500" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Estimate #" value={statusEstimateNumber}
-              onChange={(e) => setStatusEstimateNumber(e.target.value)}
-              onBlur={(e) => handleEstimateNumberBlur(e.target.value, setStatusJobLocation)}
-              placeholder="e.g. 4021" />
-            <Input label="Job / Location" value={statusJobLocation}
-              onChange={(e) => setStatusJobLocation(e.target.value)}
-              placeholder="e.g. Main St. remodel" />
-          </div>
-
-          <Input label="Invoice Number (if applicable)" value={statusInvNum}
-            onChange={(e) => setStatusInvNum(e.target.value)} placeholder="e.g. 1042" />
-
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Internal note (optional)</label>
-            <input type="text" value={statusNote} onChange={(e) => setStatusNote(e.target.value)}
-              placeholder="e.g. Waiting on updated invoice with itemized hours"
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500" />
-          </div>
-
-          {statusError && <p className="text-sm text-red-600">{statusError}</p>}
-          <div className="flex gap-3 pt-1">
-            <Button variant="secondary" fullWidth onClick={() => setStatusModal(null)}>Cancel</Button>
-            <Button fullWidth loading={statusSaving} onClick={handleSaveStatus}>Save</Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Upload contractor invoice (admin, on behalf of a contractor) */}
-      <Modal isOpen={invModal} onClose={() => setInvModal(false)} title="Upload Contractor Invoice">
-        <div className="flex flex-col gap-4">
-          <div className="relative">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Contractor</label>
-            <input
-              type="text"
-              value={invContractorQuery}
-              onChange={(e) => {
-                setInvContractorQuery(e.target.value)
-                setInvForm((f) => ({ ...f, user_id: '' })) // typing invalidates whatever was picked before
-                setInvContractorOpen(true)
-              }}
-              onFocus={() => setInvContractorOpen(true)}
-              onBlur={() => setTimeout(() => setInvContractorOpen(false), 150)} // let a suggestion's onMouseDown land first
-              placeholder="Start typing a contractor's name…"
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
-            />
-            {invForm.user_id && (
-              <p className="text-xs text-green-600 mt-1">✓ {invContractorQuery} selected</p>
-            )}
-            {invContractorOpen && invContractorQuery.trim() && !invForm.user_id && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
-                {contractorMatches.length > 0 ? (
-                  contractorMatches.map((c) => (
-                    <button key={c.id} type="button"
-                      onMouseDown={() => {
-                        setInvForm((f) => ({ ...f, user_id: String(c.id) }))
-                        setInvContractorQuery(c.name)
-                        setInvContractorOpen(false)
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      {c.name}
-                    </button>
-                  ))
-                ) : (
-                  <button type="button"
-                    onMouseDown={() => {
-                      setQuickAddContractor({ name: invContractorQuery.trim(), address: '' })
-                      setInvContractorOpen(false)
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-brand-600 font-semibold hover:bg-brand-50"
-                  >
-                    + Register "{invContractorQuery.trim()}" as a new contractor
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Estimate # (optional)" value={invForm.estimate_number}
-              onChange={(e) => setInvForm((f) => ({ ...f, estimate_number: e.target.value }))}
-              onBlur={(e) => handleEstimateNumberBlur(e.target.value, (loc) => setInvForm((f) => ({ ...f, job_location: loc })))}
-              placeholder="e.g. 4021" />
-            <Input label="Job / Location (optional)" value={invForm.job_location}
-              onChange={(e) => setInvForm((f) => ({ ...f, job_location: e.target.value }))}
-              placeholder="e.g. Main St. remodel" />
-          </div>
-
-          <Input label="Invoice Number (if applicable)" value={invForm.invoice_number}
-            onChange={(e) => setInvForm((f) => ({ ...f, invoice_number: e.target.value }))} placeholder="e.g. 1042" />
-
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Amount (optional)</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
-              <input type="number" min="0" step="0.01" value={invForm.amount}
-                onChange={(e) => setInvForm((f) => ({ ...f, amount: e.target.value }))}
-                placeholder="0.00"
-                className="w-full rounded-xl border border-gray-300 pl-7 pr-4 py-2.5 text-sm outline-none focus:border-brand-500" />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
-              Invoice File <span className="text-red-500">*</span>
-            </label>
-            <input
-              ref={invFileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
-              onChange={(e) => setInvForm((f) => ({ ...f, file: e.target.files?.[0] ?? null }))}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:text-xs file:font-semibold"
-            />
-            <p className="text-xs text-gray-400 mt-1">A picture or PDF of the contractor's invoice/receipt.</p>
-          </div>
-
-          {invError && <p className="text-sm text-red-600">{invError}</p>}
-          <div className="flex gap-3 pt-1">
-            <Button variant="secondary" fullWidth onClick={() => setInvModal(false)}>Cancel</Button>
-            <Button fullWidth loading={invSaving} onClick={handleUploadInvoice}>Upload</Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Register new contractor — quick add from inside Upload Invoice */}
-      <Modal isOpen={!!quickAddContractor} onClose={() => setQuickAddContractor(null)} title="Register New Contractor">
-        <div className="flex flex-col gap-4">
-          <Input label="Name *" value={quickAddContractor?.name ?? ''}
-            onChange={(e) => setQuickAddContractor((f) => ({ ...f, name: e.target.value }))}
-            placeholder="Company or individual name" />
-          <Input label="Address (optional)" value={quickAddContractor?.address ?? ''}
-            onChange={(e) => setQuickAddContractor((f) => ({ ...f, address: e.target.value }))}
-            placeholder="Street, City, State — shown on printed checks" />
-          <p className="text-xs text-gray-400 -mt-2">
-            More details (phone, email, tax ID) can be added later from Employees.
-          </p>
-          {qacError && <p className="text-sm text-red-600">{qacError}</p>}
-          <div className="flex gap-3 pt-1">
-            <Button variant="secondary" fullWidth onClick={() => setQuickAddContractor(null)}>Cancel</Button>
-            <Button fullWidth loading={qacSaving} onClick={handleQuickAddContractor}>Register &amp; Select</Button>
-          </div>
-        </div>
-      </Modal>
 
       {/* Print checks overlay — hourly payroll */}
       {printOpen && (() => {
@@ -1465,26 +829,6 @@ export default function AdminPayroll() {
           />
         )
       })()}
-
-      {/* Print checks overlay — flat rate */}
-      {frPrintOpen && (
-        <PrintChecks
-          employees={[]}
-          flatRatePayments={flatRatePayments}
-          period={p}
-          gasByUser={{}}
-          bonusByUser={{}}
-          loanDeductions={{}}
-          onClose={() => setFrPrintOpen(false)}
-        />
-      )}
-
-      {printInvoices && (
-        <PrintContractorCheck
-          invoices={printInvoices}
-          onClose={() => { setPrintInvoices(null); setSelectedInvIds(new Set()) }}
-        />
-      )}
 
       {/* ── Paychecks tab content ───────────────────────────────────── */}
       {tab === 'paychecks' && (
@@ -1646,24 +990,37 @@ export default function AdminPayroll() {
       <Modal isOpen={gasModal} onClose={() => setGasModal(false)} title={`Gas Allowance Review — ${p.label}`} size="lg">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-gray-500">
-            Check the employees who should receive a gas allowance this week and confirm the amount.
+            The employees on a standing weekly allowance are pre-checked (<span className="font-semibold text-amber-700">Weekly</span>).
+            Uncheck anyone, check others to add them, or edit an amount.
           </p>
           <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
-            {gasEmployees.map((emp) => (
-              <div key={emp.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
-                <input type="checkbox" checked={!!gasChecked[emp.id]}
-                  onChange={(e) => setGasChecked((c) => ({ ...c, [emp.id]: e.target.checked }))}
-                  className="accent-brand-500 w-4 h-4 shrink-0" />
-                <span className="flex-1 text-sm font-medium text-gray-900">{emp.name}</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-sm text-gray-500">$</span>
-                  <input type="number" value={gasAmounts[emp.id] ?? 70}
-                    onChange={(e) => setGasAmounts((a) => ({ ...a, [emp.id]: e.target.value }))}
-                    disabled={!gasChecked[emp.id]}
-                    className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-right outline-none focus:border-brand-500 disabled:opacity-40" />
+            {gasEmployees.map((emp) => {
+              const standing = parseFloat(emp.gas_weekly_allowance) || 0
+              const paid = gasPaid.has(emp.id)
+              return (
+                <div key={emp.id} className={`flex items-center gap-3 rounded-xl px-4 py-3 ${paid ? 'bg-gray-100 opacity-60' : 'bg-gray-50'}`}>
+                  <input type="checkbox" checked={!!gasChecked[emp.id]} disabled={paid}
+                    onChange={(e) => setGasChecked((c) => ({ ...c, [emp.id]: e.target.checked }))}
+                    className="accent-brand-500 w-4 h-4 shrink-0 disabled:opacity-40" />
+                  <span className="flex-1 min-w-0 text-sm font-medium text-gray-900 flex items-center gap-2">
+                    <span className="truncate">{emp.name}</span>
+                    {standing > 0 && !paid && (
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded shrink-0">Weekly</span>
+                    )}
+                    {paid && (
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded shrink-0">Applied</span>
+                    )}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm text-gray-500">$</span>
+                    <input type="number" value={gasAmounts[emp.id] ?? 70}
+                      onChange={(e) => setGasAmounts((a) => ({ ...a, [emp.id]: e.target.value }))}
+                      disabled={!gasChecked[emp.id] || paid}
+                      className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-right outline-none focus:border-brand-500 disabled:opacity-40" />
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
           <div className="bg-brand-100 rounded-xl px-4 py-3 text-sm text-brand-900 font-medium">
             Total gas this period: {formatCurrency(

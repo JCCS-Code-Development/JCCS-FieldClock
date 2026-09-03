@@ -177,7 +177,7 @@ function validateVisitCategory(
 ): void {
     if ($category === null) return; // recurring-maintenance / no classification needed
 
-    $allowed = ['work_order', 'estimate', 'regular', 'estimate_unknown', 'add_on', 'emergency', 'warranty'];
+    $allowed = ['work_order', 'estimate', 'regular', 'estimate_unknown', 'add_on', 'emergency', 'warranty', 'pto'];
     if (!in_array($category, $allowed)) {
         http_response_code(422);
         echo json_encode(['error' => 'Invalid visit_category']);
@@ -190,7 +190,9 @@ function validateVisitCategory(
         exit;
     };
 
-    if ($category === 'work_order') {
+    if ($category === 'pto') {
+        return; // paid time off — no job, engineer, or description needed
+    } elseif ($category === 'work_order') {
         if (!$jobId) $fail('Work Order requires an existing job location');
         if (!$workOrderNumber) $fail('Work order number is required');
     } elseif ($category === 'estimate') {

@@ -84,15 +84,16 @@ if ($method === 'GET') {
     $payType      = $role === 'contractor' ? 'w2'     : sanitizeString($body['pay_type'] ?? 'w2');
     $payRate      = $role === 'contractor' ? 0.00     : (float)($body['pay_rate'] ?? 0);
     $payStructure = $role === 'contractor' ? 'hourly' : sanitizeString($body['pay_structure'] ?? 'hourly');
+    $gasWeekly    = $role === 'contractor' ? 0.00     : (float)($body['gas_weekly_allowance'] ?? 0);
 
     if (!in_array($payStructure, ['hourly', 'salary'])) {
         $payStructure = 'hourly';
     }
 
     $stmt = $pdo->prepare(
-        'INSERT INTO users (name, email, phone, address, role, pay_type, pay_rate, pay_structure, is_active) VALUES (?,?,?,?,?,?,?,?,1)'
+        'INSERT INTO users (name, email, phone, address, role, pay_type, pay_rate, pay_structure, gas_weekly_allowance, is_active) VALUES (?,?,?,?,?,?,?,?,?,1)'
     );
-    $stmt->execute([$name, $email, $phone, $address, $role, $payType, $payRate, $payStructure]);
+    $stmt->execute([$name, $email, $phone, $address, $role, $payType, $payRate, $payStructure, $gasWeekly]);
     $newId = (int)$pdo->lastInsertId();
 
     // Starting rate, not a mid-stream change — effective immediately (today),

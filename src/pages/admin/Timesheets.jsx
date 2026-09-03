@@ -27,6 +27,8 @@ const NEW_LOCATION_VISIT_OPTIONS = [
   { value: 'emergency',        label: 'Emergency' },
   { value: 'warranty',         label: 'Warranty' },
 ]
+// PTO isn't tied to a job or an engineer/description — always offered.
+const PTO_OPTION = { value: 'pto', label: 'PTO' }
 const ESTIMATE_SUBTYPE_OPTIONS = [
   { value: 'regular',   label: 'Regular' },
   { value: 'add_on',    label: 'Add-On' },
@@ -37,11 +39,13 @@ const ESTIMATE_SUBTYPE_OPTIONS = [
 const VISIT_CATEGORY_LABELS = {
   work_order: 'Work Order', estimate: 'Estimate', regular: 'Regular',
   estimate_unknown: 'Estimate (# unknown)', add_on: 'Add-On', emergency: 'Emergency', warranty: 'Warranty',
+  pto: 'PTO',
 }
 const VISIT_CATEGORY_COLORS = {
   work_order: 'bg-blue-100 text-blue-700', estimate: 'bg-indigo-100 text-indigo-700',
   regular: 'bg-gray-100 text-gray-600', estimate_unknown: 'bg-indigo-50 text-indigo-600',
   add_on: 'bg-purple-100 text-purple-700', emergency: 'bg-red-100 text-red-700', warranty: 'bg-teal-100 text-teal-700',
+  pto: 'bg-amber-100 text-amber-800',
 }
 
 // Retained only to label/color entries logged before this restructure
@@ -160,7 +164,7 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
   const [estimates,   setEstimates]   = useState([])
   const [loadingEstimates, setLoadingEstimates] = useState(false)
 
-  const isNewLocationCategory = visitCategory && visitCategory !== 'work_order' && visitCategory !== 'estimate'
+  const isNewLocationCategory = visitCategory && !['work_order', 'estimate', 'pto'].includes(visitCategory)
 
   // Fetch the selected job's estimates whenever the job changes
   useEffect(() => {
@@ -284,15 +288,21 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
           Visit Category (optional) {jobId ? '' : '— new/unlisted location'}
         </label>
         <div className="grid grid-cols-3 gap-2">
-          {(jobId ? EXISTING_VISIT_OPTIONS : NEW_LOCATION_VISIT_OPTIONS).map(opt => (
-            <button key={opt.value}
-              onClick={() => setVisitCategory(visitCategory === opt.value ? '' : opt.value)}
-              className={`py-2 rounded-xl text-xs font-semibold border-2 transition-colors ${
-                visitCategory === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
-              }`}>
-              {opt.label}
-            </button>
-          ))}
+          {[...(jobId ? EXISTING_VISIT_OPTIONS : NEW_LOCATION_VISIT_OPTIONS), PTO_OPTION].map(opt => {
+            const selected = visitCategory === opt.value
+            const isPto = opt.value === 'pto'
+            return (
+              <button key={opt.value}
+                onClick={() => setVisitCategory(selected ? '' : opt.value)}
+                className={`py-2 rounded-xl text-xs font-semibold border-2 transition-colors ${
+                  selected
+                    ? (isPto ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-brand-500 bg-brand-50 text-brand-700')
+                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                }`}>
+                {opt.label}
+              </button>
+            )
+          })}
         </div>
 
         {visitCategory === 'estimate' && (
@@ -419,7 +429,9 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
                       <p className="text-xs text-gray-400 truncate mt-0.5">{loc || comment}</p>
                     )}
                     {describeVisit(entry) && (
-                      <p className="text-[10px] font-semibold text-gray-400 mt-0.5">{describeVisit(entry)}</p>
+                      <span className={`inline-flex mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${visitColor(entry)}`}>
+                        {describeVisit(entry)}
+                      </span>
                     )}
                   </div>
                   <span className="text-xs font-semibold text-gray-700 shrink-0 w-10 text-right">{isDayEnd ? '' : fmtDur(mins)}</span>

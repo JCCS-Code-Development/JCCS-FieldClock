@@ -20,12 +20,11 @@ import AdminEmployees from './pages/admin/Employees'
 import AdminTimesheets from './pages/admin/Timesheets'
 import AdminPayroll from './pages/admin/Payroll'
 import AdminLoans from './pages/admin/Loans'
-import AdminVendors from './pages/admin/Vendors'
-import AdminMiscChecks from './pages/admin/MiscChecks'
 import AdminDocuments from './pages/admin/AdminDocuments'
 import AdminHR from './pages/admin/HRDocuments'
 import AdminReports from './pages/admin/Reports'
 import CheckRegistry from './pages/admin/CheckRegistry'
+import AccountsPayable from './pages/admin/AccountsPayable'
 
 function RoleRedirect() {
   const user = useAuthStore((s) => s.user)
@@ -61,12 +60,16 @@ export default function App() {
             <Route path="/admin/timesheets" element={<AdminTimesheets />} />
             <Route path="/admin/payroll" element={<AdminPayroll />} />
             <Route path="/admin/loans"      element={<AdminLoans />}      />
-            <Route path="/admin/vendors"    element={<AdminVendors />}    />
-            <Route path="/admin/misc-checks" element={<AdminMiscChecks />} />
             <Route path="/admin/documents"  element={<AdminDocuments />}  />
             <Route path="/admin/hr"         element={<AdminHR />}         />
             <Route path="/admin/reports"    element={<AdminReports />}    />
             <Route path="/admin/checks"     element={<CheckRegistry />}   />
+            <Route path="/admin/vendors-contractors" element={<AccountsPayable />} />
+            {/* retired paths — folded into the unified pages */}
+            <Route path="/admin/vendors"             element={<Navigate to="/admin/vendors-contractors" replace />} />
+            <Route path="/admin/invoices"            element={<Navigate to="/admin/vendors-contractors" replace />} />
+            <Route path="/admin/contractor-invoices" element={<Navigate to="/admin/vendors-contractors" replace />} />
+            <Route path="/admin/misc-checks"         element={<Navigate to="/admin/checks" replace />} />
           </Route>
         </Route>
       </Route>
