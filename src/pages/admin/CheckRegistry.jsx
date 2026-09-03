@@ -8,7 +8,7 @@ import Spinner from '../../components/ui/Spinner'
 import Badge from '../../components/ui/Badge'
 import PrintMiscCheck from '../../components/admin/PrintMiscCheck'
 import {
-  listChecks, createCheck, updateCheck, markPrinted, voidCheck, deleteCheck, payInvoices, payVendorInvoices,
+  listChecks, createCheck, updateCheck, markPrinted, unmarkPrinted, voidCheck, deleteCheck, payInvoices, payVendorInvoices,
 } from '../../api/checks'
 import { listEmployees } from '../../api/employees'
 import { listVendors } from '../../api/vendors'
@@ -572,11 +572,13 @@ export default function AdminChecks() {
   const [dateTo, setDateTo] = useState('')
 
   const [modal, setModal] = useState(null) // 'create' | 'pay' | {kind:'printed'|'void'|'edit', check}
-  const [printing, setPrinting] = useState(null)
+  const [printing, setPrinting] = useState(null)     // array of checks to print | null
+  const [selected, setSelected] = useState(() => new Set())  // check ids picked for batch print
 
   const load = useCallback(async () => {
     if (tab === 'registry') { setLoading(false); return }  // RegistryView fetches its own
     setLoading(true)
+    setSelected(new Set())
     try {
       const t = TABS.find((x) => x.key === tab) ?? TABS[0]
       const params = {}
@@ -603,7 +605,19 @@ export default function AdminChecks() {
     if (!window.confirm('Delete this draft check?')) return
     await deleteCheck(c.id).catch(() => {}); refresh()
   }
-  const doPrint = (c) => setPrinting(c)
+  const doPrint = (c) => setPrinting([c])
+  const doUndo = async (c) => { await unmarkPrinted(c.id).catch(() => {}); refresh() }
+
+  const printable = (c) => c.status === 'draft' || c.status === 'printed'
+  const toggleSelect = (c) => setSelected((prev) => {
+    const next = new Set(prev)
+    next.has(c.id) ? next.delete(c.id) : next.add(c.id)
+    return next
+  })
+  const printSelected = () => {
+    const rows = checks.filter((c) => selected.has(c.id))
+    if (rows.length) setPrinting(rows)
+  }
 
   return (
     <div className="w-full">
@@ -668,6 +682,17 @@ export default function AdminChecks() {
         </div>
       </div>
 
+      {/* Batch-print bar */}
+      {selected.size > 0 && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-2.5">
+          <span className="text-sm font-semibold text-brand-800">{selected.size} selected</span>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setSelected(new Set())}>Clear</Button>
+            <Button size="sm" onClick={printSelected}>Print selected ({selected.size})</Button>
+          </div>
+        </div>
+      )}
+
       {/* List */}
       {loading ? (
         <div className="flex justify-center py-16"><Spinner size="lg" /></div>
@@ -677,6 +702,10 @@ export default function AdminChecks() {
         <div className="flex flex-col gap-2">
           {checks.map((c) => (
             <div key={c.id} className="bg-white rounded-2xl border border-gray-100 px-4 py-3.5 flex items-center gap-4 flex-wrap">
+              <input type="checkbox" className="w-4 h-4 shrink-0 accent-brand-500 disabled:opacity-30"
+                checked={selected.has(c.id)} disabled={!printable(c)}
+                onChange={() => toggleSelect(c)}
+                title={printable(c) ? 'Select to batch-print' : 'Only draft or printed checks can be printed'} />
               <div className="w-16 shrink-0 text-center">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Check</p>
                 <p className="text-base font-bold text-gray-900 leading-tight">{c.check_number ? `#${c.check_number}` : '—'}</p>
@@ -710,6 +739,7 @@ export default function AdminChecks() {
                 {c.status === 'printed' && (
                   <>
                     <Button size="sm" variant="secondary" onClick={() => doPrint(c)}>Print</Button>
+                    <Button size="sm" variant="secondary" onClick={() => doUndo(c)}>Undo</Button>
                     <Button size="sm" variant="danger" onClick={() => setModal({ kind: 'void', check: c })}>Void</Button>
                   </>
                 )}
@@ -742,7 +772,7 @@ export default function AdminChecks() {
 
       {printing && (
         <PrintMiscCheck
-          checks={[{ ...printing, reason: printing.memo || '', check_date: printing.issued_date }]}
+          checks={printing.map((c) => ({ ...c, reason: c.memo || '', check_date: c.issued_date }))}
           onClose={() => setPrinting(null)}
         />
       )}

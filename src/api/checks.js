@@ -20,6 +20,8 @@ export const registerChecks = (checks) => client.post('/checks/index.php', { che
 // Move a check along its lifecycle: draft -> printed -> cleared -> voided.
 export const markPrinted    = (id, check_number, issued_date) =>
   client.put('/checks/item.php', { id, status: 'printed', check_number, issued_date }).then(r => r.data)
+// Undo "mark printed" — back to draft, check number cleared.
+export const unmarkPrinted  = (id) => client.put('/checks/item.php', { id, status: 'draft' }).then(r => r.data)
 export const markCleared    = (id) => client.put('/checks/item.php', { id, status: 'cleared' }).then(r => r.data)
 export const voidCheck      = (id, void_reason) =>
   client.put('/checks/item.php', { id, status: 'voided', void_reason }).then(r => r.data)
