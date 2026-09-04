@@ -147,6 +147,7 @@ function ContractorsPanel() {
   const [statusError, setStatusError] = useState('')
 
   const [invModal, setInvModal] = useState(false)
+  const [invPeriodIdx, setInvPeriodIdx] = useState(0) // which period this invoice is filed against
   const [invForm, setInvForm] = useState({ user_id: '', estimate_number: '', job_location: '', invoice_number: '', amount: '', file: null })
   const [invSaving, setInvSaving] = useState(false)
   const [invError, setInvError] = useState('')
@@ -225,6 +226,9 @@ function ContractorsPanel() {
     setInvForm({ user_id: '', estimate_number: '', job_location: '', invoice_number: '', amount: '', file: null })
     setInvContractorQuery(''); setInvContractorOpen(false)
     setInvError('')
+    // Default to whichever period is being viewed; fall back to Last Week
+    // when the filter is "All pay periods" so upload never needs that first.
+    setInvPeriodIdx(periodIdx === 'all' ? 0 : periodIdx)
     if (invFileRef.current) invFileRef.current.value = ''
     setInvModal(true)
   }
@@ -256,15 +260,15 @@ function ContractorsPanel() {
   }
 
   const handleUploadInvoice = async () => {
-    if (!selPeriod) { setInvError('Pick a pay period at the top before uploading.'); return }
     if (!invForm.user_id) { setInvError('Select a contractor.'); return }
     if (!invForm.file)    { setInvError('Attach a picture or PDF of the invoice.'); return }
     setInvSaving(true); setInvError('')
     try {
+      const invPeriod = periods[invPeriodIdx]
       const form = new FormData()
       form.append('user_id', invForm.user_id)
-      form.append('period_start', selPeriod.start)
-      form.append('period_end', selPeriod.end)
+      form.append('period_start', invPeriod.start)
+      form.append('period_end', invPeriod.end)
       if (invForm.estimate_number.trim()) form.append('estimate_number', invForm.estimate_number.trim())
       if (invForm.job_location.trim())    form.append('job_location', invForm.job_location.trim())
       if (invForm.invoice_number.trim())  form.append('invoice_number', invForm.invoice_number.trim())
@@ -302,10 +306,9 @@ function ContractorsPanel() {
           {periods.map((p2, i) => <option key={i} value={i}>{p2.label}</option>)}
         </select>
         <div className="sm:ml-auto">
-          <Button onClick={openInvoiceModal} disabled={!selPeriod}>+ Upload Invoice</Button>
+          <Button onClick={openInvoiceModal}>+ Upload Invoice</Button>
         </div>
       </div>
-      {!selPeriod && <p className="text-xs text-gray-400 -mt-3 mb-4">Switch to a pay period to upload a new invoice.</p>}
 
       <StatusFilterBar value={statusFilter} onChange={setStatusFilter} counts={counts} />
 
@@ -416,9 +419,13 @@ function ContractorsPanel() {
       {/* Upload invoice */}
       <Modal isOpen={invModal} onClose={() => setInvModal(false)} title="Upload Contractor Invoice">
         <div className="flex flex-col gap-4">
-          {selPeriod && (
-            <p className="text-xs text-gray-400">Filing against <span className="font-semibold text-gray-600">{selPeriod.label}</span>.</p>
-          )}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Pay Period</label>
+            <select value={invPeriodIdx} onChange={(e) => setInvPeriodIdx(Number(e.target.value))}
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500">
+              {periods.map((p2, i) => <option key={i} value={i}>{p2.label}</option>)}
+            </select>
+          </div>
           <div className="relative">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Contractor</label>
             <input
