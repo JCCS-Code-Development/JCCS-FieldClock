@@ -24,17 +24,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $mine = $auth['role'] !== 'admin' || !empty($_GET['mine']);
 
     // Optional: period_start + period_end → return loan deduction per user for
-    // that pay period. A recorded loan_payment overlapping the period is
-    // authoritative; otherwise, for an active loan whose schedule has started
-    // and still has a balance, fall back to the scheduled weekly_deduction
-    // (capped at the remaining balance) so payroll withholds it automatically.
+    // that pay period. Any recorded loan_payment overlapping the period is
+    // authoritative — even one that sums to $0, which is how an admin skips a
+    // week. Only when there is NO entry for the week do we fall back, for an
+    // active loan whose schedule has started and still has a balance, to the
+    // scheduled weekly_deduction (capped at the remaining balance) so payroll
+    // withholds it automatically.
     if (!empty($_GET['period_start']) && !empty($_GET['period_end'])) {
         $ps = sanitizeString($_GET['period_start']);
         $pe = sanitizeString($_GET['period_end']);
 
         $deductionExpr =
             "CASE
-                WHEN COALESCE(rec.paid, 0) > 0 THEN rec.paid
+                WHEN COALESCE(rec.n, 0) > 0 THEN COALESCE(rec.paid, 0)
                 WHEN l.status = 'active'
                      AND l.weekly_deduction > 0
                      AND l.deduction_start_date IS NOT NULL
@@ -47,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $from =
             "FROM employee_loans l
              LEFT JOIN (
-                 SELECT loan_id, SUM(amount) AS paid FROM loan_payments
+                 SELECT loan_id, SUM(amount) AS paid, COUNT(*) AS n FROM loan_payments
                  WHERE period_start <= ? AND period_end >= ?
                  GROUP BY loan_id
              ) rec ON rec.loan_id = l.id
