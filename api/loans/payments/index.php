@@ -23,13 +23,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         http_response_code(422);
         exit(json_encode(['error' => 'loan_id is required']));
     }
-    if ($amount <= 0) {
-        http_response_code(422);
-        exit(json_encode(['error' => 'Amount must be greater than zero']));
-    }
     if (!in_array($method, ['cash', 'check', 'transfer', 'payroll_deduction'], true)) {
         http_response_code(422);
         exit(json_encode(['error' => 'Invalid payment method']));
+    }
+    // $0 is allowed only for a payroll_deduction — it records "skip this week's
+    // deduction" so the automatic withholding in index.php doesn't re-add it.
+    // A real cash/check/transfer payment of $0 is meaningless.
+    if ($amount < 0 || ($amount == 0 && $method !== 'payroll_deduction')) {
+        http_response_code(422);
+        exit(json_encode(['error' => 'Amount must be greater than zero']));
     }
 
     // Fetch remaining balance to prevent overpayment

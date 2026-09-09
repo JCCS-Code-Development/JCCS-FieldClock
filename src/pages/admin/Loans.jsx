@@ -9,11 +9,15 @@ import { listEmployees } from '../../api/employees'
 import { formatCurrency } from '../../utils/format'
 import { format, startOfWeek, endOfWeek, subWeeks, addDays } from 'date-fns'
 
+// Deductions are only recorded for weeks payroll has actually run — last week
+// and earlier, never the in-progress week (matches the Payroll page, which
+// pays completed weeks). So the list starts one week back.
 const periods = Array.from({ length: 8 }, (_, i) => {
-  const start = startOfWeek(subWeeks(new Date(), i), { weekStartsOn: 1 })
-  const end   = endOfWeek(subWeeks(new Date(), i),   { weekStartsOn: 1 })
+  const w     = i + 1
+  const start = startOfWeek(subWeeks(new Date(), w), { weekStartsOn: 1 })
+  const end   = endOfWeek(subWeeks(new Date(), w),   { weekStartsOn: 1 })
   return {
-    label: i === 0 ? 'This Week' : i === 1 ? 'Last Week' : format(start, 'MMM d'),
+    label: i === 0 ? 'Last Week' : format(start, 'MMM d'),
     start: format(start, 'yyyy-MM-dd'),
     end:   format(end,   'yyyy-MM-dd'),
   }
@@ -213,7 +217,12 @@ export default function AdminLoans() {
   }
 
   const handleRecordPayment = async () => {
-    if (!payAmount || parseFloat(payAmount) <= 0) { setPayError('Enter a valid amount.'); return }
+    const amt = parseFloat(payAmount)
+    if (payAmount === '' || isNaN(amt) || amt < 0) { setPayError('Enter a valid amount.'); return }
+    // $0 is a valid "skip this week" for a 1099 loan (withheld from the check
+    // here); for a W-2 loan a payment is a real external transfer, so it can't
+    // be zero.
+    if (amt === 0 && isW2Loan(payModal)) { setPayError('Enter an amount greater than zero.'); return }
     if ((payMethod === 'check' || payMethod === 'transfer') && !payReceipt) {
       setPayError('Attach a receipt image for check or transfer payments.'); return
     }
@@ -628,13 +637,16 @@ export default function AdminLoans() {
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
               <input
-                type="number" min="0.01" step="0.01"
+                type="number" min="0" step="0.01"
                 value={payAmount}
                 onChange={(e) => setPayAmount(e.target.value)}
                 placeholder="0.00"
                 className="w-full rounded-xl border border-gray-300 pl-7 pr-4 py-2.5 text-sm outline-none focus:border-brand-500"
               />
             </div>
+            {!isW2Loan(payModal) && (
+              <p className="text-xs text-gray-400 mt-1">Enter $0 to skip this week&rsquo;s deduction.</p>
+            )}
           </div>
 
           {isW2Loan(payModal) ? (
@@ -713,7 +725,9 @@ export default function AdminLoans() {
 
           <div className="flex gap-3 pt-1">
             <Button variant="secondary" fullWidth onClick={() => setPayModal(null)}>Cancel</Button>
-            <Button fullWidth loading={paySaving} onClick={handleRecordPayment}>Record Deduction</Button>
+            <Button fullWidth loading={paySaving} onClick={handleRecordPayment}>
+              {!isW2Loan(payModal) && parseFloat(payAmount) === 0 ? 'Skip This Week' : 'Record Deduction'}
+            </Button>
           </div>
         </div>
       </Modal>
