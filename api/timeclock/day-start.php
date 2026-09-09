@@ -35,6 +35,18 @@ $pdo = getPDO();
 requireHourly($auth, $pdo);
 beginTimeclockTransaction($pdo, (int)$auth['user_id']);
 
+// beginTimeclockTransaction takes a FOR UPDATE lock on this user's row. Several
+// paths below exit() early (the visit-category 422s, the open-entry 409) without
+// an explicit rollback; on LiteSpeed a lingering connection can then hold that
+// lock long enough that the same employee's next clock-in blocks past
+// max_execution_time and 500s with no body. Guarantee the rollback on every
+// exit path. The success path commits first, so this is a no-op there.
+register_shutdown_function(function () use ($pdo) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+});
+
 // Verify job exists and is usable (active, or a pending-review location this
 // same employee registered) if provided
 if ($jobId) {
