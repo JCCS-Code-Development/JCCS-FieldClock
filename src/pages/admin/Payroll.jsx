@@ -81,6 +81,7 @@ export default function AdminPayroll() {
   const [gasAmounts,   setGasAmounts]   = useState({})
   const [gasChecked,   setGasChecked]   = useState({})
   const [gasPaid,      setGasPaid]      = useState(() => new Set())  // already got gas this period
+  const [gasRecent,    setGasRecent]    = useState({})               // user_id → last gas amount in the recent lookback
   const [gasSaving,    setGasSaving]    = useState(false)
 
   // Paychecks
@@ -266,26 +267,42 @@ export default function AdminPayroll() {
 
   // ── Gas review ───────────────────────────────────────────────────
   const openGasReview = async () => {
-    const d = await listEmployees()
+    const [d, recentAdj] = await Promise.all([
+      listEmployees(),
+      // "The ones I typically pay for" — anyone who got a gas allowance in the
+      // last few weeks, so it carries forward without maintaining a field.
+      listAdjustments({
+        period_start: format(subWeeks(new Date(p.start + 'T12:00'), 4), 'yyyy-MM-dd'),
+        period_end:   p.end,
+      }).catch(() => ({ adjustments: [] })),
+    ])
     // Gas allowance is a payroll adjustment — employees only, no contractors.
     const active = (d.employees ?? []).filter((e) => e.is_active && e.role !== 'contractor')
     // Anyone who already has a gas allowance logged for this period.
     const paid = new Set(adjustments.filter((a) => a.type === 'gas_allowance').map((a) => a.user_id))
+    // Most recent gas amount per user across the lookback window.
+    const recent = {}
+    for (const a of (recentAdj.adjustments ?? [])) {
+      if (a.type !== 'gas_allowance') continue
+      recent[a.user_id] = parseFloat(a.amount) || recent[a.user_id] || 0
+    }
+
+    const typical = (e) => (parseFloat(e.gas_weekly_allowance) || 0) > 0 || (recent[e.id] ?? 0) > 0
+
     const amounts = {}; const checked = {}
     active.forEach((e) => {
       const standing = parseFloat(e.gas_weekly_allowance) || 0
-      amounts[e.id] = standing > 0 ? standing : 70
-      // Pre-check the standard weekly recipients who haven't been paid yet this period.
-      checked[e.id] = standing > 0 && !paid.has(e.id)
+      amounts[e.id] = standing > 0 ? standing : (recent[e.id] > 0 ? recent[e.id] : 70)
+      // Pre-check the ones we typically pay, unless already paid this period.
+      checked[e.id] = typical(e) && !paid.has(e.id)
     })
-    // Standing-allowance employees first, then the rest — each alphabetical.
+    // Typical recipients first, then the rest — each alphabetical.
     const sorted = [...active].sort((a, b) => {
-      const sa = (parseFloat(a.gas_weekly_allowance) || 0) > 0
-      const sb = (parseFloat(b.gas_weekly_allowance) || 0) > 0
-      if (sa !== sb) return sa ? -1 : 1
+      const ta = typical(a), tb = typical(b)
+      if (ta !== tb) return ta ? -1 : 1
       return (a.name ?? '').localeCompare(b.name ?? '')
     })
-    setGasPaid(paid)
+    setGasPaid(paid); setGasRecent(recent)
     setGasEmployees(sorted); setGasAmounts(amounts); setGasChecked(checked); setGasModal(true)
   }
 
@@ -990,13 +1007,15 @@ export default function AdminPayroll() {
       <Modal isOpen={gasModal} onClose={() => setGasModal(false)} title={`Gas Allowance Review — ${p.label}`} size="lg">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-gray-500">
-            The employees on a standing weekly allowance are pre-checked (<span className="font-semibold text-amber-700">Weekly</span>).
-            Uncheck anyone, check others to add them, or edit an amount.
+            Pre-checked: anyone on a <span className="font-semibold text-amber-700">standing allowance</span> or paid gas
+            in the last few weeks (<span className="font-semibold text-gray-600">Recurring</span>). Uncheck anyone,
+            check others to add them, or edit an amount.
           </p>
           <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
             {gasEmployees.map((emp) => {
               const standing = parseFloat(emp.gas_weekly_allowance) || 0
               const paid = gasPaid.has(emp.id)
+              const recurring = !standing && (gasRecent[emp.id] ?? 0) > 0
               return (
                 <div key={emp.id} className={`flex items-center gap-3 rounded-xl px-4 py-3 ${paid ? 'bg-gray-100 opacity-60' : 'bg-gray-50'}`}>
                   <input type="checkbox" checked={!!gasChecked[emp.id]} disabled={paid}
@@ -1006,6 +1025,9 @@ export default function AdminPayroll() {
                     <span className="truncate">{emp.name}</span>
                     {standing > 0 && !paid && (
                       <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded shrink-0">Weekly</span>
+                    )}
+                    {recurring && !paid && (
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">Recurring</span>
                     )}
                     {paid && (
                       <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded shrink-0">Applied</span>
