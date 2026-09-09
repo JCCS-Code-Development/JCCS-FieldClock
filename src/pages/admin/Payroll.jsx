@@ -81,7 +81,7 @@ export default function AdminPayroll() {
   const [gasAmounts,   setGasAmounts]   = useState({})
   const [gasChecked,   setGasChecked]   = useState({})
   const [gasPaid,      setGasPaid]      = useState(() => new Set())  // already got gas this period
-  const [gasRecent,    setGasRecent]    = useState({})               // user_id → last gas amount in the recent lookback
+  const [gasRecent,    setGasRecent]    = useState({})               // user_id → true when paid gas most of the last 4 weeks
   const [gasSaving,    setGasSaving]    = useState(false)
 
   // Paychecks
@@ -267,12 +267,14 @@ export default function AdminPayroll() {
 
   // ── Gas review ───────────────────────────────────────────────────
   const openGasReview = async () => {
+    // Look back over the 4 weeks before this period.
+    const lookbackStart = format(subWeeks(new Date(p.start + 'T12:00'), 4), 'yyyy-MM-dd')
     const [d, recentAdj] = await Promise.all([
       listEmployees(),
-      // "The ones I typically pay for" — anyone who got a gas allowance in the
-      // last few weeks, so it carries forward without maintaining a field.
+      // "The ones I typically pay for" — anyone who got a gas allowance in most
+      // of the last 4 weeks, so it carries forward without maintaining a field.
       listAdjustments({
-        period_start: format(subWeeks(new Date(p.start + 'T12:00'), 4), 'yyyy-MM-dd'),
+        period_start: lookbackStart,
         period_end:   p.end,
       }).catch(() => ({ adjustments: [] })),
     ])
@@ -280,19 +282,29 @@ export default function AdminPayroll() {
     const active = (d.employees ?? []).filter((e) => e.is_active && e.role !== 'contractor')
     // Anyone who already has a gas allowance logged for this period.
     const paid = new Set(adjustments.filter((a) => a.type === 'gas_allowance').map((a) => a.user_id))
-    // Most recent gas amount per user across the lookback window.
-    const recent = {}
+
+    // Trailing gas history: how many distinct weeks each employee was paid gas
+    // before this period, plus their most recent amount (recentAdj is ordered
+    // created_at DESC, so the first hit per user is the newest).
+    const weeksPaid  = {}   // user_id → Set of period_start values
+    const lastAmount = {}   // user_id → most recent gas amount
     for (const a of (recentAdj.adjustments ?? [])) {
-      if (a.type !== 'gas_allowance') continue
-      recent[a.user_id] = parseFloat(a.amount) || recent[a.user_id] || 0
+      if (a.type !== 'gas_allowance' || a.period_start >= p.start) continue
+      ;(weeksPaid[a.user_id] ??= new Set()).add(a.period_start)
+      if (lastAmount[a.user_id] == null) lastAmount[a.user_id] = parseFloat(a.amount) || 0
     }
 
-    const typical = (e) => (parseFloat(e.gas_weekly_allowance) || 0) > 0 || (recent[e.id] ?? 0) > 0
+    // "Recurring" = paid gas in at least 3 of the last 4 weeks.
+    const RECURRING_WEEKS = 3
+    const recurring = {}
+    active.forEach((e) => { recurring[e.id] = (weeksPaid[e.id]?.size ?? 0) >= RECURRING_WEEKS })
+
+    const typical = (e) => (parseFloat(e.gas_weekly_allowance) || 0) > 0 || recurring[e.id]
 
     const amounts = {}; const checked = {}
     active.forEach((e) => {
       const standing = parseFloat(e.gas_weekly_allowance) || 0
-      amounts[e.id] = standing > 0 ? standing : (recent[e.id] > 0 ? recent[e.id] : 70)
+      amounts[e.id] = standing > 0 ? standing : (lastAmount[e.id] > 0 ? lastAmount[e.id] : 70)
       // Pre-check the ones we typically pay, unless already paid this period.
       checked[e.id] = typical(e) && !paid.has(e.id)
     })
@@ -302,7 +314,7 @@ export default function AdminPayroll() {
       if (ta !== tb) return ta ? -1 : 1
       return (a.name ?? '').localeCompare(b.name ?? '')
     })
-    setGasPaid(paid); setGasRecent(recent)
+    setGasPaid(paid); setGasRecent(recurring)
     setGasEmployees(sorted); setGasAmounts(amounts); setGasChecked(checked); setGasModal(true)
   }
 
@@ -1008,14 +1020,14 @@ export default function AdminPayroll() {
         <div className="flex flex-col gap-4">
           <p className="text-sm text-gray-500">
             Pre-checked: anyone on a <span className="font-semibold text-amber-700">standing allowance</span> or paid gas
-            in the last few weeks (<span className="font-semibold text-gray-600">Recurring</span>). Uncheck anyone,
+            in at least 3 of the last 4 weeks (<span className="font-semibold text-gray-600">Recurring</span>). Uncheck anyone,
             check others to add them, or edit an amount.
           </p>
           <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
             {gasEmployees.map((emp) => {
               const standing = parseFloat(emp.gas_weekly_allowance) || 0
               const paid = gasPaid.has(emp.id)
-              const recurring = !standing && (gasRecent[emp.id] ?? 0) > 0
+              const recurring = !standing && !!gasRecent[emp.id]
               return (
                 <div key={emp.id} className={`flex items-center gap-3 rounded-xl px-4 py-3 ${paid ? 'bg-gray-100 opacity-60' : 'bg-gray-50'}`}>
                   <input type="checkbox" checked={!!gasChecked[emp.id]} disabled={paid}
