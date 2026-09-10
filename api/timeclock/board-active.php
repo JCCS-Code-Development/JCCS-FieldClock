@@ -59,8 +59,16 @@ $out = array_map(static function ($r) {
     ];
 }, $rows);
 
+// The full active roster too, so the board can show everyone — clocked in
+// (grouped by site) and off the clock — at a glance. Names + ids only.
+$roster = array_map(
+    static fn($r) => ['user_id' => (int) $r['id'], 'name' => $r['name']],
+    $pdo->query('SELECT id, name FROM users WHERE is_active = 1 ORDER BY name')->fetchAll()
+);
+
 echo json_encode([
     'as_of'   => (new DateTimeImmutable('now', new DateTimeZone(FIELDCLOCK_TIMEZONE)))->format('c'),
     'count'   => count($out),
     'workers' => $out,
+    'roster'  => $roster,
 ]);
