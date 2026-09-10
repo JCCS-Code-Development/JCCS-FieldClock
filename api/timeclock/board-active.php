@@ -36,10 +36,9 @@ if ($expected === '' || $expected === 'CHANGE_ME' || !hash_equals($expected, $gi
 
 $pdo = getPDO();
 
-// An open entry (end_time IS NULL) that isn't a wrap-up marker = on the clock.
-// Anyone actually on the clock shows (an admin doing field work still needs
-// to appear), except contractors. The OFF-clock roster below stays
-// employees-only so it doesn't list every office admin.
+// The personnel column is about the crew that actually punches in and out —
+// hourly staff only. Salaried people and contractors are never listed, even
+// if they have an open entry.
 $rows = $pdo->query(
     "SELECT u.id, u.name, te.status_label, te.start_time, j.name AS job_name, j.client_name
      FROM time_entries te
@@ -47,6 +46,7 @@ $rows = $pdo->query(
      LEFT JOIN jobs j ON j.id = te.job_id
      WHERE te.end_time IS NULL
        AND u.role <> 'contractor'
+       AND u.pay_structure = 'hourly'
        AND (te.status_label IS NULL OR te.status_label NOT IN ('done'))
        AND (te.cost_category IS NULL OR te.cost_category <> 'day_end')
      ORDER BY u.name"
@@ -63,12 +63,15 @@ $out = array_map(static function ($r) {
     ];
 }, $rows);
 
-// Active employees only — the personnel column groups them into clocked-in
-// (by site) and off the clock. Inactive employees, admins and contractors
-// are not listed.
+// Off-clock roster: active, hourly employees only (same population as the
+// clocked-in list). No salaried staff, admins, contractors or inactive users.
 $roster = array_map(
     static fn($r) => ['user_id' => (int) $r['id'], 'name' => $r['name']],
-    $pdo->query("SELECT id, name FROM users WHERE is_active = 1 AND role = 'employee' ORDER BY name")->fetchAll()
+    $pdo->query(
+        "SELECT id, name FROM users
+         WHERE is_active = 1 AND role = 'employee' AND pay_structure = 'hourly'
+         ORDER BY name"
+    )->fetchAll()
 );
 
 echo json_encode([
