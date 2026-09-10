@@ -37,12 +37,15 @@ if ($expected === '' || $expected === 'CHANGE_ME' || !hash_equals($expected, $gi
 $pdo = getPDO();
 
 // An open entry (end_time IS NULL) that isn't a wrap-up marker = on the clock.
+// Employees only — the Operations Board's personnel column deliberately
+// excludes admins and contractors (vendors aren't `users` at all).
 $rows = $pdo->query(
     "SELECT u.id, u.name, te.status_label, te.start_time, j.name AS job_name, j.client_name
      FROM time_entries te
      JOIN users u ON u.id = te.user_id
      LEFT JOIN jobs j ON j.id = te.job_id
      WHERE te.end_time IS NULL
+       AND u.role = 'employee'
        AND (te.status_label IS NULL OR te.status_label NOT IN ('done'))
        AND (te.cost_category IS NULL OR te.cost_category <> 'day_end')
      ORDER BY u.name"
@@ -63,7 +66,7 @@ $out = array_map(static function ($r) {
 // (grouped by site) and off the clock — at a glance. Names + ids only.
 $roster = array_map(
     static fn($r) => ['user_id' => (int) $r['id'], 'name' => $r['name']],
-    $pdo->query('SELECT id, name FROM users WHERE is_active = 1 ORDER BY name')->fetchAll()
+    $pdo->query("SELECT id, name FROM users WHERE is_active = 1 AND role = 'employee' ORDER BY name")->fetchAll()
 );
 
 echo json_encode([
