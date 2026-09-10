@@ -37,15 +37,16 @@ if ($expected === '' || $expected === 'CHANGE_ME' || !hash_equals($expected, $gi
 $pdo = getPDO();
 
 // An open entry (end_time IS NULL) that isn't a wrap-up marker = on the clock.
-// Employees only — the Operations Board's personnel column deliberately
-// excludes admins and contractors (vendors aren't `users` at all).
+// Anyone actually on the clock shows (an admin doing field work still needs
+// to appear), except contractors. The OFF-clock roster below stays
+// employees-only so it doesn't list every office admin.
 $rows = $pdo->query(
     "SELECT u.id, u.name, te.status_label, te.start_time, j.name AS job_name, j.client_name
      FROM time_entries te
      JOIN users u ON u.id = te.user_id
      LEFT JOIN jobs j ON j.id = te.job_id
      WHERE te.end_time IS NULL
-       AND u.role = 'employee'
+       AND u.role <> 'contractor'
        AND (te.status_label IS NULL OR te.status_label NOT IN ('done'))
        AND (te.cost_category IS NULL OR te.cost_category <> 'day_end')
      ORDER BY u.name"
