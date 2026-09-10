@@ -62,11 +62,16 @@ $out = array_map(static function ($r) {
     ];
 }, $rows);
 
-// The full active roster too, so the board can show everyone — clocked in
-// (grouped by site) and off the clock — at a glance. Names + ids only.
+// The full EMPLOYEE roster — active and inactive — so the board's personnel
+// column can show everyone: clocked in (grouped by site), off the clock, and
+// a greyed "Inactive" group. Admins and contractors are excluded.
 $roster = array_map(
-    static fn($r) => ['user_id' => (int) $r['id'], 'name' => $r['name']],
-    $pdo->query("SELECT id, name FROM users WHERE is_active = 1 AND role = 'employee' ORDER BY name")->fetchAll()
+    static fn($r) => [
+        'user_id'   => (int) $r['id'],
+        'name'      => $r['name'],
+        'is_active' => (bool) $r['is_active'],
+    ],
+    $pdo->query("SELECT id, name, is_active FROM users WHERE role = 'employee' ORDER BY is_active DESC, name")->fetchAll()
 );
 
 echo json_encode([
