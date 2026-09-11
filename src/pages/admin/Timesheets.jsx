@@ -143,6 +143,10 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
       : (entry?.start_time ? format(new Date(entry.start_time), 'yyyy-MM-dd') : '')
   const initStart = isNew ? '08:00' : (entry?.start_time ? format(new Date(entry.start_time), 'HH:mm') : '')
   const initEnd   = isNew ? '17:00' : (entry?.end_time   ? format(new Date(entry.end_time),   'HH:mm') : '')
+  // An existing entry with no end_time (and that isn't a day-end marker) is a
+  // shift the employee is still on. Default to keeping it open so an admin can
+  // fix just the clock-in without being forced to also clock them out.
+  const initOpen  = !isNew && !entry?.end_time && entry?.cost_category !== 'day_end'
 
   // No longer user-selectable (traveling was the only other option); new
   // entries are always 'working', existing entries keep whatever they had.
@@ -150,6 +154,7 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
   const [entryDate,   setEntryDate]   = useState(initDate)
   const [startTime,   setStartTime]   = useState(initStart)
   const [endTime,     setEndTime]     = useState(initEnd)
+  const [stillClockedIn, setStillClockedIn] = useState(initOpen)
   const [jobId,       setJobId]       = useState(entry?.job_id ? String(entry.job_id) : '')
   const [notes,       setNotes]       = useState(entry?.notes ?? '')
   const [error,       setError]       = useState('')
@@ -177,6 +182,7 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
   }, [jobId])
 
   const duration = useMemo(() => {
+    if (stillClockedIn) return null
     if (!startTime || !endTime) return null
     const [sh, sm] = startTime.split(':').map(Number)
     const [eh, em] = endTime.split(':').map(Number)
@@ -184,7 +190,7 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
     if (mins <= 0) return null
     const h = Math.floor(mins / 60), m = mins % 60
     return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`
-  }, [startTime, endTime])
+  }, [startTime, endTime, stillClockedIn])
 
   const handleSave = async () => {
     if (!entryDate) { setError('Please select a day.'); return }
@@ -194,7 +200,7 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
       const payload = {
         status_label: statusLabel,
         start_time:   `${entryDate} ${startTime}:00`,
-        end_time:     endTime ? `${entryDate} ${endTime}:00` : null,
+        end_time:     stillClockedIn ? null : (endTime ? `${entryDate} ${endTime}:00` : null),
         job_id:             jobId ? parseInt(jobId) : null,
         notes:              notes.trim() || null,
         visit_category:     visitCategory || null,
@@ -249,13 +255,34 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
         </div>
         <div>
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Clock Out</label>
-          <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
-            className="w-full rounded-2xl border-2 border-gray-200 px-3 py-3.5 text-xl font-bold text-gray-900 text-center outline-none focus:border-brand-500 transition-colors" />
+          {stillClockedIn ? (
+            <div className="w-full rounded-2xl border-2 border-dashed border-gray-200 px-3 py-3.5 text-base font-semibold text-gray-400 text-center">
+              Still on the clock
+            </div>
+          ) : (
+            <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
+              className="w-full rounded-2xl border-2 border-gray-200 px-3 py-3.5 text-xl font-bold text-gray-900 text-center outline-none focus:border-brand-500 transition-colors" />
+          )}
         </div>
       </div>
 
+      {/* Leave the shift open — fix the clock-in without clocking the employee out */}
+      <label className="flex items-center gap-2.5 -mt-1 cursor-pointer select-none">
+        <input type="checkbox" checked={stillClockedIn} onChange={e => setStillClockedIn(e.target.checked)}
+          className="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500" />
+        <span className="text-sm text-gray-600">
+          Employee is still clocked in — save without a clock-out
+        </span>
+      </label>
+
       {/* Duration pill */}
-      {duration && (
+      {stillClockedIn ? (
+        <div className="flex justify-center">
+          <span className="bg-orange-50 text-orange-600 font-semibold text-sm px-5 py-1.5 rounded-full border border-orange-200">
+            Shift still open
+          </span>
+        </div>
+      ) : duration && (
         <div className="flex justify-center">
           <span className="bg-green-50 text-green-700 font-semibold text-sm px-5 py-1.5 rounded-full border border-green-200">
             {duration} total
