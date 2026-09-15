@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import PageHeader from '../../components/admin/PageHeader'
 import PrintChecks from '../../components/admin/PrintChecks'
 import Button from '../../components/ui/Button'
@@ -13,20 +13,6 @@ import PayPieChart from '../../components/ui/PayPieChart'
 import { formatCurrency, formatHours, formatDate } from '../../utils/format'
 import { format, startOfWeek, endOfWeek, subWeeks, startOfYear, differenceInWeeks } from 'date-fns'
 
-const _today         = new Date()
-const _lastWeekStart = startOfWeek(subWeeks(_today, 1), { weekStartsOn: 1 })
-const _yearWeekStart = startOfWeek(startOfYear(_today), { weekStartsOn: 1 })
-const _numWeeks      = differenceInWeeks(_lastWeekStart, _yearWeekStart) + 1
-
-const periods = Array.from({ length: _numWeeks }, (_, i) => {
-  const start = startOfWeek(subWeeks(_today, i + 1), { weekStartsOn: 1 })
-  const end   = endOfWeek(subWeeks(_today, i + 1), { weekStartsOn: 1 })
-  return {
-    label: i === 0 ? 'Last Week' : `${format(start, 'MMM d')} – ${format(end, 'MMM d')}`,
-    start: format(start, 'yyyy-MM-dd'),
-    end:   format(end,   'yyyy-MM-dd'),
-  }
-})
 
 const ADJ_TYPES = [
   { value: 'bonus',         label: 'Bonus',        color: 'bg-green-100 text-green-700' },
@@ -106,6 +92,29 @@ export default function AdminPayroll() {
   const [pcMarkingAll,   setPcMarkingAll]   = useState(false)
   const [pcMarkingAllPickedUp, setPcMarkingAllPickedUp] = useState(false)
   const [employees,      setEmployees]      = useState([])
+
+  // Computed fresh on every mount (not at module load) so "Last Week" and the
+  // rest of this list stay correct across long-lived PWA sessions — this page
+  // used to compute `today` once, ever, the first time the bundle was
+  // imported, so a tab left open for days would keep labeling an
+  // increasingly stale week "Last Week" while every other page (e.g.
+  // Timesheets) computed the real current week on each render.
+  const periods = useMemo(() => {
+    const today         = new Date()
+    const lastWeekStart = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 })
+    const yearWeekStart = startOfWeek(startOfYear(today), { weekStartsOn: 1 })
+    const numWeeks       = differenceInWeeks(lastWeekStart, yearWeekStart) + 1
+
+    return Array.from({ length: numWeeks }, (_, i) => {
+      const start = startOfWeek(subWeeks(today, i + 1), { weekStartsOn: 1 })
+      const end   = endOfWeek(subWeeks(today, i + 1), { weekStartsOn: 1 })
+      return {
+        label: i === 0 ? 'Last Week' : `${format(start, 'MMM d')} – ${format(end, 'MMM d')}`,
+        start: format(start, 'yyyy-MM-dd'),
+        end:   format(end,   'yyyy-MM-dd'),
+      }
+    })
+  }, [])
 
   const p = periods[period]
 

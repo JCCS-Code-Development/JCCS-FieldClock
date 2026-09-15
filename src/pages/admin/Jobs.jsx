@@ -6,7 +6,7 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import Spinner from '../../components/ui/Spinner'
-import { listJobs, createJob, updateJob, deleteJob, assignEmployees, mergeJob } from '../../api/jobs'
+import { listJobs, createJob, updateJob, deleteJob, deleteJobPermanently, assignEmployees, mergeJob } from '../../api/jobs'
 import { listEmployees } from '../../api/employees'
 import { listEstimates, createEstimate, updateEstimate } from '../../api/estimates'
 import { listInvoices, getDownloadUrl } from '../../api/contractor'
@@ -175,6 +175,19 @@ export default function AdminJobs() {
     }
   }
 
+  // Only ever offered once a job is already cancelled — the API itself
+  // refuses this for anything else, and for anything with time entries on
+  // file (that history should be folded into a real job via Merge instead).
+  const handleDeletePermanently = async (row) => {
+    if (!confirm(`Permanently delete "${row.name}"? This removes it entirely — unlike Delete, this can't be undone.`)) return
+    try {
+      await deleteJobPermanently(row.id)
+      load()
+    } catch (err) {
+      alert(err?.response?.data?.error ?? 'Could not permanently delete. Try again.')
+    }
+  }
+
   const handleApprove = async () => {
     setSaving(true); setFormError('')
     try {
@@ -235,7 +248,11 @@ export default function AdminJobs() {
     { key: 'id', label: '', className: 'w-44', render: (_, row) => (
       <div className="flex gap-2">
         <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(row) }}>Edit</Button>
-        <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDelete(row.id) }}>Delete</Button>
+        {row.status === 'cancelled' ? (
+          <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDeletePermanently(row) }}>Delete Permanently</Button>
+        ) : (
+          <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDelete(row.id) }}>Delete</Button>
+        )}
       </div>
     )},
   ]

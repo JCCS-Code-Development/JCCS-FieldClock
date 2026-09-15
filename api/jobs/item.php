@@ -42,6 +42,40 @@ if ($method === 'GET') {
 
 } elseif ($method === 'DELETE') {
     requireAdmin($auth);
+
+    // ?permanent=1 actually removes the row, instead of the normal soft
+    // delete below. Only ever offered for a job that's already cancelled and
+    // has no time entries logged against it, so this can never silently erase
+    // real payroll/timesheet history — a job with history should go through
+    // merge.php instead, which folds its entries into a real job before the
+    // placeholder is removed.
+    if (isset($_GET['permanent']) && $_GET['permanent'] == '1') {
+        $job = $pdo->prepare('SELECT status FROM jobs WHERE id = ?');
+        $job->execute([$id]);
+        $row = $job->fetch();
+        if (!$row) { http_response_code(404); exit(json_encode(['error' => 'Not found'])); }
+        if ($row['status'] !== 'cancelled') {
+            http_response_code(422);
+            exit(json_encode(['error' => 'Only a cancelled job can be permanently deleted — cancel it first.']));
+        }
+
+        $count = $pdo->prepare('SELECT COUNT(*) AS c FROM time_entries WHERE job_id = ?');
+        $count->execute([$id]);
+        if ((int)$count->fetch()['c'] > 0) {
+            http_response_code(409);
+            exit(json_encode(['error' => 'This job has time entries logged against it, so it can\'t be permanently deleted. Use Merge to fold its history into another job first.']));
+        }
+
+        try {
+            $pdo->prepare('DELETE FROM jobs WHERE id = ?')->execute([$id]);
+        } catch (PDOException $e) {
+            http_response_code(409);
+            exit(json_encode(['error' => 'This job still has related records (invoices, estimates, assignments) and can\'t be permanently deleted.']));
+        }
+        echo json_encode(['message' => 'Permanently deleted']);
+        exit;
+    }
+
     $pdo->prepare('UPDATE jobs SET status="cancelled" WHERE id=?')->execute([$id]);
     echo json_encode(['message' => 'Deleted']);
 } else {

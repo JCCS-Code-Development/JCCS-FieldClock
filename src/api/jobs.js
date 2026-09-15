@@ -18,6 +18,11 @@ export const updateJob = (id, data) =>
 export const deleteJob = (id) =>
   client.delete('/jobs/item.php', { params: { id } }).then((r) => r.data)
 
+// Actually removes the row — only accepted by the API for a job that's
+// already cancelled and has no time entries against it.
+export const deleteJobPermanently = (id) =>
+  client.delete('/jobs/item.php', { params: { id, permanent: 1 } }).then((r) => r.data)
+
 export const assignEmployees = (jobId, userIds) =>
   client.post('/jobs/assign.php', { job_id: jobId, user_ids: userIds }).then((r) => r.data)
 
