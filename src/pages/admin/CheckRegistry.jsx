@@ -6,7 +6,7 @@ import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import Spinner from '../../components/ui/Spinner'
 import Badge from '../../components/ui/Badge'
-import PrintMiscCheck from '../../components/admin/PrintMiscCheck'
+import PrintMiscCheck, { MAX_LINE_ITEMS } from '../../components/admin/PrintMiscCheck'
 import {
   listChecks, createCheck, updateCheck, markPrinted, unmarkPrinted, voidCheck, deleteCheck, payInvoices, payVendorInvoices,
 } from '../../api/checks'
@@ -234,6 +234,7 @@ function PayInvoicesModal({ onClose, onSaved }) {
 
   const chosen = items.filter((it) => selected.has(it.uid))
   const total = chosen.reduce((s, it) => s + it.amount, 0)
+  const checkCount = Math.max(1, Math.ceil(chosen.length / MAX_LINE_ITEMS))
 
   const save = async () => {
     setError('')
@@ -298,11 +299,25 @@ function PayInvoicesModal({ onClose, onSaved }) {
         <span className="text-lg font-bold text-gray-900">{formatCurrency(total)}</span>
       </div>
 
+      {/* A stub only itemizes MAX_LINE_ITEMS invoices, so the API cuts extra
+          checks past that — say so before they commit, not after. */}
+      {checkCount > 1 && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+          A check stub fits {MAX_LINE_ITEMS} invoices, so this creates <strong>{checkCount} checks</strong>
+          {checkNumber.trim() && (/^\d+$/.test(checkNumber.trim())
+            ? <> numbered {Array.from({ length: checkCount }, (_, i) =>
+                String(parseInt(checkNumber.trim(), 10) + i).padStart(checkNumber.trim().length, '0')).join(', ')}</>
+            : <> — only the first takes check #{checkNumber.trim()}; number the rest by hand</>)}.
+        </p>
+      )}
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-3">
         <Button variant="secondary" fullWidth onClick={onClose}>Cancel</Button>
         <Button fullWidth loading={saving} onClick={save} disabled={!selected.size}>
-          {checkNumber.trim() ? 'Cut check' : 'Create draft check'}
+          {checkNumber.trim()
+            ? `Cut check${checkCount > 1 ? `s (${checkCount})` : ''}`
+            : `Create draft check${checkCount > 1 ? `s (${checkCount})` : ''}`}
         </Button>
       </div>
     </div>

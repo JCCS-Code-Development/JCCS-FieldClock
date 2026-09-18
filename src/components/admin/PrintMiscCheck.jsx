@@ -6,11 +6,22 @@ import { amountToWords, CHECK_CON, SEC, CutLine, ES, esH, esC, SectionOverlays, 
 
 const PAYEE_TYPE_LABELS = { vendor: 'Vendor/Provider', employee: 'Employee', contractor: 'Contractor', other: 'Payee' }
 
-// ── Adjustment/compensation pay stub — same table/typography as every
-// other check type in the app. This is a one-off check independent of any
-// regular pay period or invoice, so the "reason" line is the whole point ─
+// A check stub has room for this many invoice lines. The API splits a payment
+// run into additional checks past this, so a stub never has to truncate.
+export const MAX_LINE_ITEMS = 5
+
+// ── Pay stub for every check cut from the registry — same table/typography
+// as every other check type in the app. Two shapes: an invoice-backed check
+// (contractor/vendor) itemizes what it pays; a one-off adjustment has no
+// invoices behind it, so its "reason" line is the whole point ──────────────
 function MiscEarningsStatement({ ck, checkDate }) {
-  const amount = parseFloat(ck.amount)
+  const amount   = parseFloat(ck.amount)
+  // New checks are split so they never exceed MAX_LINE_ITEMS, but a check cut
+  // before that rule existed can still carry more — show what fits and account
+  // for the rest rather than silently dropping invoices off the stub.
+  const allItems = ck.line_items ?? []
+  const items    = allItems.slice(0, MAX_LINE_ITEMS)
+  const overflow = allItems.length - items.length
 
   return (
     <div style={{ fontFamily: ES.font, display: 'flex', flexDirection: 'column', gap: '5pt', height: '100%', justifyContent: 'center' }}>
@@ -36,27 +47,83 @@ function MiscEarningsStatement({ ck, checkDate }) {
         </tbody>
       </table>
 
-      {/* Reason + amount table */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
-        <thead>
-          <tr>
-            <th style={{ ...esH({ textAlign: 'left', paddingLeft: '6pt', width: '70%' }) }}>Adjustment / Compensation</th>
-            <th style={{ ...esH({ textAlign: 'right', paddingRight: '6pt', width: '30%' }) }}>Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt', fontWeight: 500 }) }}>{ck.reason}</td>
-            <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 600 }) }}>{formatCurrency(amount)}</td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr style={{ background: ES.footerBg, borderTop: `1pt solid ${ES.border}` }}>
-            <td style={{ ...esC({ fontWeight: 700, textAlign: 'left', paddingLeft: '6pt', color: '#1e40af', background: ES.footerBg }) }}>Net Pay</td>
-            <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 700, color: '#1e40af', background: ES.footerBg }) }}>{formatCurrency(amount)}</td>
-          </tr>
-        </tfoot>
-      </table>
+      {/* What this check pays for. An invoice-backed check (contractor or
+          vendor) itemizes each invoice — estimate #, invoice #, project — so
+          the payee can reconcile it line by line instead of against one
+          lumped-together total. Anything else (a one-off adjustment) keeps
+          the single reason row. */}
+      {items.length > 0 ? (
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
+          <thead>
+            <tr>
+              <th style={{ ...esH({ textAlign: 'left', paddingLeft: '6pt', width: '18%' }) }}>Estimate #</th>
+              <th style={{ ...esH({ textAlign: 'left', paddingLeft: '6pt', width: '16%' }) }}>Invoice #</th>
+              <th style={{ ...esH({ textAlign: 'left', paddingLeft: '6pt', width: '42%' }) }}>Project / Location</th>
+              <th style={{ ...esH({ textAlign: 'right', paddingRight: '6pt', width: '24%' }) }}>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* Padded to a fixed row count so every stub prints the same height */}
+            {Array.from({ length: Math.max(items.length, 3) }, (_, i) => {
+              const it = items[i]
+              return (
+                <tr key={i} style={{ background: i % 2 ? '#fdf9ee' : '#fff' }}>
+                  <td style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt', fontWeight: 600, color: ES.accent }) }}>
+                    {it ? (it.estimate_number || '—') : ' '}
+                  </td>
+                  <td style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt' }) }}>
+                    {it ? (it.invoice_number ? `#${String(it.invoice_number).replace(/^#/, '')}` : '—') : ' '}
+                  </td>
+                  <td style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt', fontSize: '7.5pt' }) }}>
+                    {it ? (it.location || it.description || '—') : ' '}
+                  </td>
+                  <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 600 }) }}>
+                    {it ? formatCurrency(it.amount) : ' '}
+                  </td>
+                </tr>
+              )
+            })}
+            {overflow > 0 && (
+              <tr style={{ background: '#fdf9ee' }}>
+                <td colSpan={4} style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt', fontSize: '7pt', fontStyle: 'italic', color: '#666' }) }}>
+                  + {overflow} more invoice{overflow === 1 ? '' : 's'} on this check — see the check register for the full list
+                </td>
+              </tr>
+            )}
+          </tbody>
+          <tfoot>
+            <tr style={{ background: ES.footerBg, borderTop: `1pt solid ${ES.border}` }}>
+              <td colSpan={3} style={{ ...esC({ fontWeight: 700, textAlign: 'left', paddingLeft: '6pt', color: '#1e40af', background: ES.footerBg }) }}>
+                Net Pay&ensp;<span style={{ fontWeight: 400, color: '#666', fontSize: '7pt' }}>
+                  ({allItems.length} invoice{allItems.length === 1 ? '' : 's'})
+                </span>
+              </td>
+              <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 700, color: '#1e40af', background: ES.footerBg }) }}>{formatCurrency(amount)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: `0.5pt solid ${ES.border}` }}>
+          <thead>
+            <tr>
+              <th style={{ ...esH({ textAlign: 'left', paddingLeft: '6pt', width: '70%' }) }}>Adjustment / Compensation</th>
+              <th style={{ ...esH({ textAlign: 'right', paddingRight: '6pt', width: '30%' }) }}>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={{ ...esC({ textAlign: 'left', paddingLeft: '6pt', fontWeight: 500 }) }}>{ck.reason}</td>
+              <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 600 }) }}>{formatCurrency(amount)}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr style={{ background: ES.footerBg, borderTop: `1pt solid ${ES.border}` }}>
+              <td style={{ ...esC({ fontWeight: 700, textAlign: 'left', paddingLeft: '6pt', color: '#1e40af', background: ES.footerBg }) }}>Net Pay</td>
+              <td style={{ ...esC({ textAlign: 'right', paddingRight: '6pt', fontWeight: 700, color: '#1e40af', background: ES.footerBg }) }}>{formatCurrency(amount)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      )}
     </div>
   )
 }

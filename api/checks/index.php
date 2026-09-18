@@ -12,6 +12,23 @@ $pdo = getPDO();
 $PAYEE_TYPES = ['employee', 'contractor', 'vendor', 'other'];
 $SOURCES     = ['payroll', 'contractor', 'vendor', 'donation', 'misc', 'manual'];
 
+// A printed check stub itemizes each invoice it pays (estimate #, invoice #,
+// project) and only has room for this many lines. Paying more than this in one
+// run cuts additional checks rather than overflowing — or hiding — the rest.
+const MAX_INVOICES_PER_CHECK = 5;
+
+// Check numbers on a split run follow the physical stock: the admin gives the
+// number of the first check and the rest continue the sequence. A non-numeric
+// number can't be continued safely, so only the first check takes it and the
+// others stay drafts for the admin to number by hand.
+function checkNumberForChunk(?string $first, int $index): ?string {
+    if ($first === null || $first === '')  return null;
+    if ($index === 0)                      return $first;
+    if (!ctype_digit($first))              return null;
+    // Preserve any zero padding (e.g. "0042" + 1 → "0043").
+    return str_pad((string)((int)$first + $index), strlen($first), '0', STR_PAD_LEFT);
+}
+
 // ── GET: list checks with optional filters ───────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $where  = [];
@@ -57,6 +74,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stmt->execute($params);
     $checks = $stmt->fetchAll();
 
+    // What each check actually pays for, one row per linked invoice. The
+    // GROUP_CONCAT above only yields invoice numbers; the printed stub needs
+    // the estimate and job location behind each one, so pull them separately
+    // rather than trying to pack several columns into one concatenated string.
+    $checkIds = array_column($checks, 'id');
+    if ($checkIds) {
+        $ph    = implode(',', array_fill(0, count($checkIds), '?'));
+        $items = [];
+
+        // Contractor invoices — prefer the resolved estimate/job when the typed
+        // estimate # matched a real one, else fall back to what was typed.
+        $ci = $pdo->prepare(
+            "SELECT ci.check_id, ci.invoice_number, ci.amount,
+                    COALESCE(je.estimate_number, ci.estimate_number) AS estimate_number,
+                    je.description AS description,
+                    COALESCE(j.name, ci.job_location) AS location
+             FROM contractor_invoices ci
+             LEFT JOIN job_estimates je ON je.id = ci.estimate_id
+             LEFT JOIN jobs j ON j.id = je.job_id
+             WHERE ci.check_id IN ($ph)
+             ORDER BY ci.id"
+        );
+        $ci->execute($checkIds);
+        foreach ($ci->fetchAll() as $r) {
+            $items[$r['check_id']][] = [
+                'invoice_number'  => $r['invoice_number'],
+                'estimate_number' => $r['estimate_number'],
+                'description'     => $r['description'],
+                'location'        => $r['location'],
+                'amount'          => (float)$r['amount'],
+            ];
+        }
+
+        // Vendor invoices carry no estimate/job — their memo is the description.
+        $vi = $pdo->prepare(
+            "SELECT vi.check_id, vi.invoice_number, vi.amount, vi.memo AS description
+             FROM vendor_invoices vi
+             WHERE vi.check_id IN ($ph)
+             ORDER BY vi.id"
+        );
+        $vi->execute($checkIds);
+        foreach ($vi->fetchAll() as $r) {
+            $items[$r['check_id']][] = [
+                'invoice_number'  => $r['invoice_number'],
+                'estimate_number' => null,
+                'description'     => $r['description'],
+                'location'        => null,
+                'amount'          => (float)$r['amount'],
+            ];
+        }
+
+        foreach ($checks as &$c) { $c['line_items'] = $items[$c['id']] ?? []; }
+        unset($c);
+    }
+
     $cStmt  = $pdo->query('SELECT status, COUNT(*) AS cnt, COALESCE(SUM(amount),0) AS total FROM check_registry GROUP BY status');
     $counts = ['draft' => 0, 'printed' => 0, 'cleared' => 0, 'voided' => 0];
     $totals = ['draft' => 0, 'printed' => 0, 'cleared' => 0, 'voided' => 0];
@@ -94,28 +166,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($r['status'] !== 'draft') { http_response_code(422); exit(json_encode(['error' => 'Invoice ' . ($r['invoice_number'] ?: $r['id']) . ' is already paid or voided.'])); }
                 if (!$r['amount'] || (float)$r['amount'] <= 0) { http_response_code(422); exit(json_encode(['error' => 'Invoice ' . ($r['invoice_number'] ?: $r['id']) . ' has no amount.'])); }
             }
-            $total     = array_sum(array_map(fn($r) => (float)$r['amount'], $rows));
-            $invNums   = array_filter(array_map(fn($r) => $r['invoice_number'], $rows));
-            $memo      = 'Invoice ' . ($invNums ? implode(', ', $invNums) : ('#' . implode(', #', $ids)));
-            $checkNum  = !empty($body['check_number']) ? sanitizeString($body['check_number']) : null;
+            $firstNum  = !empty($body['check_number']) ? sanitizeString($body['check_number']) : null;
             $checkDate = sanitizeString($body['check_date'] ?? date('Y-m-d'));
 
+            // Keep the caller's ordering so the invoices grouped onto each
+            // physical check match what the admin saw when selecting them.
+            $byId   = [];
+            foreach ($rows as $r) { $byId[(int)$r['id']] = $r; }
+            $chunks = array_chunk($ids, MAX_INVOICES_PER_CHECK);
+
             $pdo->beginTransaction();
-            $pdo->prepare(
-                'INSERT INTO check_registry
-                   (check_number, payee_type, user_id, payee_name, payee_address, amount, memo,
-                    issued_date, status, source, created_by)
-                 VALUES (?, "contractor", ?, ?, ?, ?, ?, ?, ?, "contractor", ?)'
-            )->execute([
-                $checkNum, $rows[0]['user_id'], $rows[0]['contractor_name'], $rows[0]['contractor_address'],
-                $total, $memo, $checkDate, $checkNum ? 'printed' : 'draft', $auth['user_id'],
-            ]);
-            $checkId = (int)$pdo->lastInsertId();
-            $pdo->prepare("UPDATE contractor_invoices SET check_id = ?, status = 'printed' WHERE id IN ($ph)")
-                ->execute(array_merge([$checkId], $ids));
+            $checkIds = [];
+            foreach ($chunks as $i => $chunkIds) {
+                $chunkRows = array_map(fn($id) => $byId[$id], $chunkIds);
+                $total     = array_sum(array_map(fn($r) => (float)$r['amount'], $chunkRows));
+                $invNums   = array_filter(array_map(fn($r) => $r['invoice_number'], $chunkRows));
+                $memo      = 'Invoice ' . ($invNums ? implode(', ', $invNums) : ('#' . implode(', #', $chunkIds)));
+                $checkNum  = checkNumberForChunk($firstNum, $i);
+
+                $pdo->prepare(
+                    'INSERT INTO check_registry
+                       (check_number, payee_type, user_id, payee_name, payee_address, amount, memo,
+                        issued_date, status, source, created_by)
+                     VALUES (?, "contractor", ?, ?, ?, ?, ?, ?, ?, "contractor", ?)'
+                )->execute([
+                    $checkNum, $chunkRows[0]['user_id'], $chunkRows[0]['contractor_name'], $chunkRows[0]['contractor_address'],
+                    $total, $memo, $checkDate, $checkNum ? 'printed' : 'draft', $auth['user_id'],
+                ]);
+                $checkId    = (int)$pdo->lastInsertId();
+                $checkIds[] = $checkId;
+
+                $cph = implode(',', array_fill(0, count($chunkIds), '?'));
+                $pdo->prepare("UPDATE contractor_invoices SET check_id = ?, status = 'printed' WHERE id IN ($cph)")
+                    ->execute(array_merge([$checkId], $chunkIds));
+            }
             $pdo->commit();
 
-            echo json_encode(['success' => true, 'check_id' => $checkId]);
+            echo json_encode(['success' => true, 'check_id' => $checkIds[0], 'check_ids' => $checkIds]);
             exit;
         }
 
@@ -138,28 +225,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($r['status'] !== 'draft') { http_response_code(422); exit(json_encode(['error' => 'Invoice ' . ($r['invoice_number'] ?: $r['id']) . ' is already paid or voided.'])); }
                 if (!$r['amount'] || (float)$r['amount'] <= 0) { http_response_code(422); exit(json_encode(['error' => 'Invoice ' . ($r['invoice_number'] ?: $r['id']) . ' has no amount.'])); }
             }
-            $total     = array_sum(array_map(fn($r) => (float)$r['amount'], $rows));
-            $invNums   = array_filter(array_map(fn($r) => $r['invoice_number'], $rows));
-            $memo      = 'Invoice ' . ($invNums ? implode(', ', $invNums) : ('#' . implode(', #', $ids)));
-            $checkNum  = !empty($body['check_number']) ? sanitizeString($body['check_number']) : null;
+            $firstNum  = !empty($body['check_number']) ? sanitizeString($body['check_number']) : null;
             $checkDate = sanitizeString($body['check_date'] ?? date('Y-m-d'));
 
+            $byId   = [];
+            foreach ($rows as $r) { $byId[(int)$r['id']] = $r; }
+            $chunks = array_chunk($ids, MAX_INVOICES_PER_CHECK);
+
             $pdo->beginTransaction();
-            $pdo->prepare(
-                'INSERT INTO check_registry
-                   (check_number, payee_type, vendor_id, payee_name, payee_address, amount, memo,
-                    issued_date, status, source, created_by)
-                 VALUES (?, "vendor", ?, ?, ?, ?, ?, ?, ?, "vendor", ?)'
-            )->execute([
-                $checkNum, $rows[0]['vendor_id'], $rows[0]['vendor_name'], $rows[0]['vendor_address'],
-                $total, $memo, $checkDate, $checkNum ? 'printed' : 'draft', $auth['user_id'],
-            ]);
-            $checkId = (int)$pdo->lastInsertId();
-            $pdo->prepare("UPDATE vendor_invoices SET check_id = ?, status = 'printed' WHERE id IN ($ph)")
-                ->execute(array_merge([$checkId], $ids));
+            $checkIds = [];
+            foreach ($chunks as $i => $chunkIds) {
+                $chunkRows = array_map(fn($id) => $byId[$id], $chunkIds);
+                $total     = array_sum(array_map(fn($r) => (float)$r['amount'], $chunkRows));
+                $invNums   = array_filter(array_map(fn($r) => $r['invoice_number'], $chunkRows));
+                $memo      = 'Invoice ' . ($invNums ? implode(', ', $invNums) : ('#' . implode(', #', $chunkIds)));
+                $checkNum  = checkNumberForChunk($firstNum, $i);
+
+                $pdo->prepare(
+                    'INSERT INTO check_registry
+                       (check_number, payee_type, vendor_id, payee_name, payee_address, amount, memo,
+                        issued_date, status, source, created_by)
+                     VALUES (?, "vendor", ?, ?, ?, ?, ?, ?, ?, "vendor", ?)'
+                )->execute([
+                    $checkNum, $chunkRows[0]['vendor_id'], $chunkRows[0]['vendor_name'], $chunkRows[0]['vendor_address'],
+                    $total, $memo, $checkDate, $checkNum ? 'printed' : 'draft', $auth['user_id'],
+                ]);
+                $checkId    = (int)$pdo->lastInsertId();
+                $checkIds[] = $checkId;
+
+                $cph = implode(',', array_fill(0, count($chunkIds), '?'));
+                $pdo->prepare("UPDATE vendor_invoices SET check_id = ?, status = 'printed' WHERE id IN ($cph)")
+                    ->execute(array_merge([$checkId], $chunkIds));
+            }
             $pdo->commit();
 
-            echo json_encode(['success' => true, 'check_id' => $checkId]);
+            echo json_encode(['success' => true, 'check_id' => $checkIds[0], 'check_ids' => $checkIds]);
             exit;
         }
 
