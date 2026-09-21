@@ -331,7 +331,13 @@ export default function MyPay() {
                     const periodPaycheck = paychecks.find(
                       (pc) => pc.period_start === p.start && pc.period_end === p.end
                     )
-                    const payAvailable = ['available', 'picked_up'].includes(periodPaycheck?.status)
+                    // Also unlocked by the clock: pay day is the Friday after the
+                    // period ends (period end is Sunday), from noon local time.
+                    const payDayNoon = parseISO(`${p.end}T12:00:00`)
+                    payDayNoon.setDate(payDayNoon.getDate() + 5)
+                    const payAvailable = !p.current && (
+                      ['available', 'picked_up'].includes(periodPaycheck?.status) || new Date() >= payDayNoon
+                    )
                     return (
                       <>
                         {/* ── Stats — one card, 4 cells, no per-item chrome ── */}
