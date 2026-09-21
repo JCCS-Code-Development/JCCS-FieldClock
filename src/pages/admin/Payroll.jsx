@@ -401,18 +401,22 @@ export default function AdminPayroll() {
         .filter(e => e._gas + e._bonus > 0)
     : []
 
-  const pendingPcCount = paychecks.filter((pc) => pc.status === 'processing').length
-  const pendingPcForPeriodCount = paychecks.filter((pc) =>
+    const pendingPcForPeriodCount = paychecks.filter((pc) =>
     pc.status === 'processing' && pc.period_start === p.start && pc.period_end === p.end
   ).length
   const notPickedUpForPeriodCount = paychecks.filter((pc) =>
     (pc.status === 'processing' || pc.status === 'available') && pc.period_start === p.start && pc.period_end === p.end
   ).length
 
+  // Tab badge: processing checks for the selected period only, and only while
+  // that period is recent — stale periods shouldn't nag.
+  const badgeCutoff = format(subWeeks(new Date(), 2), 'yyyy-MM-dd')
+  const pcBadge = p.end >= badgeCutoff ? pendingPcForPeriodCount : 0
+
   const TABS = [
     { key: 'w2',          label: 'W-2 Employees' },
     { key: '1099',        label: '1099 Employees' },
-    { key: 'paychecks',   label: 'Paychecks', badge: pendingPcCount || null },
+    { key: 'paychecks',   label: 'Paychecks', badge: pcBadge || null },
   ]
 
   return (
@@ -468,7 +472,7 @@ export default function AdminPayroll() {
             {label}
             {badge ? (
               <span
-                title={`${badge} paycheck${badge === 1 ? '' : 's'} pending`}
+                title={`${badge} paycheck${badge === 1 ? '' : 's'} pending for this period`}
                 className="bg-amber-100 text-amber-700 text-[11px] font-bold min-w-[1.25rem] h-5 px-1.5 rounded-full inline-flex items-center justify-center leading-none tabular-nums">
                 {badge > 99 ? '99+' : badge}
               </span>
