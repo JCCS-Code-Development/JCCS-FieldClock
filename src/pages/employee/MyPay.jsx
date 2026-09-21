@@ -331,13 +331,13 @@ export default function MyPay() {
                     const periodPaycheck = paychecks.find(
                       (pc) => pc.period_start === p.start && pc.period_end === p.end
                     )
-                    // Also unlocked by the clock: pay day is the Friday after the
-                    // period ends (period end is Sunday), from noon local time.
-                    const payDayNoon = parseISO(`${p.end}T12:00:00`)
-                    payDayNoon.setDate(payDayNoon.getDate() + 5)
-                    const payAvailable = !p.current && (
-                      ['available', 'picked_up'].includes(periodPaycheck?.status) || new Date() >= payDayNoon
-                    )
+                    // Also unlocked by the clock: from Friday noon (local time) of
+                    // the pay week itself (weeks run Mon–Sun), for the current
+                    // week and every finished one after it.
+                    const unlockAt = parseISO(`${p.start}T12:00:00`)
+                    unlockAt.setDate(unlockAt.getDate() + 4)
+                    const payAvailable =
+                      ['available', 'picked_up'].includes(periodPaycheck?.status) || new Date() >= unlockAt
                     return (
                       <>
                         {/* ── Stats — one card, 4 cells, no per-item chrome ── */}
