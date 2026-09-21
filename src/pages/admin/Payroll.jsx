@@ -459,16 +459,18 @@ export default function AdminPayroll() {
           overflow-y: auto), so the badges' -top-1.5 overshoot above the
           buttons needs real top padding here, not just the shorthand p-1 —
           otherwise their tops get cut off by the container's own clip box. */}
-      <div className="flex gap-1 mb-5 bg-gray-100 rounded-xl px-1 pb-1 pt-2.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex gap-1 mb-5 bg-gray-100 rounded-xl p-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
         {TABS.map(({ key, label, badge }) => (
           <button key={key} onClick={() => setTab(key)}
-            className={`relative px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors ${
+            className={`inline-flex items-center gap-2 px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors ${
               tab === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}>
             {label}
             {badge ? (
-              <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center leading-none">
-                {badge}
+              <span
+                title={`${badge} paycheck${badge === 1 ? '' : 's'} pending`}
+                className="bg-amber-100 text-amber-700 text-[11px] font-bold min-w-[1.25rem] h-5 px-1.5 rounded-full inline-flex items-center justify-center leading-none tabular-nums">
+                {badge > 99 ? '99+' : badge}
               </span>
             ) : null}
           </button>
