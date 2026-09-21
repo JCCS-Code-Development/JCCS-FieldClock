@@ -7,7 +7,8 @@ import Spinner from '../../components/ui/Spinner'
 import Input from '../../components/ui/Input'
 import { getSummary, getBreakdown, listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment } from '../../api/payroll'
 import { listEmployees } from '../../api/employees'
-import { getPeriodLoanTotals } from '../../api/loans'
+import { getPeriodLoanTotals, listLoans } from '../../api/loans'
+import { useNavigate } from 'react-router-dom'
 import { listPaychecks, createPaycheck, updatePaycheck, deletePaycheck, markAllAvailable, markAllPickedUp } from '../../api/paychecks'
 import PayPieChart from '../../components/ui/PayPieChart'
 import { formatCurrency, formatHours, formatDate } from '../../utils/format'
@@ -58,8 +59,30 @@ export default function AdminPayroll() {
 
   // Per-period loan deductions keyed by user_id
   const [loanDeductions, setLoanDeductions] = useState({})
+  // user_id → { weekly, remaining } for everyone with an active loan that still has a balance
+  const [activeLoans, setActiveLoans] = useState({})
+  const navigate = useNavigate()
 
   const [printOpen, setPrintOpen] = useState(false)
+
+  // Flag next to a name when the person has an active loan; click jumps to the
+  // Loans tab where the weekly amount is collected (Record Payment).
+  const loanFlag = (userId) => {
+    const l = activeLoans[userId]
+    if (!l) return null
+    return (
+      <span
+        role="link"
+        tabIndex={0}
+        title={`Active loan — ${formatCurrency(l.remaining)} remaining. Go to Loans to collect the weekly amount.`}
+        onClick={(e) => { e.stopPropagation(); navigate('/admin/loans') }}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); navigate('/admin/loans') } }}
+        className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-full cursor-pointer whitespace-nowrap"
+      >
+        Loan{l.weekly > 0 ? ` ${formatCurrency(l.weekly)}/wk` : ''} · Collect in Loans ›
+      </span>
+    )
+  }
 
   // Gas review
   const [gasModal,     setGasModal]     = useState(false)
@@ -141,6 +164,16 @@ export default function AdminPayroll() {
     loadSummary()
     loadAdjustments()
     getPeriodLoanTotals(p.start, p.end).then(setLoanDeductions).catch(() => setLoanDeductions({}))
+    listLoans({ status: 'active' }).then((d) => {
+      const m = {}
+      for (const l of d.loans ?? []) {
+        const remaining = parseFloat(l.remaining) || 0
+        if (remaining <= 0) continue
+        const cur = m[l.user_id] ?? { weekly: 0, remaining: 0 }
+        m[l.user_id] = { weekly: cur.weekly + (parseFloat(l.weekly_deduction) || 0), remaining: cur.remaining + remaining }
+      }
+      setActiveLoans(m)
+    }).catch(() => setActiveLoans({}))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period])
 
@@ -473,6 +506,7 @@ export default function AdminPayroll() {
                           }
                           {gas  > 0 && <span className="text-xs text-amber-600 font-medium">+{formatCurrency(gas)} gas</span>}
                           {loan > 0 && <span className="text-xs text-red-500 font-medium">−{formatCurrency(loan)} loan</span>}
+                          {loanFlag(emp.user_id)}
                           {bonus> 0 && <span className="text-xs text-green-600 font-medium">+{formatCurrency(bonus)} bonus</span>}
                         </div>
                       </div>
@@ -550,7 +584,9 @@ export default function AdminPayroll() {
                       return (
                         <tr key={emp.user_id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
                           onClick={() => openDrillDown(emp)}>
-                          <td className="px-5 py-3 font-medium text-gray-900">{emp.name}</td>
+                          <td className="px-5 py-3 font-medium text-gray-900">
+                            <div className="flex items-center gap-2 flex-wrap">{emp.name}{loanFlag(emp.user_id)}</div>
+                          </td>
                           <td className="px-4 py-3 text-right text-gray-600">
                             {emp.pay_structure === 'salary'
                               ? <span className="text-xs font-semibold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">Salary</span>
