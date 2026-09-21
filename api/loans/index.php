@@ -24,27 +24,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $mine = $auth['role'] !== 'admin' || !empty($_GET['mine']);
 
     // Optional: period_start + period_end → return loan deduction per user for
-    // that pay period. Any recorded loan_payment overlapping the period is
-    // authoritative — even one that sums to $0, which is how an admin skips a
-    // week. Only when there is NO entry for the week do we fall back, for an
-    // active loan whose schedule has started and still has a balance, to the
-    // scheduled weekly_deduction (capped at the remaining balance) so payroll
-    // withholds it automatically.
+    // that pay period. Only loan_payment rows recorded by an admin (Loans page →
+    // Record Payment) that overlap the period count. Nothing is withheld
+    // automatically from the scheduled weekly_deduction — payroll flags active
+    // loans instead, and the admin collects by recording the payment.
     if (!empty($_GET['period_start']) && !empty($_GET['period_end'])) {
         $ps = sanitizeString($_GET['period_start']);
         $pe = sanitizeString($_GET['period_end']);
 
-        $deductionExpr =
-            "CASE
-                WHEN COALESCE(rec.n, 0) > 0 THEN COALESCE(rec.paid, 0)
-                WHEN l.status = 'active'
-                     AND l.weekly_deduction > 0
-                     AND l.deduction_start_date IS NOT NULL
-                     AND l.deduction_start_date <= ?
-                     AND (l.amount - COALESCE(pd.paid_ever, 0)) > 0
-                  THEN LEAST(l.weekly_deduction, l.amount - COALESCE(pd.paid_ever, 0))
-                ELSE 0
-             END";
+        $deductionExpr = "COALESCE(rec.paid, 0)";
 
         $from =
             "FROM employee_loans l
@@ -52,10 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                  SELECT loan_id, SUM(amount) AS paid, COUNT(*) AS n FROM loan_payments
                  WHERE period_start <= ? AND period_end >= ?
                  GROUP BY loan_id
-             ) rec ON rec.loan_id = l.id
-             LEFT JOIN (
-                 SELECT loan_id, SUM(amount) AS paid_ever FROM loan_payments GROUP BY loan_id
-             ) pd ON pd.loan_id = l.id";
+             ) rec ON rec.loan_id = l.id";
 
         if (!$mine) {
             // Admin: all users grouped by user_id
@@ -65,8 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                  GROUP BY l.user_id
                  HAVING period_deduction > 0"
             );
-            // placeholder order: deduction_start_date<=?, rec.period_start<=?, rec.period_end>=?
-            $stmt->execute([$ps, $pe, $ps]);
+            $stmt->execute([$pe, $ps]);
             $byUser = [];
             foreach ($stmt->fetchAll() as $r) {
                 $byUser[(int)$r['user_id']] = (float)$r['period_deduction'];
@@ -79,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                  $from
                  WHERE l.user_id = ?"
             );
-            $stmt->execute([$ps, $pe, $ps, $auth['user_id']]);
+            $stmt->execute([$pe, $ps, $auth['user_id']]);
             $row = $stmt->fetch();
             echo json_encode(['period_loan_deduction' => (float)($row['period_deduction'] ?? 0)]);
         }
