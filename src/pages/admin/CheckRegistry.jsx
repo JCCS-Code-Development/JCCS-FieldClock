@@ -65,7 +65,7 @@ function CreateCheckModal({ onClose, onSaved }) {
   useEffect(() => {
     // Employees only — contractors are paid from an approved invoice, never a hand-cut check.
     listEmployees().then((d) => setEmployees((d.employees ?? []).filter((e) => e.is_active && e.role !== 'contractor'))).catch(() => {})
-    listVendors({ active: true }).then((d) => setVendors(d.vendors ?? [])).catch(() => {})
+    listVendors({ active: 1 }).then((d) => setVendors(d.vendors ?? [])).catch(() => {})
   }, [])
 
   const opt = PAYEE_OPTIONS.find((o) => o.key === choice)
