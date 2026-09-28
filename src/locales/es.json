@@ -90,6 +90,7 @@
     },
     "lunch": {
       "start": "Iniciar Almuerzo",
+      "paidUpTo": "Pagado, hasta 1 hora",
       "end": "Terminar Almuerzo",
       "remaining": "Quedan {{time}}",
       "over": "Más de 1 hora",

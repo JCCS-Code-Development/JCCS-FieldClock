@@ -479,37 +479,64 @@ export default function ClockPanel({ showHeader = true }) {
                 ⚠️ {t('home.offSiteBadge')}
               </span>
             )}
-
-            {/* Lunch — paid, capped at 1 hour. Start from any active status;
-                while on lunch, show time left (red once over, matching the
-                server auto clock-out + lock at the same cap). */}
-            {statusLabel === 'lunch' ? (
-              <div className="flex flex-col items-center gap-1">
-                <span className={`text-xs font-bold tabular-nums ${liveElapsed >= LUNCH_CAP_SECONDS ? 'text-red-600' : 'text-amber-700'}`}>
-                  {liveElapsed >= LUNCH_CAP_SECONDS
-                    ? t('home.lunch.over')
-                    : t('home.lunch.remaining', { time: formatElapsed(LUNCH_CAP_SECONDS - liveElapsed) })}
-                </span>
-                <button
-                  onClick={handleEndLunch}
-                  disabled={lunchLoading || !isOnline}
-                  className="text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50 px-4 py-1.5 rounded-full transition-colors"
-                >
-                  {lunchLoading ? <Spinner size="sm" /> : t('home.lunch.end')}
-                </button>
-              </div>
-            ) : (
-              statusLabel !== 'done' && (
-                <button
-                  onClick={handleStartLunch}
-                  disabled={lunchLoading || !isOnline}
-                  className="text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 disabled:opacity-50 px-4 py-1.5 rounded-full transition-colors"
-                >
-                  {lunchLoading ? <Spinner size="sm" /> : t('home.lunch.start')}
-                </button>
-              )
-            )}
           </div>
+        )}
+
+        {/* Lunch — paid, capped at 1 hour. A full-width, high-contrast card
+            (not a small pill) so it reads clearly at a glance on both phone
+            and desktop. Two states: an inviting "Start Lunch" tap target while
+            working, and an unmissable countdown + "End Lunch" once on lunch —
+            it turns red past the cap, matching the server auto clock-out +
+            lock that lands at the same 60-minute mark. */}
+        {isClockedIn && statusLabel !== 'done' && (
+          statusLabel === 'lunch' ? (
+            <div className={`w-full rounded-2xl border-2 px-4 py-3.5 sm:px-5 sm:py-4 flex items-center justify-between gap-3 transition-colors ${
+              liveElapsed >= LUNCH_CAP_SECONDS ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'
+            }`}>
+              <div className="flex items-center gap-3 min-w-0">
+                <span className={`w-11 h-11 rounded-full flex items-center justify-center text-xl shrink-0 ${
+                  liveElapsed >= LUNCH_CAP_SECONDS ? 'bg-red-100' : 'bg-amber-100'
+                }`}>
+                  🍽️
+                </span>
+                <div className="min-w-0">
+                  <p className={`text-xs font-bold uppercase tracking-wide ${liveElapsed >= LUNCH_CAP_SECONDS ? 'text-red-600' : 'text-amber-700'}`}>
+                    {t('status.lunch')}
+                  </p>
+                  <p className={`text-lg sm:text-xl font-bold tabular-nums leading-tight ${liveElapsed >= LUNCH_CAP_SECONDS ? 'text-red-700' : 'text-amber-800'}`}>
+                    {liveElapsed >= LUNCH_CAP_SECONDS
+                      ? t('home.lunch.over')
+                      : t('home.lunch.remaining', { time: formatElapsed(LUNCH_CAP_SECONDS - liveElapsed) })}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleEndLunch}
+                disabled={lunchLoading || !isOnline}
+                className="shrink-0 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 active:scale-95 disabled:opacity-50 px-4 sm:px-6 py-3 rounded-xl shadow-sm shadow-amber-300/50 transition-all"
+              >
+                {lunchLoading ? <Spinner size="sm" /> : t('home.lunch.end')}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleStartLunch}
+              disabled={lunchLoading || !isOnline}
+              className="w-full flex items-center justify-between gap-3 rounded-2xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 active:scale-[0.99] disabled:opacity-50 px-4 py-3.5 sm:px-5 sm:py-4 transition-all"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="w-11 h-11 rounded-full bg-amber-100 flex items-center justify-center text-xl shrink-0">🍽️</span>
+                <div className="text-left min-w-0">
+                  <p className="text-sm sm:text-base font-bold text-amber-800">{t('home.lunch.start')}</p>
+                  <p className="text-xs text-amber-600">{t('home.lunch.paidUpTo')}</p>
+                </div>
+              </div>
+              {lunchLoading
+                ? <Spinner size="sm" className="text-amber-600 shrink-0" />
+                : <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+              }
+            </button>
+          )
         )}
 
         {/* One-time heads-up right after a clock-in whose GPS didn't match the

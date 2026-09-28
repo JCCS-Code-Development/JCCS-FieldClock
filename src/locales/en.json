@@ -90,6 +90,7 @@
     },
     "lunch": {
       "start": "Start Lunch",
+      "paidUpTo": "Paid, up to 1 hour",
       "end": "End Lunch",
       "remaining": "{{time}} left",
       "over": "Over 1 hour",
