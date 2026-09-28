@@ -270,8 +270,12 @@ export default function ClockPanel({ showHeader = true }) {
     setCorrModal(entry)
     setCorrStep(1)
     setCorrType('')
-    setCorrStart(entry.start_time ? entry.start_time.slice(0, 16) : '')
-    setCorrEnd(entry.end_time     ? entry.end_time.slice(0, 16)   : '')
+    // The API returns MySQL's space-separated "YYYY-MM-DD HH:MM:SS" — an
+    // <input type="datetime-local"> requires a literal "T" separator or it
+    // silently renders blank (no error) instead of showing the entry's
+    // actual time.
+    setCorrStart(entry.start_time ? entry.start_time.replace(' ', 'T').slice(0, 16) : '')
+    setCorrEnd(entry.end_time     ? entry.end_time.replace(' ', 'T').slice(0, 16)   : '')
     setCorrReason('')
     setCorrError('')
   }
@@ -284,8 +288,8 @@ export default function ClockPanel({ showHeader = true }) {
     try {
       await createChangeRequest({
         entry_id: corrModal.id,
-        requested_start: corrStart || null,
-        requested_end:   corrEnd   || null,
+        requested_start: corrStart ? corrStart.replace('T', ' ') : null,
+        requested_end:   corrEnd   ? corrEnd.replace('T', ' ')   : null,
         reason: corrReason,
       })
       setCorrModal(null)
@@ -490,50 +494,64 @@ export default function ClockPanel({ showHeader = true }) {
             lock that lands at the same 60-minute mark. */}
         {isClockedIn && statusLabel !== 'done' && (
           statusLabel === 'lunch' ? (
-            <div className={`w-full rounded-2xl border-2 px-4 py-3.5 sm:px-5 sm:py-4 flex items-center justify-between gap-3 transition-colors ${
-              liveElapsed >= LUNCH_CAP_SECONDS ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'
+            // lunchReady guards against a real "restarted" illusion: the store
+            // persists statusLabel across app opens (so it can say 'lunch'
+            // immediately on a cold start) but deliberately does NOT persist
+            // currentEntry (see timeclockStore.js's partialize) — that only
+            // arrives once the mount-time getStatus() call resolves. Until it
+            // does, currentEntry is null, liveElapsed reads 0, and showing
+            // LUNCH_CAP_SECONDS - 0 would flash a full, wrong "01:00:00 left"
+            // (looking exactly like the timer reset) before snapping to the
+            // real value moments later. Show a neutral loading state instead
+            // of a specific number we don't actually know yet.
+            (() => { const lunchReady = !!currentEntry?.start_time; return (
+            <div className={`w-full rounded-2xl border-2 px-5 py-4 flex items-center justify-between gap-3 transition-colors ${
+              !lunchReady ? 'bg-gray-50 border-gray-200' : liveElapsed >= LUNCH_CAP_SECONDS ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'
             }`}>
               <div className="flex items-center gap-3 min-w-0">
-                <span className={`w-11 h-11 rounded-full flex items-center justify-center text-xl shrink-0 ${
-                  liveElapsed >= LUNCH_CAP_SECONDS ? 'bg-red-100' : 'bg-amber-100'
+                <span className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shrink-0 ${
+                  !lunchReady ? 'bg-gray-100' : liveElapsed >= LUNCH_CAP_SECONDS ? 'bg-red-100' : 'bg-amber-100'
                 }`}>
                   🍽️
                 </span>
                 <div className="min-w-0">
-                  <p className={`text-xs font-bold uppercase tracking-wide ${liveElapsed >= LUNCH_CAP_SECONDS ? 'text-red-600' : 'text-amber-700'}`}>
+                  <p className={`text-xs font-bold uppercase tracking-wide ${!lunchReady ? 'text-gray-400' : liveElapsed >= LUNCH_CAP_SECONDS ? 'text-red-600' : 'text-amber-700'}`}>
                     {t('status.lunch')}
                   </p>
-                  <p className={`text-lg sm:text-xl font-bold tabular-nums leading-tight ${liveElapsed >= LUNCH_CAP_SECONDS ? 'text-red-700' : 'text-amber-800'}`}>
-                    {liveElapsed >= LUNCH_CAP_SECONDS
-                      ? t('home.lunch.over')
-                      : t('home.lunch.remaining', { time: formatElapsed(LUNCH_CAP_SECONDS - liveElapsed) })}
+                  <p className={`text-xl font-bold tabular-nums leading-tight ${!lunchReady ? 'text-gray-400' : liveElapsed >= LUNCH_CAP_SECONDS ? 'text-red-700' : 'text-amber-800'}`}>
+                    {!lunchReady
+                      ? <Spinner size="sm" />
+                      : liveElapsed >= LUNCH_CAP_SECONDS
+                        ? t('home.lunch.over')
+                        : t('home.lunch.remaining', { time: formatElapsed(LUNCH_CAP_SECONDS - liveElapsed) })}
                   </p>
                 </div>
               </div>
               <button
                 onClick={handleEndLunch}
-                disabled={lunchLoading || !isOnline}
-                className="shrink-0 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 active:scale-95 disabled:opacity-50 px-4 sm:px-6 py-3 rounded-xl shadow-sm shadow-amber-300/50 transition-all"
+                disabled={lunchLoading || !isOnline || !lunchReady}
+                className="shrink-0 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 active:scale-95 disabled:opacity-50 px-6 py-3.5 rounded-xl shadow-sm shadow-amber-300/50 transition-all"
               >
                 {lunchLoading ? <Spinner size="sm" /> : t('home.lunch.end')}
               </button>
             </div>
+          )})()
           ) : (
             <button
               onClick={handleStartLunch}
               disabled={lunchLoading || !isOnline}
-              className="w-full flex items-center justify-between gap-3 rounded-2xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 active:scale-[0.99] disabled:opacity-50 px-4 py-3.5 sm:px-5 sm:py-4 transition-all"
+              className="w-full flex items-center justify-between gap-3 rounded-2xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 active:scale-[0.99] disabled:opacity-50 px-5 py-4 transition-all"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="w-11 h-11 rounded-full bg-amber-100 flex items-center justify-center text-xl shrink-0">🍽️</span>
+                <span className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-2xl shrink-0">🍽️</span>
                 <div className="text-left min-w-0">
-                  <p className="text-sm sm:text-base font-bold text-amber-800">{t('home.lunch.start')}</p>
+                  <p className="text-base font-bold text-amber-800">{t('home.lunch.start')}</p>
                   <p className="text-xs text-amber-600">{t('home.lunch.paidUpTo')}</p>
                 </div>
               </div>
               {lunchLoading
                 ? <Spinner size="sm" className="text-amber-600 shrink-0" />
-                : <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                : <svg className="w-6 h-6 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
               }
             </button>
           )

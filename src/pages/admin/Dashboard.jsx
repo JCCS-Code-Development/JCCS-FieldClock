@@ -43,6 +43,19 @@ export default function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // "Currently Clocked In" (and the lunch-lock alert) reflect a snapshot from
+  // whenever this loaded — someone starting/ending lunch, clocking in/out, or
+  // getting auto locked-out doesn't push here. Refresh it the same way the
+  // Clock page keeps its nearby-jobs list current: on regaining focus, plus a
+  // periodic fallback for a screen just left open (e.g. on an office display).
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') loadStatus() }
+    document.addEventListener('visibilitychange', onVisible)
+    const interval = setInterval(loadStatus, 60 * 1000)
+    return () => { document.removeEventListener('visibilitychange', onVisible); clearInterval(interval) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleClearLock = async (emp) => {
     if (!window.confirm(t('dashboard.clearLockConfirm', { name: emp.name }))) return
     setClearingId(emp.id); setClearError('')

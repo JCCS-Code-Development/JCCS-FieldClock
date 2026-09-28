@@ -158,8 +158,12 @@ export default function MyPay() {
     setCorrModal(entry)
     setCorrStep(1)
     setCorrType('')
-    setCorrStart(entry.start_time ? entry.start_time.slice(0, 16) : '')
-    setCorrEnd(entry.end_time   ? entry.end_time.slice(0, 16)   : '')
+    // The API returns MySQL's space-separated "YYYY-MM-DD HH:MM:SS" — an
+    // <input type="datetime-local"> requires a literal "T" separator or it
+    // silently renders blank (no error) instead of showing the entry's
+    // actual time.
+    setCorrStart(entry.start_time ? entry.start_time.replace(' ', 'T').slice(0, 16) : '')
+    setCorrEnd(entry.end_time   ? entry.end_time.replace(' ', 'T').slice(0, 16)   : '')
     setCorrReason('')
     setCorrError('')
   }
@@ -173,8 +177,8 @@ export default function MyPay() {
     try {
       await createChangeRequest({
         entry_id: corrModal.id,
-        requested_start: corrStart || null,
-        requested_end:   corrEnd   || null,
+        requested_start: corrStart ? corrStart.replace('T', ' ') : null,
+        requested_end:   corrEnd   ? corrEnd.replace('T', ' ')   : null,
         reason: corrReason,
       })
       setCorrModal(null)
