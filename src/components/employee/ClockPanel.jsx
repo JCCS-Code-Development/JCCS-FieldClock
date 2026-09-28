@@ -391,6 +391,11 @@ export default function ClockPanel({ showHeader = true }) {
   const now      = new Date()
   const mapPos   = position ? [position.lat, position.lng] : null
   const config   = STATUS_CONFIG[statusLabel] ?? null
+  // One lunch per day (server-enforced too, see api/timeclock/lunch.php) — a
+  // CLOSED lunch entry today, whether ended normally or auto-cut at the
+  // 1-hour cap, means today's lunch is used up. An open one doesn't count
+  // here; that's the currently-active lunch, handled by its own card.
+  const hasTakenLunchToday = todayEntries.some((e) => e.status_label === 'lunch' && e.end_time)
 
   const displayLocation = activeJob?.name
     ?? (currentEntry?.notes ? currentEntry.notes.replace('Location: ', '') : null)
@@ -509,7 +514,7 @@ export default function ClockPanel({ showHeader = true }) {
             // real value moments later. Show a neutral loading state instead
             // of a specific number we don't actually know yet.
             (() => { const lunchReady = !!currentEntry?.start_time; return (
-            <div className={`w-full rounded-2xl border-2 px-5 py-4 flex items-center justify-between gap-3 transition-colors ${
+            <div className={`w-full rounded-2xl border-2 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5 transition-colors ${
               !lunchReady ? 'bg-gray-50 border-gray-200' : liveElapsed >= LUNCH_CAP_SECONDS ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'
             }`}>
               <div className="flex items-center gap-3 min-w-0">
@@ -534,12 +539,23 @@ export default function ClockPanel({ showHeader = true }) {
               <button
                 onClick={handleEndLunch}
                 disabled={lunchLoading || !isOnline || !lunchReady}
-                className="shrink-0 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 active:scale-95 disabled:opacity-50 px-6 py-3.5 rounded-xl shadow-sm shadow-amber-300/50 transition-all"
+                className="w-full sm:w-auto sm:shrink-0 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 active:scale-95 disabled:opacity-50 px-6 py-3.5 rounded-xl shadow-sm shadow-amber-300/50 transition-all"
               >
                 {lunchLoading ? <Spinner size="sm" /> : t('home.lunch.end')}
               </button>
             </div>
           )})()
+          ) : hasTakenLunchToday ? (
+            // Used up for the day — server-enforced too (lunch.php), so this
+            // is purely so they see why, without tapping into a 409. No
+            // self-service way to get another; only an admin can help.
+            <div className="w-full flex items-center gap-3 rounded-2xl border-2 border-gray-200 bg-gray-50 px-5 py-4">
+              <span className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-2xl shrink-0 grayscale opacity-60">🍽️</span>
+              <div className="min-w-0">
+                <p className="text-base font-bold text-gray-600">{t('home.lunch.takenTitle')}</p>
+                <p className="text-xs text-gray-400">{t('home.lunch.takenMessage')}</p>
+              </div>
+            </div>
           ) : (
             <button
               onClick={() => { setError(''); setLunchConfirmModal(true) }}

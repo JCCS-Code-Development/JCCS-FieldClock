@@ -99,8 +99,10 @@
       "lockedTitle": "Salida registrada — almuerzo superó 1 hora",
       "lockedMessage": "Tu almuerzo superó el límite pagado de 1 hora, así que se registró tu salida automáticamente. Contacta a tu administrador para volver a marcar entrada.",
       "confirmTitle": "¿Iniciar tu Almuerzo?",
-      "confirmBody": "Tu almuerzo es pagado hasta por 1 hora continua. Puedes tocar Terminar Almuerzo en cualquier momento antes de eso para volver a marcar entrada. Si pasa la hora y no has vuelto a marcar entrada, se registrará tu salida automáticamente y ese tiempo no será pagado — deberás contactar a tu administrador para volver a marcar entrada.",
-      "confirmStart": "Sí, Iniciar Almuerzo"
+      "confirmBody": "Tienes un almuerzo por día, pagado hasta por 1 hora continua. Puedes tocar Terminar Almuerzo en cualquier momento antes de eso para volver a marcar entrada. Si pasa la hora y no has vuelto a marcar entrada, se registrará tu salida automáticamente y ese tiempo no será pagado — deberás contactar a tu administrador para volver a marcar entrada. Una vez usado el almuerzo de hoy, no hay forma de tomar otro por tu cuenta.",
+      "confirmStart": "Sí, Iniciar Almuerzo",
+      "takenTitle": "Almuerzo Ya Tomado Hoy",
+      "takenMessage": "Contacta a tu administrador si necesitas otro."
     }
   },
   "status": {
