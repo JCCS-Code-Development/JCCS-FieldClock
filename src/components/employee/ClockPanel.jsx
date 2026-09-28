@@ -161,6 +161,7 @@ export default function ClockPanel({ showHeader = true }) {
   // immediately — it opens this so the employee can see the location that's
   // about to be recorded and optionally leave a note before confirming.
   const [clockOutModal, setClockOutModal] = useState(false)
+  const [lunchConfirmModal, setLunchConfirmModal] = useState(false)
   const [clockOutNote, setClockOutNote]   = useState('')
 
   // Additional Stops Today — a quick, no-approval-needed log of the extra
@@ -368,7 +369,10 @@ export default function ClockPanel({ showHeader = true }) {
     try {
       const data = await setLunch({ lat: position?.lat, lng: position?.lng, accuracy: position?.accuracy })
       setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
+      setLunchConfirmModal(false)
     } catch (err) {
+      // Leave the modal open so the error is visible right next to the
+      // action that caused it, instead of appearing behind the modal.
       setError(err?.response?.data?.error ?? t('home.lunch.startError'))
     } finally { setLunchLoading(false) }
   }
@@ -538,7 +542,7 @@ export default function ClockPanel({ showHeader = true }) {
           )})()
           ) : (
             <button
-              onClick={handleStartLunch}
+              onClick={() => { setError(''); setLunchConfirmModal(true) }}
               disabled={lunchLoading || !isOnline}
               className="w-full flex items-center justify-between gap-3 rounded-2xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 active:scale-[0.99] disabled:opacity-50 px-5 py-4 transition-all"
             >
@@ -970,6 +974,26 @@ export default function ClockPanel({ showHeader = true }) {
             </Button>
             <Button fullWidth size="lg" loading={loading} onClick={handleClockOut}>
               {t('home.clockOut')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Lunch confirmation — makes the 1-hour cap and its consequence
+          explicit before they commit, instead of only finding out later. */}
+      <Modal isOpen={lunchConfirmModal} onClose={() => !lunchLoading && setLunchConfirmModal(false)} title={t('home.lunch.confirmTitle')}>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3.5">
+            <span className="text-2xl shrink-0">🍽️</span>
+            <p className="text-sm text-amber-800 leading-relaxed">{t('home.lunch.confirmBody')}</p>
+          </div>
+          {error && <p className="text-xs text-red-600 font-medium text-center">{error}</p>}
+          <div className="flex gap-3">
+            <Button variant="secondary" fullWidth size="lg" onClick={() => setLunchConfirmModal(false)} disabled={lunchLoading}>
+              {t('common.cancel')}
+            </Button>
+            <Button fullWidth size="lg" loading={lunchLoading} onClick={handleStartLunch}>
+              {t('home.lunch.confirmStart')}
             </Button>
           </div>
         </div>

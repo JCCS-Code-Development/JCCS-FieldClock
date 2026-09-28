@@ -97,7 +97,10 @@
       "startError": "Could not start lunch. Try again.",
       "endError": "Could not end lunch. Try again.",
       "lockedTitle": "Clocked out — lunch exceeded 1 hour",
-      "lockedMessage": "Your lunch went over the 1-hour paid limit, so you were automatically clocked out. Contact your administrator to clock back in."
+      "lockedMessage": "Your lunch went over the 1-hour paid limit, so you were automatically clocked out. Contact your administrator to clock back in.",
+      "confirmTitle": "Start Your Lunch?",
+      "confirmBody": "Your lunch is paid for up to 1 continuous hour. You can tap End Lunch any time before then to clock back in. If the hour passes and you haven't clocked back in, you'll be automatically clocked out and that time will not be paid — you'll need to contact your administrator to clock back in.",
+      "confirmStart": "Yes, Start Lunch"
     }
   },
   "status": {
