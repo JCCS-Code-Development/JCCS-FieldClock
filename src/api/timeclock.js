@@ -12,6 +12,11 @@ export const setWorking = (payload) =>
 export const setLunch = (payload) =>
   client.post('/timeclock/lunch.php', payload).then((r) => r.data)
 
+// Admin: release the "clocked out for exceeding 1-hour paid lunch" lock so
+// the employee can clock back in.
+export const clearLunchLock = (user_id) =>
+  client.post('/timeclock/clear-lunch-lock.php', { user_id }).then((r) => r.data)
+
 export const setMaterialRun = (payload) =>
   client.post('/timeclock/material-run.php', payload).then((r) => r.data)
 

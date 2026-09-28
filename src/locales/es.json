@@ -87,6 +87,16 @@
       "save": "Guardar",
       "nameRequired": "Escribe dónde estuviste.",
       "saveError": "No se pudo guardar. Intenta de nuevo."
+    },
+    "lunch": {
+      "start": "Iniciar Almuerzo",
+      "end": "Terminar Almuerzo",
+      "remaining": "Quedan {{time}}",
+      "over": "Más de 1 hora",
+      "startError": "No se pudo iniciar el almuerzo. Intenta de nuevo.",
+      "endError": "No se pudo terminar el almuerzo. Intenta de nuevo.",
+      "lockedTitle": "Salida registrada — almuerzo superó 1 hora",
+      "lockedMessage": "Tu almuerzo superó el límite pagado de 1 hora, así que se registró tu salida automáticamente. Contacta a tu administrador para volver a marcar entrada."
     }
   },
   "status": {
@@ -317,7 +327,12 @@
     "changeRequests": "Solicitudes de Cambio",
     "activeJobs": "Trabajos Activos",
     "pendingPayroll": "Nómina Pendiente",
-    "currentlyClockedIn": "Actualmente Registrados"
+    "currentlyClockedIn": "Actualmente Registrados",
+    "lunchLocked": "Bloqueados — Almuerzo Superó 1 Hora",
+    "lunchLockedSince": "Bloqueado desde {{time}}",
+    "clearLock": "Desbloquear",
+    "clearLockConfirm": "¿Permitir que {{name}} vuelva a marcar entrada? Su almuerzo superó el límite de 1 hora y se registró su salida automáticamente.",
+    "clearLockError": "No se pudo desbloquear. Intenta de nuevo."
   },
   "common": {
     "loading": "Cargando…",

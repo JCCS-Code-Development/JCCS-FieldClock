@@ -87,6 +87,16 @@
       "save": "Save",
       "nameRequired": "Enter where you were.",
       "saveError": "Could not save. Try again."
+    },
+    "lunch": {
+      "start": "Start Lunch",
+      "end": "End Lunch",
+      "remaining": "{{time}} left",
+      "over": "Over 1 hour",
+      "startError": "Could not start lunch. Try again.",
+      "endError": "Could not end lunch. Try again.",
+      "lockedTitle": "Clocked out — lunch exceeded 1 hour",
+      "lockedMessage": "Your lunch went over the 1-hour paid limit, so you were automatically clocked out. Contact your administrator to clock back in."
     }
   },
   "status": {
@@ -317,7 +327,12 @@
     "changeRequests": "Change Requests",
     "activeJobs": "Active Jobs",
     "pendingPayroll": "Pending Payroll",
-    "currentlyClockedIn": "Currently Clocked In"
+    "currentlyClockedIn": "Currently Clocked In",
+    "lunchLocked": "Locked Out — Lunch Over 1 Hour",
+    "lunchLockedSince": "Locked since {{time}}",
+    "clearLock": "Clear",
+    "clearLockConfirm": "Let {{name}} clock back in? Their lunch exceeded the 1-hour limit and they were automatically clocked out.",
+    "clearLockError": "Could not clear the lock. Try again."
   },
   "common": {
     "loading": "Loading…",

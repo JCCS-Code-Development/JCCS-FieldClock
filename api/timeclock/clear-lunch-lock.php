@@ -1,0 +1,46 @@
+<?php
+ini_set("display_errors", 0);
+set_exception_handler(function ($e) {
+    http_response_code(500);
+    echo json_encode(["error" => $e->getMessage()]);
+    exit;
+});
+set_error_handler(function ($severity, $message, $file, $line) {
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+require_once __DIR__ . '/../config/cors.php';
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../config/jwt.php';
+require_once __DIR__ . '/../middleware/auth.php';
+require_once __DIR__ . '/../middleware/validate.php';
+require_once __DIR__ . '/_helper.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit; }
+
+$auth = requireAuth();
+requireAdmin($auth);
+$pdo  = getPDO();
+$body = jsonBody();
+requireFields($body, ['user_id']);
+$userId = (int)$body['user_id'];
+
+$stmt = $pdo->prepare('SELECT lunch_locked_at, lunch_locked_entry_id FROM users WHERE id = ?');
+$stmt->execute([$userId]);
+$user = $stmt->fetch();
+if (!$user) { http_response_code(404); exit(json_encode(['error' => 'Employee not found'])); }
+if (!$user['lunch_locked_at']) { http_response_code(422); exit(json_encode(['error' => 'That employee is not lunch-locked'])); }
+
+$pdo->prepare('UPDATE users SET lunch_locked_at = NULL, lunch_locked_entry_id = NULL WHERE id = ?')
+    ->execute([$userId]);
+
+// Leave a trail on the entry that triggered the lock, same as any other
+// admin-visible timeclock change.
+if ($user['lunch_locked_entry_id']) {
+    $e = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
+    $e->execute([$user['lunch_locked_entry_id']]);
+    if ($entry = $e->fetch()) {
+        logTimeEntryHistory($pdo, (int)$entry['id'], 'update', (int)$auth['user_id'], 'lunch_lock_clear', $entry, $entry);
+    }
+}
+
+echo json_encode(['ok' => true]);

@@ -47,6 +47,7 @@ if ($jobId) {
 beginTimeclockTransaction($pdo, (int)$auth['user_id']);
 $open = getOpenWorkEntry($pdo, (int)$auth['user_id']);
 if (!$open) {
+    exitIfLunchLocked($pdo, (int)$auth['user_id']);
     $pdo->rollBack();
     http_response_code(422);
     exit(json_encode(['error' => 'Not clocked in']));

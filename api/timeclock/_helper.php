@@ -33,14 +33,104 @@ function logTimeEntryHistory(
 // retry a request, a user can double-tap, and multiple API workers can handle
 // those requests at the same time. Locking the durable users row makes the
 // read/close/open sequence atomic across all PHP processes.
+//
+// Also self-heals an overlong paid lunch here (see enforceLunchCutoff) —
+// every timeclock mutation (day-start, day-end, switch-job, status, and the
+// working/lunch/waiting/material-run transitions via transitionOpenWorkEntry)
+// calls this first, so a lunch that ran past the 1-hour cap gets closed and
+// the account locked the moment anyone next touches this user's timeclock
+// state, with no cron job needed.
+//
+// day-start.php was previously patched (af7de38) with its own
+// register_shutdown_function to guarantee a rollback on every exit path,
+// after an unrolled-back transaction there once left a user's row FOR-UPDATE
+// lock held, blocking their next clock-in until PHP's max_execution_time
+// killed it (see project memory: FieldClock Timeclock Quirks). That guard
+// only ever covered day-start.php — day-end, switch-job, status, and every
+// working/lunch/waiting/material-run transition open the exact same kind of
+// transaction here without one. Registering it centrally, once, closes that
+// gap everywhere instead of requiring every caller to remember it — and
+// matters more now that this function also runs enforceLunchCutoff's writes
+// on every call, including from status.php, which loads on nearly every
+// screen. A second registration (day-start.php still has its own) is a safe
+// no-op: whichever runs first rolls back, and $pdo->inTransaction() is false
+// for the other.
 function beginTimeclockTransaction(PDO $pdo, int $userId): void {
     $pdo->beginTransaction();
+    register_shutdown_function(function () use ($pdo) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+    });
     $lock = $pdo->prepare('SELECT id FROM users WHERE id = ? FOR UPDATE');
     $lock->execute([$userId]);
     if (!$lock->fetch()) {
         $pdo->rollBack();
         throw new RuntimeException('User not found');
     }
+    enforceLunchCutoff($pdo, $userId);
+}
+
+// Lunch is paid, capped at this many minutes.
+const LUNCH_CAP_MINUTES = 60;
+
+// If this user has an open 'lunch' entry that started more than
+// LUNCH_CAP_MINUTES ago, close it at exactly the cap (so no more than the cap
+// is ever paid), end the day the same way day-end.php does (a 'done' marker —
+// so the employee reads as clocked out, not just off lunch), and lock the
+// account: day-start.php refuses a new clock-in until an admin clears the
+// lock (see clear-lunch-lock.php). Must be called with the row lock already
+// held (i.e. from inside beginTimeclockTransaction) so two requests can't
+// race on the same overlong entry.
+function enforceLunchCutoff(PDO $pdo, int $userId): void {
+    $stmt = $pdo->prepare(
+        "SELECT * FROM time_entries
+         WHERE user_id = ? AND end_time IS NULL AND status_label = 'lunch'
+           AND start_time <= (NOW() - INTERVAL " . LUNCH_CAP_MINUTES . " MINUTE)
+         ORDER BY start_time DESC, id DESC LIMIT 1"
+    );
+    $stmt->execute([$userId]);
+    $entry = $stmt->fetch();
+    if (!$entry) return;
+
+    $cutoff = date('Y-m-d H:i:s', strtotime($entry['start_time']) + LUNCH_CAP_MINUTES * 60);
+
+    $pdo->prepare(
+        "UPDATE time_entries
+            SET end_time = ?, last_edited_at = NOW(),
+                notes = TRIM(CONCAT(COALESCE(notes, ''), ' Auto-closed: lunch exceeded " . LUNCH_CAP_MINUTES . " minutes.'))
+          WHERE id = ?"
+    )->execute([$cutoff, $entry['id']]);
+    $updated = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
+    $updated->execute([$entry['id']]);
+    logTimeEntryHistory($pdo, (int)$entry['id'], 'update', null, 'lunch_cutoff', $entry, $updated->fetch());
+
+    openEntry($pdo, $userId, null, 'done', 'day_end', null, null, null, source: 'lunch_cutoff');
+
+    $pdo->prepare('UPDATE users SET lunch_locked_at = ?, lunch_locked_entry_id = ? WHERE id = ?')
+        ->execute([$cutoff, $entry['id'], $userId]);
+}
+
+// If this user is currently lunch-locked, commit (persisting whatever
+// enforceLunchCutoff just did) and exit with a friendly, actionable error.
+// Otherwise return false and leave the transaction open for the caller to
+// continue. Call this wherever "no open entry" could mean "the lunch cutoff
+// just ended their day" rather than "they were never clocked in" — day-start
+// (new clock-in), and every transition that requires an open entry
+// (transitionOpenWorkEntry, switch-job.php) once it finds none.
+function exitIfLunchLocked(PDO $pdo, int $userId): void {
+    $stmt = $pdo->prepare('SELECT lunch_locked_at FROM users WHERE id = ?');
+    $stmt->execute([$userId]);
+    $lockedAt = $stmt->fetchColumn();
+    if (!$lockedAt) return;
+
+    $pdo->commit();
+    http_response_code(403);
+    exit(json_encode([
+        'error'           => 'Your lunch went over 1 hour and you were automatically clocked out. Contact your administrator to clock back in.',
+        'lunch_locked'    => true,
+        'lunch_locked_at' => $lockedAt,
+    ]));
 }
 
 function getOpenWorkEntry(PDO $pdo, int $userId): array|false {
@@ -96,6 +186,7 @@ function transitionOpenWorkEntry(
     beginTimeclockTransaction($pdo, $userId);
     $open = getOpenWorkEntry($pdo, $userId);
     if (!$open) {
+        exitIfLunchLocked($pdo, $userId);
         $pdo->rollBack();
         http_response_code(422);
         exit(json_encode(['error' => 'Not clocked in']));

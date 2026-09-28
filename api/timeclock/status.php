@@ -12,11 +12,22 @@ require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/jwt.php';
 require_once __DIR__ . '/../middleware/auth.php';
+require_once __DIR__ . '/_helper.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(405); exit; }
 
 $auth = requireAuth();
 $pdo  = getPDO();
+
+// Self-heal here too (not just on the next clock action) so the app reflects
+// an overlong lunch — and the resulting lock — as soon as it's opened, rather
+// than only on the employee's next failed clock-in attempt.
+beginTimeclockTransaction($pdo, (int)$auth['user_id']);
+$pdo->commit();
+
+$lockStmt = $pdo->prepare('SELECT lunch_locked_at FROM users WHERE id = ?');
+$lockStmt->execute([$auth['user_id']]);
+$lunchLockedAt = $lockStmt->fetchColumn() ?: null;
 
 // Current open entry for this user
 $stmt = $pdo->prepare(
@@ -41,8 +52,10 @@ if ($entry && $entry['job_id']) {
     ];
 }
 
-// Admin view: all currently clocked-in employees
+// Admin view: all currently clocked-in employees, and anyone currently locked
+// out after a lunch that ran past the 1-hour cap.
 $activeEmployees = [];
+$lunchLocked     = [];
 if ($auth['role'] === 'admin') {
     $all = $pdo->query(
         'SELECT u.id, u.name, te.status_label, j.name as job_name
@@ -53,6 +66,11 @@ if ($auth['role'] === 'admin') {
          ORDER BY u.name'
     )->fetchAll();
     $activeEmployees = $all;
+
+    $lunchLocked = $pdo->query(
+        "SELECT id, name, lunch_locked_at FROM users
+         WHERE lunch_locked_at IS NOT NULL ORDER BY lunch_locked_at DESC"
+    )->fetchAll();
 }
 
 echo json_encode([
@@ -61,5 +79,7 @@ echo json_encode([
     'currentEntry'     => $entry,
     'activeJob'        => $activeJob,
     'active_employees' => $activeEmployees,
+    'lunch_locked_at'  => $lunchLockedAt,
+    'lunch_locked_employees' => $lunchLocked,
 ]);
 exit;

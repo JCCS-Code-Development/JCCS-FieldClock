@@ -9,7 +9,7 @@ import { useTimeclockStore } from '../../store/timeclockStore'
 import { useAuthStore } from '../../store/authStore'
 import { useGPS } from '../../hooks/useGPS'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
-import { getStatus, dayStart, dayEnd, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
+import { getStatus, dayStart, dayEnd, setLunch, setWorking, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
 import { getNearbyJobs, listJobs } from '../../api/jobs'
 import { listVisitStops, createVisitStop, deleteVisitStop } from '../../api/visitStops'
 import Spinner from '../ui/Spinner'
@@ -40,8 +40,12 @@ const ActivityIcon = () => (
 
 const STATUS_CONFIG = {
   working: { text: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
+  lunch:   { text: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
   done:    { text: 'text-gray-500',  bg: 'bg-gray-50',  border: 'border-gray-200' },
 }
+
+// Paid lunch is capped at 1 hour — matches LUNCH_CAP_MINUTES in api/timeclock/_helper.php.
+const LUNCH_CAP_SECONDS = 60 * 60
 
 // Matches the m/km convention already used in the job-site dropdown below.
 function formatDistanceLabel(m) {
@@ -147,6 +151,7 @@ export default function ClockPanel({ showHeader = true }) {
   const [loadingJobs, setLoadingJobs]       = useState(false)
   const [manualLocation, setManualLocation] = useState('')
   const [error, setError]                   = useState('')
+  const [lunchLoading, setLunchLoading]     = useState(false)
   // Set right after a clock-in whose GPS doesn't match the selected job site —
   // a non-blocking heads-up, not an error. Replaces the old traveling/arrival
   // flow: the clock-in always succeeds, this is just a flag on top of it.
@@ -351,6 +356,28 @@ export default function ClockPanel({ showHeader = true }) {
     } finally { setLoading(false) }
   }
 
+  // Lunch is paid, capped at 1 hour — going over auto clocks the employee out
+  // and locks them until an admin clears it (server-enforced; see
+  // api/timeclock/_helper.php). These just transition the open entry.
+  const handleStartLunch = async () => {
+    setLunchLoading(true); setError('')
+    try {
+      const data = await setLunch({ lat: position?.lat, lng: position?.lng, accuracy: position?.accuracy })
+      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
+    } catch (err) {
+      setError(err?.response?.data?.error ?? t('home.lunch.startError'))
+    } finally { setLunchLoading(false) }
+  }
+
+  const handleEndLunch = async () => {
+    setLunchLoading(true); setError('')
+    try {
+      const data = await setWorking({ lat: position?.lat, lng: position?.lng, accuracy: position?.accuracy })
+      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
+    } catch (err) {
+      setError(err?.response?.data?.error ?? t('home.lunch.endError'))
+    } finally { setLunchLoading(false) }
+  }
 
   const dateFnsLocale = i18n.language.startsWith('es') ? es : enUS
   const now      = new Date()
@@ -451,6 +478,36 @@ export default function ClockPanel({ showHeader = true }) {
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                 ⚠️ {t('home.offSiteBadge')}
               </span>
+            )}
+
+            {/* Lunch — paid, capped at 1 hour. Start from any active status;
+                while on lunch, show time left (red once over, matching the
+                server auto clock-out + lock at the same cap). */}
+            {statusLabel === 'lunch' ? (
+              <div className="flex flex-col items-center gap-1">
+                <span className={`text-xs font-bold tabular-nums ${liveElapsed >= LUNCH_CAP_SECONDS ? 'text-red-600' : 'text-amber-700'}`}>
+                  {liveElapsed >= LUNCH_CAP_SECONDS
+                    ? t('home.lunch.over')
+                    : t('home.lunch.remaining', { time: formatElapsed(LUNCH_CAP_SECONDS - liveElapsed) })}
+                </span>
+                <button
+                  onClick={handleEndLunch}
+                  disabled={lunchLoading || !isOnline}
+                  className="text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50 px-4 py-1.5 rounded-full transition-colors"
+                >
+                  {lunchLoading ? <Spinner size="sm" /> : t('home.lunch.end')}
+                </button>
+              </div>
+            ) : (
+              statusLabel !== 'done' && (
+                <button
+                  onClick={handleStartLunch}
+                  disabled={lunchLoading || !isOnline}
+                  className="text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 disabled:opacity-50 px-4 py-1.5 rounded-full transition-colors"
+                >
+                  {lunchLoading ? <Spinner size="sm" /> : t('home.lunch.start')}
+                </button>
+              )
             )}
           </div>
         )}

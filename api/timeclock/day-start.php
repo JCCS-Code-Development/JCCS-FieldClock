@@ -34,6 +34,10 @@ $visitDescription = !empty($body['visit_description']) ? trim((string)$body['vis
 $pdo = getPDO();
 requireHourly($auth, $pdo);
 beginTimeclockTransaction($pdo, (int)$auth['user_id']);
+// beginTimeclockTransaction just ran enforceLunchCutoff, which may have locked
+// this account (a lunch that exceeded 1 hour with nobody tapping "End Lunch").
+// Refuse the clock-in with a clear reason instead of silently starting a new day.
+exitIfLunchLocked($pdo, (int)$auth['user_id']);
 
 // beginTimeclockTransaction takes a FOR UPDATE lock on this user's row. Several
 // paths below exit() early (the visit-category 422s, the open-entry 409) without
