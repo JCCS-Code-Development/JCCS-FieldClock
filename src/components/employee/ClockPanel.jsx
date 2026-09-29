@@ -205,7 +205,7 @@ export default function ClockPanel({ showHeader = true }) {
     getChangeRequests().then(d => setMyRequests(d.requests ?? [])).catch(() => {})
   }, [setTimeclockData])
   const isOnline = useOnlineStatus()
-  const { position, error: gpsError, errorCode: gpsErrorCode, loading: gpsLoading, getPosition } = useGPS()
+  const { position, errorCode: gpsErrorCode, loading: gpsLoading, getPosition, requestPosition } = useGPS()
 
   const [loading, setLoading]               = useState(false)
   const [activityOpen, setActivityOpen]     = useState(false)
@@ -390,15 +390,6 @@ export default function ClockPanel({ showHeader = true }) {
     if (!isOnline || loading) return
     setError('')
     if (!isClockedIn) {
-      // Location is required to clock in — a device permission the phone/
-      // browser already remembers on its own (no app-side storage needed for
-      // that part); this just refuses to start a shift without a fix instead
-      // of silently recording one with no GPS, and the banner below explains
-      // why and offers a retry.
-      if (!position) {
-        setError(gpsErrorCode === 1 ? t('home.locationDeniedError') : t('home.locationRequiredError'))
-        return
-      }
       if (!selectedJobId && !manualLocation.trim()) {
         setError(t('home.noLocation'))
         return
@@ -427,11 +418,18 @@ export default function ClockPanel({ showHeader = true }) {
   // Clocking in always registers the shift immediately — no separate
   // "traveling" status or "I've arrived" step. If GPS shows the employee
   // isn't actually at the selected job site, the entry is just flagged
-  // (via within_radius, computed server-side) rather than blocked.
+  // (via within_radius, computed server-side) rather than blocked. Location
+  // is not required — a device that can't get a fix still clocks in fine —
+  // but every clock-in re-asks for a fresh fix right at that moment (rather
+  // than trusting a single attempt from whenever the page first loaded), so
+  // a one-off or slow GPS hiccup (common on Android — see useGPS) gets
+  // another shot instead of silently recording no location for the whole
+  // shift.
   const performClockIn = async () => {
     setLoading(true)
     setOffSiteNotice(null)
     try {
+      const fresh = await requestPosition()
       const jobId = selectedJobId ? parseInt(selectedJobId) : null
       // No job selected — instead of registering a new location that sits in
       // an admin review queue, just clock in unassigned and keep what they
@@ -440,9 +438,9 @@ export default function ClockPanel({ showHeader = true }) {
       // without creating one.
       const data = await dayStart({
         job_id:   jobId,
-        lat:      position?.lat      ?? null,
-        lng:      position?.lng      ?? null,
-        accuracy: position?.accuracy ?? null,
+        lat:      fresh?.lat      ?? null,
+        lng:      fresh?.lng      ?? null,
+        accuracy: fresh?.accuracy ?? null,
         notes:    !jobId && manualLocation.trim() ? manualLocation.trim() : undefined,
       })
       setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
@@ -586,7 +584,7 @@ export default function ClockPanel({ showHeader = true }) {
             {isClockedIn && <span className="absolute w-40 h-40 lg:w-60 lg:h-60 rounded-full animate-ping bg-red-400/20" />}
             <button
               onClick={handleToggle}
-              disabled={loading || !isOnline || (!isClockedIn && !position)}
+              disabled={loading || !isOnline}
               className={`relative w-36 h-36 lg:w-52 lg:h-52 rounded-full flex flex-col items-center justify-center gap-1.5 lg:gap-2 text-white font-semibold shadow-2xl transition-all duration-300 active:scale-95 disabled:opacity-50 ring-8 lg:ring-[10px]
                 ${isClockedIn
                   ? 'bg-red-500 ring-red-100 shadow-red-300/50'
@@ -683,19 +681,21 @@ export default function ClockPanel({ showHeader = true }) {
           </p>
         )}
 
-        {/* Location is required to clock in. Shown once the browser has
-            actually finished trying (not during the brief initial fetch) so
-            it doesn't flash on every normal page load. Denied vs.
-            unavailable get different guidance — a denial needs a phone
-            Settings change; the browser won't re-prompt on its own. */}
+        {/* Location isn't required to clock in — this is informational, not
+            a blocker. Shown once the browser has actually finished trying
+            (not during the brief initial fetch) so it doesn't flash on every
+            normal page load. Denied vs. unavailable get different
+            guidance — a denial needs a phone Settings change; the browser
+            won't re-prompt on its own. Every clock-in still re-asks for a
+            fresh fix regardless of what's shown here (see performClockIn). */}
         {!isClockedIn && !gpsLoading && !position && (
-          <div className="w-full flex flex-col items-center gap-2 bg-red-50 border border-red-200 px-4 py-3 rounded-xl text-center">
-            <p className="text-xs text-red-700 font-medium">
-              {gpsErrorCode === 1 ? t('home.locationDeniedError') : t('home.locationRequiredError')}
+          <div className="w-full flex flex-col items-center gap-2 bg-amber-50 border border-amber-200 px-4 py-3 rounded-xl text-center">
+            <p className="text-xs text-amber-700 font-medium">
+              {gpsErrorCode === 1 ? t('home.locationDeniedNotice') : t('home.gpsUnavailable')}
             </p>
             <button
               onClick={getPosition}
-              className="text-xs font-semibold text-white bg-red-500 hover:bg-red-600 px-4 py-1.5 rounded-full transition-colors"
+              className="text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 px-4 py-1.5 rounded-full transition-colors"
             >
               {t('home.locationRetry')}
             </button>
