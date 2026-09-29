@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { format, parseISO, differenceInMinutes, differenceInCalendarDays, startOfWeek, endOfWeek, addWeeks, isSameYear } from 'date-fns'
+import { format, parseISO, differenceInMinutes, differenceInCalendarDays, startOfWeek, endOfWeek, addWeeks, addDays, isSameYear } from 'date-fns'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
@@ -190,12 +190,25 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
       .finally(() => setLoadingEstimates(false))
   }, [jobId])
 
+  // There's no separate end-date field — just one day plus a start/end time —
+  // so an overnight shift (e.g. in 9:07 PM, out 3:49 AM) is inferred from the
+  // clock-out time-of-day being numerically earlier than clock-in, the same
+  // way it would naturally happen for a real clock-out spanning midnight.
+  // Equal times are left as a same-day zero-length shift (surfaces as an
+  // error) rather than assumed to mean a full 24 hours.
+  const isOvernight = (start, end) => {
+    const [sh, sm] = start.split(':').map(Number)
+    const [eh, em] = end.split(':').map(Number)
+    return (eh * 60 + em) < (sh * 60 + sm)
+  }
+
   const duration = useMemo(() => {
     if (stillClockedIn) return null
     if (!startTime || !endTime) return null
     const [sh, sm] = startTime.split(':').map(Number)
     const [eh, em] = endTime.split(':').map(Number)
-    const mins = (eh * 60 + em) - (sh * 60 + sm)
+    let mins = (eh * 60 + em) - (sh * 60 + sm)
+    if (mins < 0) mins += 24 * 60
     if (mins <= 0) return null
     const h = Math.floor(mins / 60), m = mins % 60
     return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`
@@ -206,10 +219,13 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
     if (!startTime) { setError('Start time is required.'); return }
     setSaving(true); setError('')
     try {
+      const endDate = (!stillClockedIn && endTime && isOvernight(startTime, endTime))
+        ? format(addDays(parseISO(entryDate), 1), 'yyyy-MM-dd')
+        : entryDate
       const payload = {
         status_label: statusLabel,
         start_time:   `${entryDate} ${startTime}:00`,
-        end_time:     stillClockedIn ? null : (endTime ? `${entryDate} ${endTime}:00` : null),
+        end_time:     stillClockedIn ? null : (endTime ? `${endDate} ${endTime}:00` : null),
         job_id:             jobId ? parseInt(jobId) : null,
         notes:              notes.trim() || null,
         visit_category:     visitCategory || null,

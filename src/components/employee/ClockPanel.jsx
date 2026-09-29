@@ -205,7 +205,7 @@ export default function ClockPanel({ showHeader = true }) {
     getChangeRequests().then(d => setMyRequests(d.requests ?? [])).catch(() => {})
   }, [setTimeclockData])
   const isOnline = useOnlineStatus()
-  const { position, loading: gpsLoading, getPosition } = useGPS()
+  const { position, error: gpsError, errorCode: gpsErrorCode, loading: gpsLoading, getPosition } = useGPS()
 
   const [loading, setLoading]               = useState(false)
   const [activityOpen, setActivityOpen]     = useState(false)
@@ -390,6 +390,15 @@ export default function ClockPanel({ showHeader = true }) {
     if (!isOnline || loading) return
     setError('')
     if (!isClockedIn) {
+      // Location is required to clock in — a device permission the phone/
+      // browser already remembers on its own (no app-side storage needed for
+      // that part); this just refuses to start a shift without a fix instead
+      // of silently recording one with no GPS, and the banner below explains
+      // why and offers a retry.
+      if (!position) {
+        setError(gpsErrorCode === 1 ? t('home.locationDeniedError') : t('home.locationRequiredError'))
+        return
+      }
       if (!selectedJobId && !manualLocation.trim()) {
         setError(t('home.noLocation'))
         return
@@ -577,7 +586,7 @@ export default function ClockPanel({ showHeader = true }) {
             {isClockedIn && <span className="absolute w-40 h-40 lg:w-60 lg:h-60 rounded-full animate-ping bg-red-400/20" />}
             <button
               onClick={handleToggle}
-              disabled={loading || !isOnline}
+              disabled={loading || !isOnline || (!isClockedIn && !position)}
               className={`relative w-36 h-36 lg:w-52 lg:h-52 rounded-full flex flex-col items-center justify-center gap-1.5 lg:gap-2 text-white font-semibold shadow-2xl transition-all duration-300 active:scale-95 disabled:opacity-50 ring-8 lg:ring-[10px]
                 ${isClockedIn
                   ? 'bg-red-500 ring-red-100 shadow-red-300/50'
@@ -672,6 +681,25 @@ export default function ClockPanel({ showHeader = true }) {
           <p className="text-xs text-amber-700 font-medium bg-amber-50 border border-amber-200 px-4 py-2.5 rounded-xl w-full text-center">
             ⚠️ {t('home.offSiteNotice', { distance: formatDistanceLabel(offSiteNotice.distanceMeters) })}
           </p>
+        )}
+
+        {/* Location is required to clock in. Shown once the browser has
+            actually finished trying (not during the brief initial fetch) so
+            it doesn't flash on every normal page load. Denied vs.
+            unavailable get different guidance — a denial needs a phone
+            Settings change; the browser won't re-prompt on its own. */}
+        {!isClockedIn && !gpsLoading && !position && (
+          <div className="w-full flex flex-col items-center gap-2 bg-red-50 border border-red-200 px-4 py-3 rounded-xl text-center">
+            <p className="text-xs text-red-700 font-medium">
+              {gpsErrorCode === 1 ? t('home.locationDeniedError') : t('home.locationRequiredError')}
+            </p>
+            <button
+              onClick={getPosition}
+              className="text-xs font-semibold text-white bg-red-500 hover:bg-red-600 px-4 py-1.5 rounded-full transition-colors"
+            >
+              {t('home.locationRetry')}
+            </button>
+          </div>
         )}
 
         {!isOnline && (
