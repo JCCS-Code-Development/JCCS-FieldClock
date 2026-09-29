@@ -58,12 +58,14 @@ const VISIT_TYPE_COLORS = {
 }
 
 function describeVisit(entry) {
-  // Lunch entries can inherit a visit_category from whatever job/visit was
-  // active right before the break (transitionOpenWorkEntry carries it over
-  // so switching back afterward doesn't lose the job context) — but that's
-  // misleading here ("WO #1234" on what was actually the lunch break), so
-  // show Lunch instead, ahead of any inherited visit info.
-  if (entry.status_label === 'lunch') return 'Lunch'
+  // Lunch/Dinner entries can inherit a visit_category from whatever
+  // job/visit was active right before the break (transitionOpenWorkEntry
+  // carries it over so switching back afterward doesn't lose the job
+  // context) — but that's misleading here ("WO #1234" on what was actually
+  // the break), so show which meal it was instead, ahead of any inherited
+  // visit info.
+  if (entry.status_label === 'lunch')  return 'Lunch'
+  if (entry.status_label === 'dinner') return 'Dinner'
   if (entry.visit_category) {
     if (entry.visit_category === 'work_order') {
       return entry.work_order_number ? `WO #${entry.work_order_number}` : 'Work Order'
@@ -84,7 +86,7 @@ function describeVisit(entry) {
 }
 
 function visitColor(entry) {
-  if (entry.status_label === 'lunch') return 'bg-amber-100 text-amber-800'
+  if (entry.status_label === 'lunch' || entry.status_label === 'dinner') return 'bg-amber-100 text-amber-800'
   if (entry.visit_category) return VISIT_CATEGORY_COLORS[entry.visit_category] ?? 'bg-gray-100 text-gray-500'
   if (entry.visit_type)     return VISIT_TYPE_COLORS[entry.visit_type] ?? 'bg-gray-100 text-gray-500'
   return 'bg-gray-100 text-gray-500'

@@ -23,6 +23,7 @@ $pdo  = getPDO();
 $COST_MAP = [
     'working'      => 'direct_labor',
     'lunch'        => 'paid_lunch',
+    'dinner'       => 'paid_dinner',
     'material_run' => 'material_pickup',
     'waiting'      => 'waiting_time',
     'done'         => 'day_end',

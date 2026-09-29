@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next'
 import StatsCard from '../../components/admin/StatsCard'
 import Badge from '../../components/ui/Badge'
 import Spinner from '../../components/ui/Spinner'
+import Modal from '../../components/ui/Modal'
+import Button from '../../components/ui/Button'
 import ClockPanel from '../../components/employee/ClockPanel'
 import { getStatus, clearLunchLock } from '../../api/timeclock'
 import { useTimeclockStore } from '../../store/timeclockStore'
@@ -20,6 +22,11 @@ export default function AdminDashboard() {
   const [lunchLocked, setLunchLocked] = useState([])
   const [clearingId, setClearingId] = useState(null)
   const [clearError, setClearError] = useState('')
+  // The employee awaiting confirmation to clear, or null — replaces
+  // window.confirm(), which renders as an ugly native browser dialog
+  // showing the raw domain ("fieldclock.jccs-services.com says") instead of
+  // fitting the app's own UI.
+  const [clearLockTarget, setClearLockTarget] = useState(null)
   const { setTimeclockData } = useTimeclockStore()
 
   const loadStatus = () =>
@@ -56,12 +63,13 @@ export default function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleClearLock = async (emp) => {
-    if (!window.confirm(t('dashboard.clearLockConfirm', { name: emp.name }))) return
+  const handleClearLock = async () => {
+    const emp = clearLockTarget
     setClearingId(emp.id); setClearError('')
     try {
       await clearLunchLock(emp.id)
       await loadStatus()
+      setClearLockTarget(null)
     } catch {
       setClearError(t('dashboard.clearLockError'))
     } finally { setClearingId(null) }
@@ -69,7 +77,7 @@ export default function AdminDashboard() {
 
   const STATUS_LABELS = {
     working: t('status.working'),
-    lunch: t('status.lunch'), material_run: t('status.material_run'),
+    lunch: t('status.lunch'), dinner: t('status.dinner'), material_run: t('status.material_run'),
     waiting: t('status.waiting'), done: t('status.done'),
   }
 
@@ -93,8 +101,9 @@ export default function AdminDashboard() {
           icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 7v5l3.5 3.5"/></svg>} />
       </div>
 
-      {/* Lunch-lock alert — anyone auto clocked-out for going over the 1-hour
-          paid lunch cap, waiting on an admin to let them clock back in */}
+      {/* Meal-break lock alert — anyone auto clocked-out for going over the
+          1-hour paid cap on lunch or dinner, waiting on an admin to let them
+          clock back in */}
       {lunchLocked.length > 0 && (
         <div className="bg-red-50 rounded-2xl border border-red-100 overflow-hidden">
           <div className="px-5 py-3 border-b border-red-100">
@@ -104,13 +113,18 @@ export default function AdminDashboard() {
             {lunchLocked.map((emp) => (
               <div key={emp.id} className="px-5 py-2.5 flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-medium text-gray-900 text-sm">{emp.name}</p>
+                  <p className="font-medium text-gray-900 text-sm">
+                    {emp.name}
+                    <span className="ml-1.5 text-xs font-semibold text-red-500 capitalize">
+                      · {t(`status.${emp.meal === 'dinner' ? 'dinner' : 'lunch'}`)}
+                    </span>
+                  </p>
                   <p className="text-xs text-red-400">
                     {t('dashboard.lunchLockedSince', { time: format(new Date(emp.lunch_locked_at), 'MMM d, h:mm a') })}
                   </p>
                 </div>
                 <button
-                  onClick={() => handleClearLock(emp)}
+                  onClick={() => { setClearError(''); setClearLockTarget(emp) }}
                   disabled={clearingId === emp.id}
                   className="text-xs font-semibold text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 px-3.5 py-1.5 rounded-full transition-colors shrink-0"
                 >
@@ -119,9 +133,29 @@ export default function AdminDashboard() {
               </div>
             ))}
           </div>
-          {clearError && <p className="text-xs text-red-600 font-medium text-center py-2">{clearError}</p>}
         </div>
       )}
+
+      {/* Clear-lock confirmation — replaces window.confirm() (a native
+          browser dialog that shows the raw domain and can't be styled). */}
+      <Modal isOpen={!!clearLockTarget} onClose={() => !clearingId && setClearLockTarget(null)} title={t('dashboard.clearLock')}>
+        {clearLockTarget && (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-gray-700 leading-relaxed">
+              {t('dashboard.clearLockConfirm', { name: clearLockTarget.name })}
+            </p>
+            {clearError && <p className="text-xs text-red-600 font-medium text-center">{clearError}</p>}
+            <div className="flex gap-3">
+              <Button variant="secondary" fullWidth size="lg" onClick={() => setClearLockTarget(null)} disabled={!!clearingId}>
+                {t('common.cancel')}
+              </Button>
+              <Button fullWidth size="lg" loading={!!clearingId} onClick={handleClearLock}>
+                {t('dashboard.clearLock')}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Clocked-in employees */}
       {stats.clockedIn.length > 0 && (

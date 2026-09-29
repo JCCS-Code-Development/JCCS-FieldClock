@@ -23,35 +23,30 @@ $acc  = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
 $pdo  = getPDO();
 requireHourly($auth, $pdo);
 
-// Only one lunch per day. A CLOSED lunch entry today (ended normally, or
-// auto-cut off at the 1-hour cap — see enforceMealCutoff) means they already
-// took it; there is no self-service way to get another, only an admin
-// manually adjusting their timesheet. An OPEN lunch entry today doesn't
-// trigger this — that's just the normal idempotent retry
-// transitionOpenWorkEntry already handles below.
+// Only one dinner per day — same rule and reasoning as lunch.php. A CLOSED
+// dinner entry today means it's already been taken; no self-service second
+// one, only an admin adjusting the timesheet. An OPEN dinner entry doesn't
+// trigger this — that's the normal idempotent retry transitionOpenWorkEntry
+// already handles below.
 $already = $pdo->prepare(
     "SELECT id FROM time_entries
-     WHERE user_id = ? AND status_label = 'lunch' AND end_time IS NOT NULL
+     WHERE user_id = ? AND status_label = 'dinner' AND end_time IS NOT NULL
        AND DATE(start_time) = CURDATE()
      LIMIT 1"
 );
 $already->execute([(int)$auth['user_id']]);
 if ($already->fetch()) {
     http_response_code(409);
-    exit(json_encode(['error' => "You've already taken your lunch today. Contact your administrator if you need another."]));
+    exit(json_encode(['error' => "You've already taken your dinner break today. Contact your administrator if you need another."]));
 }
 
-// Lunch only unlocks after LUNCH_UNLOCK_MINUTES of actual work today. Doesn't
-// block the idempotent retry (tapping Start Lunch again while already on
-// lunch) — worked time is frozen while on a break (see
-// getWorkedMinutesToday), so anyone who already cleared the threshold to get
-// here stays clear of it.
+// Dinner only unlocks after DINNER_UNLOCK_MINUTES of actual work today.
 $worked = getWorkedMinutesToday($pdo, (int)$auth['user_id']);
-if ($worked < LUNCH_UNLOCK_MINUTES) {
+if ($worked < DINNER_UNLOCK_MINUTES) {
     http_response_code(403);
-    exit(json_encode(['error' => 'Lunch is only available after working over 2 hours today.']));
+    exit(json_encode(['error' => 'Dinner is only available after working over 10 hours today.']));
 }
 
 echo json_encode(transitionOpenWorkEntry(
-    $pdo, (int)$auth['user_id'], 'lunch', 'paid_lunch', $lat, $lng, $acc, 'lunch'
+    $pdo, (int)$auth['user_id'], 'dinner', 'paid_dinner', $lat, $lng, $acc, 'dinner'
 ));

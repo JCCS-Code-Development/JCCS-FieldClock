@@ -865,12 +865,13 @@ export default function MyPay() {
 }
 
 const ENTRY_DOT = {
-  working: 'bg-green-500', lunch: 'bg-amber-500',
+  working: 'bg-green-500', lunch: 'bg-amber-500', dinner: 'bg-amber-500',
   material_run: 'bg-violet-500', waiting: 'bg-orange-500', done: 'bg-gray-400',
 }
 const ENTRY_CFG = {
   working:      { dot: 'bg-green-500',  bg: 'bg-green-50',  text: 'text-green-700'  },
   lunch:        { dot: 'bg-amber-500',  bg: 'bg-amber-50',  text: 'text-amber-700'  },
+  dinner:       { dot: 'bg-amber-500',  bg: 'bg-amber-50',  text: 'text-amber-700'  },
   material_run: { dot: 'bg-violet-500', bg: 'bg-violet-50', text: 'text-violet-700' },
   waiting:      { dot: 'bg-orange-500', bg: 'bg-orange-50', text: 'text-orange-700' },
   done:         { dot: 'bg-gray-400',   bg: 'bg-gray-50',   text: 'text-gray-500'   },

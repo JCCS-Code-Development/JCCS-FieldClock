@@ -10,6 +10,7 @@ const variants = {
   // timeclock statuses
   working:        'bg-green-100 text-green-800',
   lunch:          'bg-amber-100 text-amber-800',
+  dinner:         'bg-amber-100 text-amber-800',
   material_run:   'bg-violet-100 text-violet-800',
   waiting:        'bg-orange-100 text-orange-800',
   done:           'bg-gray-100 text-gray-600',

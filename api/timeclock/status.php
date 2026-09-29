@@ -67,9 +67,12 @@ if ($auth['role'] === 'admin') {
     )->fetchAll();
     $activeEmployees = $all;
 
+    // meal: which break triggered the lock ('lunch' or 'dinner') — u.lunch_locked_at
+    // covers both now (see enforceMealCutoff), so the admin alert can say which one.
     $lunchLocked = $pdo->query(
-        "SELECT id, name, lunch_locked_at FROM users
-         WHERE lunch_locked_at IS NOT NULL ORDER BY lunch_locked_at DESC"
+        "SELECT u.id, u.name, u.lunch_locked_at, te.status_label AS meal
+           FROM users u LEFT JOIN time_entries te ON te.id = u.lunch_locked_entry_id
+          WHERE u.lunch_locked_at IS NOT NULL ORDER BY u.lunch_locked_at DESC"
     )->fetchAll();
 }
 

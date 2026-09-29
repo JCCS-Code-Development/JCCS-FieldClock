@@ -9,7 +9,7 @@ import { useTimeclockStore } from '../../store/timeclockStore'
 import { useAuthStore } from '../../store/authStore'
 import { useGPS } from '../../hooks/useGPS'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
-import { getStatus, dayStart, dayEnd, setLunch, setWorking, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
+import { getStatus, dayStart, dayEnd, setLunch, setDinner, setWorking, getEntries, createChangeRequest, getChangeRequests } from '../../api/timeclock'
 import { getNearbyJobs, listJobs } from '../../api/jobs'
 import { listVisitStops, createVisitStop, deleteVisitStop } from '../../api/visitStops'
 import Spinner from '../ui/Spinner'
@@ -41,11 +41,94 @@ const ActivityIcon = () => (
 const STATUS_CONFIG = {
   working: { text: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
   lunch:   { text: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+  dinner:  { text: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
   done:    { text: 'text-gray-500',  bg: 'bg-gray-50',  border: 'border-gray-200' },
 }
 
-// Paid lunch is capped at 1 hour — matches LUNCH_CAP_MINUTES in api/timeclock/_helper.php.
+// Both meal breaks are capped at 1 hour — matches LUNCH_CAP_MINUTES in
+// api/timeclock/_helper.php.
 const LUNCH_CAP_SECONDS = 60 * 60
+// Lunch unlocks after 2 hours worked — matches LUNCH_UNLOCK_MINUTES there.
+const LUNCH_UNLOCK_SECONDS = 2 * 60 * 60
+// Dinner unlocks after 10 hours worked — matches DINNER_UNLOCK_MINUTES there.
+const DINNER_UNLOCK_SECONDS = 10 * 60 * 60
+
+// One card, used for both Lunch and Dinner — same visuals, same three states
+// (start / active countdown / already taken today), parameterized by
+// `type` so the i18n keys, status label, and handlers differ per meal.
+function MealBreakCard({
+  type, active, ready, elapsedSeconds, taken, loading, disabled, onStartClick, onEndClick,
+}) {
+  const { t } = useTranslation()
+  const over = ready && elapsedSeconds >= LUNCH_CAP_SECONDS
+
+  if (active) {
+    return (
+      <div className={`w-full rounded-2xl border-2 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5 transition-colors ${
+        !ready ? 'bg-gray-50 border-gray-200' : over ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'
+      }`}>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shrink-0 ${
+            !ready ? 'bg-gray-100' : over ? 'bg-red-100' : 'bg-amber-100'
+          }`}>
+            🍽️
+          </span>
+          <div className="min-w-0">
+            <p className={`text-xs font-bold uppercase tracking-wide ${!ready ? 'text-gray-400' : over ? 'text-red-600' : 'text-amber-700'}`}>
+              {t(`status.${type}`)}
+            </p>
+            <p className={`text-xl font-bold tabular-nums leading-tight ${!ready ? 'text-gray-400' : over ? 'text-red-700' : 'text-amber-800'}`}>
+              {!ready
+                ? <Spinner size="sm" />
+                : over
+                  ? t(`home.${type}.over`)
+                  : t(`home.${type}.remaining`, { time: formatElapsed(LUNCH_CAP_SECONDS - elapsedSeconds) })}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onEndClick}
+          disabled={loading || disabled || !ready}
+          className="w-full sm:w-auto sm:shrink-0 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 active:scale-95 disabled:opacity-50 px-6 py-3.5 rounded-xl shadow-sm shadow-amber-300/50 transition-all"
+        >
+          {loading ? <Spinner size="sm" /> : t(`home.${type}.end`)}
+        </button>
+      </div>
+    )
+  }
+
+  if (taken) {
+    return (
+      <div className="w-full flex items-center gap-3 rounded-2xl border-2 border-gray-200 bg-gray-50 px-5 py-4">
+        <span className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-2xl shrink-0 grayscale opacity-60">🍽️</span>
+        <div className="min-w-0">
+          <p className="text-base font-bold text-gray-600">{t(`home.${type}.takenTitle`)}</p>
+          <p className="text-xs text-gray-400">{t(`home.${type}.takenMessage`)}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={onStartClick}
+      disabled={loading || disabled}
+      className="w-full flex items-center justify-between gap-3 rounded-2xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 active:scale-[0.99] disabled:opacity-50 px-5 py-4 transition-all"
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-2xl shrink-0">🍽️</span>
+        <div className="text-left min-w-0">
+          <p className="text-base font-bold text-amber-800">{t(`home.${type}.start`)}</p>
+          <p className="text-xs text-amber-600">{t(`home.${type}.paidUpTo`)}</p>
+        </div>
+      </div>
+      {loading
+        ? <Spinner size="sm" className="text-amber-600 shrink-0" />
+        : <svg className="w-6 h-6 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+      }
+    </button>
+  )
+}
 
 // Matches the m/km convention already used in the job-site dropdown below.
 function formatDistanceLabel(m) {
@@ -152,6 +235,7 @@ export default function ClockPanel({ showHeader = true }) {
   const [manualLocation, setManualLocation] = useState('')
   const [error, setError]                   = useState('')
   const [lunchLoading, setLunchLoading]     = useState(false)
+  const [dinnerLoading, setDinnerLoading]   = useState(false)
   // Set right after a clock-in whose GPS doesn't match the selected job site —
   // a non-blocking heads-up, not an error. Replaces the old traveling/arrival
   // flow: the clock-in always succeeds, this is just a flag on top of it.
@@ -162,6 +246,7 @@ export default function ClockPanel({ showHeader = true }) {
   // about to be recorded and optionally leave a note before confirming.
   const [clockOutModal, setClockOutModal] = useState(false)
   const [lunchConfirmModal, setLunchConfirmModal] = useState(false)
+  const [dinnerConfirmModal, setDinnerConfirmModal] = useState(false)
   const [clockOutNote, setClockOutNote]   = useState('')
 
   // Additional Stops Today — a quick, no-approval-needed log of the extra
@@ -387,6 +472,27 @@ export default function ClockPanel({ showHeader = true }) {
     } finally { setLunchLoading(false) }
   }
 
+  const handleStartDinner = async () => {
+    setDinnerLoading(true); setError('')
+    try {
+      const data = await setDinner({ lat: position?.lat, lng: position?.lng, accuracy: position?.accuracy })
+      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
+      setDinnerConfirmModal(false)
+    } catch (err) {
+      setError(err?.response?.data?.error ?? t('home.dinner.startError'))
+    } finally { setDinnerLoading(false) }
+  }
+
+  const handleEndDinner = async () => {
+    setDinnerLoading(true); setError('')
+    try {
+      const data = await setWorking({ lat: position?.lat, lng: position?.lng, accuracy: position?.accuracy })
+      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
+    } catch (err) {
+      setError(err?.response?.data?.error ?? t('home.dinner.endError'))
+    } finally { setDinnerLoading(false) }
+  }
+
   const dateFnsLocale = i18n.language.startsWith('es') ? es : enUS
   const now      = new Date()
   const mapPos   = position ? [position.lat, position.lng] : null
@@ -396,6 +502,21 @@ export default function ClockPanel({ showHeader = true }) {
   // 1-hour cap, means today's lunch is used up. An open one doesn't count
   // here; that's the currently-active lunch, handled by its own card.
   const hasTakenLunchToday = todayEntries.some((e) => e.status_label === 'lunch' && e.end_time)
+
+  // Same one-per-day rule for Dinner (server-enforced in dinner.php).
+  const hasTakenDinnerToday = todayEntries.some((e) => e.status_label === 'dinner' && e.end_time)
+
+  // Actual worked seconds today — everything except a lunch/dinner break or
+  // the day_end marker — mirrors getWorkedMinutesToday() in _helper.php.
+  // Closed entries count their real duration; the currently open entry (if
+  // it's actual work, not a break) counts up to now via liveElapsed so this
+  // updates live instead of only after a refetch.
+  const workedSecondsToday = todayEntries
+    .filter((e) => e.end_time && e.cost_category !== 'day_end' && e.status_label !== 'lunch' && e.status_label !== 'dinner')
+    .reduce((sum, e) => sum + (new Date(e.end_time) - new Date(e.start_time)) / 1000, 0)
+    + (isClockedIn && statusLabel !== 'lunch' && statusLabel !== 'dinner' ? liveElapsed : 0)
+  const lunchEligible  = workedSecondsToday >= LUNCH_UNLOCK_SECONDS
+  const dinnerEligible = workedSecondsToday >= DINNER_UNLOCK_SECONDS
 
   const displayLocation = activeJob?.name
     ?? (currentEntry?.notes ? currentEntry.notes.replace('Location: ', '') : null)
@@ -495,86 +616,54 @@ export default function ClockPanel({ showHeader = true }) {
           </div>
         )}
 
-        {/* Lunch — paid, capped at 1 hour. A full-width, high-contrast card
-            (not a small pill) so it reads clearly at a glance on both phone
-            and desktop. Two states: an inviting "Start Lunch" tap target while
-            working, and an unmissable countdown + "End Lunch" once on lunch —
-            it turns red past the cap, matching the server auto clock-out +
-            lock that lands at the same 60-minute mark. */}
-        {isClockedIn && statusLabel !== 'done' && (
-          statusLabel === 'lunch' ? (
-            // lunchReady guards against a real "restarted" illusion: the store
-            // persists statusLabel across app opens (so it can say 'lunch'
-            // immediately on a cold start) but deliberately does NOT persist
-            // currentEntry (see timeclockStore.js's partialize) — that only
-            // arrives once the mount-time getStatus() call resolves. Until it
-            // does, currentEntry is null, liveElapsed reads 0, and showing
-            // LUNCH_CAP_SECONDS - 0 would flash a full, wrong "01:00:00 left"
-            // (looking exactly like the timer reset) before snapping to the
-            // real value moments later. Show a neutral loading state instead
-            // of a specific number we don't actually know yet.
-            (() => { const lunchReady = !!currentEntry?.start_time; return (
-            <div className={`w-full rounded-2xl border-2 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5 transition-colors ${
-              !lunchReady ? 'bg-gray-50 border-gray-200' : liveElapsed >= LUNCH_CAP_SECONDS ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'
-            }`}>
-              <div className="flex items-center gap-3 min-w-0">
-                <span className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shrink-0 ${
-                  !lunchReady ? 'bg-gray-100' : liveElapsed >= LUNCH_CAP_SECONDS ? 'bg-red-100' : 'bg-amber-100'
-                }`}>
-                  🍽️
-                </span>
-                <div className="min-w-0">
-                  <p className={`text-xs font-bold uppercase tracking-wide ${!lunchReady ? 'text-gray-400' : liveElapsed >= LUNCH_CAP_SECONDS ? 'text-red-600' : 'text-amber-700'}`}>
-                    {t('status.lunch')}
-                  </p>
-                  <p className={`text-xl font-bold tabular-nums leading-tight ${!lunchReady ? 'text-gray-400' : liveElapsed >= LUNCH_CAP_SECONDS ? 'text-red-700' : 'text-amber-800'}`}>
-                    {!lunchReady
-                      ? <Spinner size="sm" />
-                      : liveElapsed >= LUNCH_CAP_SECONDS
-                        ? t('home.lunch.over')
-                        : t('home.lunch.remaining', { time: formatElapsed(LUNCH_CAP_SECONDS - liveElapsed) })}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleEndLunch}
-                disabled={lunchLoading || !isOnline || !lunchReady}
-                className="w-full sm:w-auto sm:shrink-0 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 active:scale-95 disabled:opacity-50 px-6 py-3.5 rounded-xl shadow-sm shadow-amber-300/50 transition-all"
-              >
-                {lunchLoading ? <Spinner size="sm" /> : t('home.lunch.end')}
-              </button>
-            </div>
-          )})()
-          ) : hasTakenLunchToday ? (
-            // Used up for the day — server-enforced too (lunch.php), so this
-            // is purely so they see why, without tapping into a 409. No
-            // self-service way to get another; only an admin can help.
-            <div className="w-full flex items-center gap-3 rounded-2xl border-2 border-gray-200 bg-gray-50 px-5 py-4">
-              <span className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-2xl shrink-0 grayscale opacity-60">🍽️</span>
-              <div className="min-w-0">
-                <p className="text-base font-bold text-gray-600">{t('home.lunch.takenTitle')}</p>
-                <p className="text-xs text-gray-400">{t('home.lunch.takenMessage')}</p>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => { setError(''); setLunchConfirmModal(true) }}
-              disabled={lunchLoading || !isOnline}
-              className="w-full flex items-center justify-between gap-3 rounded-2xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 active:scale-[0.99] disabled:opacity-50 px-5 py-4 transition-all"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-2xl shrink-0">🍽️</span>
-                <div className="text-left min-w-0">
-                  <p className="text-base font-bold text-amber-800">{t('home.lunch.start')}</p>
-                  <p className="text-xs text-amber-600">{t('home.lunch.paidUpTo')}</p>
-                </div>
-              </div>
-              {lunchLoading
-                ? <Spinner size="sm" className="text-amber-600 shrink-0" />
-                : <svg className="w-6 h-6 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
-              }
-            </button>
-          )
+        {/* Lunch — paid, capped at 1 hour, unlocked after 2 hours worked
+            today. A full-width, high-contrast card (not a small pill) so it
+            reads clearly at a glance on both phone and desktop. Hidden
+            entirely before eligible (same reasoning as Dinner below — no
+            button that would just 409). Once shown: an inviting "Start
+            Lunch" tap target while working, an unmissable countdown + "End
+            Lunch" once on lunch (turns red past the cap, matching the
+            server auto clock-out + lock at the same 60-minute mark), or an
+            "already taken today" notice once it's used up. */}
+        {isClockedIn && statusLabel !== 'done'
+          && (statusLabel === 'lunch' || hasTakenLunchToday || lunchEligible) && (
+          <MealBreakCard
+            type="lunch"
+            active={statusLabel === 'lunch'}
+            // Guards against a real "restarted" illusion: the store persists
+            // statusLabel across app opens (so it can say 'lunch' immediately
+            // on a cold start) but deliberately does NOT persist currentEntry
+            // (see timeclockStore.js's partialize) — that only arrives once
+            // the mount-time getStatus() call resolves. Until it does,
+            // liveElapsed reads 0, which would flash a wrong "01:00:00 left".
+            ready={!!currentEntry?.start_time}
+            elapsedSeconds={liveElapsed}
+            taken={hasTakenLunchToday}
+            loading={lunchLoading}
+            disabled={!isOnline}
+            onStartClick={() => { setError(''); setLunchConfirmModal(true) }}
+            onEndClick={handleEndLunch}
+          />
+        )}
+
+        {/* Dinner — a second meal break, identical rules to Lunch, that only
+            unlocks after working over 10 hours today. Hidden entirely before
+            that (and once already taken, unless currently active) rather
+            than shown disabled, so it doesn't invite a tap that would just
+            409. */}
+        {isClockedIn && statusLabel !== 'done'
+          && (statusLabel === 'dinner' || hasTakenDinnerToday || dinnerEligible) && (
+          <MealBreakCard
+            type="dinner"
+            active={statusLabel === 'dinner'}
+            ready={!!currentEntry?.start_time}
+            elapsedSeconds={liveElapsed}
+            taken={hasTakenDinnerToday}
+            loading={dinnerLoading}
+            disabled={!isOnline}
+            onStartClick={() => { setError(''); setDinnerConfirmModal(true) }}
+            onEndClick={handleEndDinner}
+          />
         )}
 
         {/* One-time heads-up right after a clock-in whose GPS didn't match the
@@ -1015,6 +1104,25 @@ export default function ClockPanel({ showHeader = true }) {
         </div>
       </Modal>
 
+      {/* ── Dinner confirmation — same explicit heads-up as Lunch. */}
+      <Modal isOpen={dinnerConfirmModal} onClose={() => !dinnerLoading && setDinnerConfirmModal(false)} title={t('home.dinner.confirmTitle')}>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3.5">
+            <span className="text-2xl shrink-0">🍽️</span>
+            <p className="text-sm text-amber-800 leading-relaxed">{t('home.dinner.confirmBody')}</p>
+          </div>
+          {error && <p className="text-xs text-red-600 font-medium text-center">{error}</p>}
+          <div className="flex gap-3">
+            <Button variant="secondary" fullWidth size="lg" onClick={() => setDinnerConfirmModal(false)} disabled={dinnerLoading}>
+              {t('common.cancel')}
+            </Button>
+            <Button fullWidth size="lg" loading={dinnerLoading} onClick={handleStartDinner}>
+              {t('home.dinner.confirmStart')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* ── Modification questionnaire ─────────────────────────── */}
       <Modal isOpen={!!corrModal} onClose={() => setCorrModal(null)} title={t('pay.detail.requestModification')}>
         {corrModal && (
@@ -1097,12 +1205,13 @@ export default function ClockPanel({ showHeader = true }) {
 }
 
 const ENTRY_DOT = {
-  working: 'bg-green-500', lunch: 'bg-amber-500',
+  working: 'bg-green-500', lunch: 'bg-amber-500', dinner: 'bg-amber-500',
   material_run: 'bg-violet-500', waiting: 'bg-orange-500', done: 'bg-gray-400',
 }
 const ENTRY_CFG = {
   working:      { dot: 'bg-green-500',  bg: 'bg-green-50',  text: 'text-green-700'  },
   lunch:        { dot: 'bg-amber-500',  bg: 'bg-amber-50',  text: 'text-amber-700'  },
+  dinner:       { dot: 'bg-amber-500',  bg: 'bg-amber-50',  text: 'text-amber-700'  },
   material_run: { dot: 'bg-violet-500', bg: 'bg-violet-50', text: 'text-violet-700' },
   waiting:      { dot: 'bg-orange-500', bg: 'bg-orange-50', text: 'text-orange-700' },
   done:         { dot: 'bg-gray-400',   bg: 'bg-gray-50',   text: 'text-gray-500'   },
