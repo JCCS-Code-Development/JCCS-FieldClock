@@ -121,6 +121,39 @@ function enforceMealCutoff(PDO $pdo, int $userId): void {
         ->execute([$cutoff, $entry['id'], $userId]);
 }
 
+// Defensive cleanup used by clear-lunch-lock.php: close any lunch/dinner
+// entry for this user that's still open, no matter how old. Normally
+// enforceMealCutoff already closes these the instant they pass the cap, but
+// if one somehow stayed open (e.g. a lock set under an earlier version of
+// this logic, or any other inconsistency), leaving it open would make the
+// employee's very next clock-in immediately run enforceMealCutoff again,
+// find the same overlong entry, and re-lock the account right back —
+// "Clear" would remove the flag but not actually let them back in. Closes
+// at the 1-hour cap if that's already passed (so payroll still only ever
+// pays up to the cap), or right now if an admin is clearing it before the
+// cap was even reached.
+function closeStaleMealEntries(PDO $pdo, int $userId): void {
+    $stmt = $pdo->prepare(
+        "SELECT * FROM time_entries
+         WHERE user_id = ? AND end_time IS NULL AND status_label IN ('lunch', 'dinner')"
+    );
+    $stmt->execute([$userId]);
+    $now = date('Y-m-d H:i:s');
+    foreach ($stmt->fetchAll() as $entry) {
+        $cap = date('Y-m-d H:i:s', strtotime($entry['start_time']) + LUNCH_CAP_MINUTES * 60);
+        $end = $cap < $now ? $cap : $now;
+        $pdo->prepare(
+            "UPDATE time_entries
+                SET end_time = ?, last_edited_at = NOW(),
+                    notes = TRIM(CONCAT(COALESCE(notes, ''), ' Closed by admin clearing the lock.'))
+              WHERE id = ?"
+        )->execute([$end, $entry['id']]);
+        $updated = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
+        $updated->execute([$entry['id']]);
+        logTimeEntryHistory($pdo, (int)$entry['id'], 'update', null, 'lunch_lock_clear', $entry, $updated->fetch());
+    }
+}
+
 // Sum of actual worked minutes today — everything except a lunch/dinner
 // break or a day_end marker — closed entries by their real duration, plus
 // the currently open entry (if any) counted up to right now. Powers the

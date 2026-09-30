@@ -30,17 +30,28 @@ $user = $stmt->fetch();
 if (!$user) { http_response_code(404); exit(json_encode(['error' => 'Employee not found'])); }
 if (!$user['lunch_locked_at']) { http_response_code(422); exit(json_encode(['error' => 'That employee is not lunch-locked'])); }
 
-$pdo->prepare('UPDATE users SET lunch_locked_at = NULL, lunch_locked_entry_id = NULL WHERE id = ?')
-    ->execute([$userId]);
+$pdo->beginTransaction();
+try {
+    $pdo->prepare('UPDATE users SET lunch_locked_at = NULL, lunch_locked_entry_id = NULL WHERE id = ?')
+        ->execute([$userId]);
 
-// Leave a trail on the entry that triggered the lock, same as any other
-// admin-visible timeclock change.
-if ($user['lunch_locked_entry_id']) {
-    $e = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
-    $e->execute([$user['lunch_locked_entry_id']]);
-    if ($entry = $e->fetch()) {
-        logTimeEntryHistory($pdo, (int)$entry['id'], 'update', (int)$auth['user_id'], 'lunch_lock_clear', $entry, $entry);
+    // Leave a trail on the entry that triggered the lock, same as any other
+    // admin-visible timeclock change.
+    if ($user['lunch_locked_entry_id']) {
+        $e = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
+        $e->execute([$user['lunch_locked_entry_id']]);
+        if ($entry = $e->fetch()) {
+            logTimeEntryHistory($pdo, (int)$entry['id'], 'update', (int)$auth['user_id'], 'lunch_lock_clear', $entry, $entry);
+        }
     }
+
+    // Guarantee they can actually clock back in — see closeStaleMealEntries.
+    closeStaleMealEntries($pdo, $userId);
+
+    $pdo->commit();
+} catch (Throwable $e) {
+    $pdo->rollBack();
+    throw $e;
 }
 
 echo json_encode(['ok' => true]);
