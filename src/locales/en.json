@@ -117,7 +117,7 @@
       "lockedTitle": "Clocked out — dinner exceeded 1 hour",
       "lockedMessage": "Your dinner went over the 1-hour paid limit, so you were automatically clocked out. Contact your administrator to clock back in.",
       "confirmTitle": "Start Your Dinner?",
-      "confirmBody": "You've worked over 10 hours today, so a second break — Dinner — is available. It's paid for up to 1 continuous hour, same as lunch. You can tap End Dinner any time before then to clock back in. If the hour passes and you haven't clocked back in, you'll be automatically clocked out and that time will not be paid — you'll need to contact your administrator to clock back in. Once today's dinner is used, there's no way to take another one yourself.",
+      "confirmBody": "You've worked over 10 hours today and already taken your lunch, so a second break — Dinner — is available. It's paid for up to 1 continuous hour, same as lunch. You can tap End Dinner any time before then to clock back in. If the hour passes and you haven't clocked back in, you'll be automatically clocked out and that time will not be paid — you'll need to contact your administrator to clock back in. Once today's dinner is used, there's no way to take another one yourself.",
       "confirmStart": "Yes, Start Dinner",
       "takenTitle": "Dinner Already Taken Today",
       "takenMessage": "Contact your administrator if you need another."

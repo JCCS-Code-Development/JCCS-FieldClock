@@ -523,7 +523,11 @@ export default function ClockPanel({ showHeader = true }) {
     .reduce((sum, e) => sum + (new Date(e.end_time) - new Date(e.start_time)) / 1000, 0)
     + (isClockedIn && statusLabel !== 'lunch' && statusLabel !== 'dinner' ? liveElapsed : 0)
   const lunchEligible  = workedSecondsToday >= LUNCH_UNLOCK_SECONDS
-  const dinnerEligible = workedSecondsToday >= DINNER_UNLOCK_SECONDS
+  // Dinner needs both: over 10 hours worked AND today's lunch already taken
+  // (closed) — a second break only for someone who already took their
+  // first one, not a way to skip straight to dinner. Mirrored server-side
+  // in dinner.php.
+  const dinnerEligible = workedSecondsToday >= DINNER_UNLOCK_SECONDS && hasTakenLunchToday
 
   const displayLocation = activeJob?.name
     ?? (currentEntry?.notes ? currentEntry.notes.replace('Location: ', '') : null)

@@ -117,7 +117,7 @@
       "lockedTitle": "Salida registrada — cena superó 1 hora",
       "lockedMessage": "Tu cena superó el límite pagado de 1 hora, así que se registró tu salida automáticamente. Contacta a tu administrador para volver a marcar entrada.",
       "confirmTitle": "¿Iniciar tu Cena?",
-      "confirmBody": "Has trabajado más de 10 horas hoy, así que un segundo descanso — Cena — está disponible. Es pagado hasta por 1 hora continua, igual que el almuerzo. Puedes tocar Terminar Cena en cualquier momento antes de eso para volver a marcar entrada. Si pasa la hora y no has vuelto a marcar entrada, se registrará tu salida automáticamente y ese tiempo no será pagado — deberás contactar a tu administrador para volver a marcar entrada. Una vez usada la cena de hoy, no hay forma de tomar otra por tu cuenta.",
+      "confirmBody": "Has trabajado más de 10 horas hoy y ya tomaste tu almuerzo, así que un segundo descanso — Cena — está disponible. Es pagado hasta por 1 hora continua, igual que el almuerzo. Puedes tocar Terminar Cena en cualquier momento antes de eso para volver a marcar entrada. Si pasa la hora y no has vuelto a marcar entrada, se registrará tu salida automáticamente y ese tiempo no será pagado — deberás contactar a tu administrador para volver a marcar entrada. Una vez usada la cena de hoy, no hay forma de tomar otra por tu cuenta.",
       "confirmStart": "Sí, Iniciar Cena",
       "takenTitle": "Cena Ya Tomada Hoy",
       "takenMessage": "Contacta a tu administrador si necesitas otra."

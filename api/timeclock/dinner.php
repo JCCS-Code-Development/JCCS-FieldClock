@@ -40,7 +40,22 @@ if ($already->fetch()) {
     exit(json_encode(['error' => "You've already taken your dinner break today. Contact your administrator if you need another."]));
 }
 
-// Dinner only unlocks after DINNER_UNLOCK_MINUTES of actual work today.
+// Dinner needs two things: over DINNER_UNLOCK_MINUTES of actual work today
+// (excluding any lunch/dinner time, per getWorkedMinutesToday), AND today's
+// lunch already taken (closed) — it's a second break only for someone who
+// already took their first one, not a way to skip straight to dinner.
+$lunchTaken = $pdo->prepare(
+    "SELECT id FROM time_entries
+     WHERE user_id = ? AND status_label = 'lunch' AND end_time IS NOT NULL
+       AND DATE(start_time) = CURDATE()
+     LIMIT 1"
+);
+$lunchTaken->execute([(int)$auth['user_id']]);
+if (!$lunchTaken->fetch()) {
+    http_response_code(403);
+    exit(json_encode(['error' => "Dinner is only available after you've taken your lunch today."]));
+}
+
 $worked = getWorkedMinutesToday($pdo, (int)$auth['user_id']);
 if ($worked < DINNER_UNLOCK_MINUTES) {
     http_response_code(403);
