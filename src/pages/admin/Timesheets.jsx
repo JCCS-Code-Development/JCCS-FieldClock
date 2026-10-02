@@ -157,9 +157,13 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
   // fix just the clock-in without being forced to also clock them out.
   const initOpen  = !isNew && !entry?.end_time && entry?.cost_category !== 'day_end'
 
-  // No longer user-selectable (traveling was the only other option); new
-  // entries are always 'working', existing entries keep whatever they had.
-  const [statusLabel] = useState(entry?.status_label ?? 'working')
+  // Entry type — Working, or a registered Lunch/Dinner break (same paid,
+  // capped-at-1-hour categories the self-service timeclock uses; see
+  // api/timeclock/_helper.php). Selectable for new entries so an admin can
+  // back-fill a break the same way PTO gets registered via Visit Category
+  // below. 'material_run'/'waiting' aren't offered here — nothing in the
+  // app creates those manually.
+  const [statusLabel, setStatusLabel] = useState(entry?.status_label ?? 'working')
   const [entryDate,   setEntryDate]   = useState(initDate)
   const [startTime,   setStartTime]   = useState(initStart)
   const [endTime,     setEndTime]     = useState(initEnd)
@@ -228,12 +232,14 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
         end_time:     stillClockedIn ? null : (endTime ? `${endDate} ${endTime}:00` : null),
         job_id:             jobId ? parseInt(jobId) : null,
         notes:              notes.trim() || null,
-        visit_category:     visitCategory || null,
-        estimate_id:        visitCategory === 'estimate' && estimateId ? parseInt(estimateId) : null,
-        estimate_subtype:   visitCategory === 'estimate' ? (estimateSubtype || null) : null,
-        work_order_number:  visitCategory === 'work_order' ? (workOrderNumber.trim() || null) : null,
-        engineer_name:      isNewLocationCategory ? (engineerName.trim() || null) : null,
-        visit_description:  isNewLocationCategory ? (visitDescription.trim() || null) : null,
+        // Visit category (work order/estimate/PTO/etc.) only applies to a
+        // Working entry — a Lunch/Dinner break isn't a job visit.
+        visit_category:     statusLabel === 'working' ? (visitCategory || null) : null,
+        estimate_id:        statusLabel === 'working' && visitCategory === 'estimate' && estimateId ? parseInt(estimateId) : null,
+        estimate_subtype:   statusLabel === 'working' && visitCategory === 'estimate' ? (estimateSubtype || null) : null,
+        work_order_number:  statusLabel === 'working' && visitCategory === 'work_order' ? (workOrderNumber.trim() || null) : null,
+        engineer_name:      statusLabel === 'working' && isNewLocationCategory ? (engineerName.trim() || null) : null,
+        visit_description:  statusLabel === 'working' && isNewLocationCategory ? (visitDescription.trim() || null) : null,
       }
       await onSave(isNew ? { ...payload, user_id: userId } : { ...payload, id: entry.id })
       onClose()
@@ -270,6 +276,34 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
           </p>
         </div>
       )}
+
+      {/* Entry type — Working, or a registered Lunch/Dinner break. Switching
+          away from Working clears any visit-category selection below, since
+          that section only applies to a work entry. */}
+      <div>
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Entry Type</label>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { value: 'working', label: 'Working' },
+            { value: 'lunch',   label: 'Lunch' },
+            { value: 'dinner',  label: 'Dinner' },
+          ].map(opt => {
+            const selected = statusLabel === opt.value
+            const isMeal = opt.value !== 'working'
+            return (
+              <button key={opt.value} type="button"
+                onClick={() => { setStatusLabel(opt.value); if (opt.value !== 'working') setVisitCategory('') }}
+                className={`py-2 rounded-xl text-xs font-semibold border-2 transition-colors ${
+                  selected
+                    ? (isMeal ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-brand-500 bg-brand-50 text-brand-700')
+                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                }`}>
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
 
       {/* Time inputs */}
       <div className="grid grid-cols-2 gap-4">
@@ -334,7 +368,9 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
         </div>
       </div>
 
-      {/* Visit category */}
+      {/* Visit category — only applies to a Working entry; a Lunch/Dinner
+          break isn't a job visit. */}
+      {statusLabel === 'working' && (
       <div>
         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
           Visit Category (optional) {jobId ? '' : '— new/unlisted location'}
@@ -399,6 +435,7 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
           </div>
         )}
       </div>
+      )}
 
       {/* Notes */}
       <div>
