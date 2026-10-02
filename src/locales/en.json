@@ -104,7 +104,8 @@
       "confirmBody": "You get one lunch per day, paid for up to 1 continuous hour. You can tap End Lunch any time before then to clock back in. If the hour passes and you haven't clocked back in, you'll be automatically clocked out and that time will not be paid — you'll need to contact your administrator to clock back in. Once today's lunch is used, there's no way to take another one yourself.",
       "confirmStart": "Yes, Start Lunch",
       "takenTitle": "Lunch Already Taken Today",
-      "takenMessage": "Contact your administrator if you need another."
+      "takenMessage": "Contact your administrator if you need another.",
+      "blockedMessage": "Blocked until 2 hours of work today."
     },
     "dinner": {
       "start": "Start Dinner",

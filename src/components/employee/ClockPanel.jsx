@@ -57,7 +57,7 @@ const DINNER_UNLOCK_SECONDS = 10 * 60 * 60
 // (start / active countdown / already taken today), parameterized by
 // `type` so the i18n keys, status label, and handlers differ per meal.
 function MealBreakCard({
-  type, active, ready, elapsedSeconds, taken, loading, disabled, onStartClick, onEndClick,
+  type, active, ready, elapsedSeconds, taken, eligible = true, loading, disabled, onStartClick, onEndClick,
 }) {
   const { t } = useTranslation()
   const over = ready && elapsedSeconds >= LUNCH_CAP_SECONDS
@@ -104,6 +104,21 @@ function MealBreakCard({
         <div className="min-w-0">
           <p className="text-base font-bold text-gray-600">{t(`home.${type}.takenTitle`)}</p>
           <p className="text-xs text-gray-400">{t(`home.${type}.takenMessage`)}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Not yet eligible (e.g. Lunch's 2-hour-worked minimum) — shown gray and
+  // non-interactive rather than hidden, so it never looks like the feature
+  // is just missing; the message says exactly when it'll unlock.
+  if (!eligible) {
+    return (
+      <div className="w-full flex items-center gap-3 rounded-2xl border-2 border-gray-200 bg-gray-50 px-5 py-4">
+        <span className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-2xl shrink-0 grayscale opacity-50">🍽️</span>
+        <div className="min-w-0">
+          <p className="text-base font-bold text-gray-400">{t(`home.${type}.start`)}</p>
+          <p className="text-xs text-gray-400">{t(`home.${type}.blockedMessage`)}</p>
         </div>
       </div>
     )
@@ -166,6 +181,7 @@ function formatDur(start, end) {
 function useTodayData(statusLabel) {
   const [entries, setEntries] = useState([])
   const [completedSeconds, setCompletedSeconds] = useState(0)
+  const [tick, setTick] = useState(0)
   useEffect(() => {
     const today = format(new Date(), 'yyyy-MM-dd')
     getEntries({ start: today, end: today }).then((d) => {
@@ -177,7 +193,20 @@ function useTodayData(statusLabel) {
       )
       setCompletedSeconds(Math.floor(total))
     }).catch(() => {})
-  }, [statusLabel])
+  }, [statusLabel, tick])
+  // A status-triggered refetch alone misses a long continuous session with
+  // no status change (e.g. hours of uninterrupted "working") — today's
+  // entries would never refresh. Matters more now that they feed the
+  // Lunch/Dinner hours-worked eligibility check, not just the activity
+  // list, so a stale read can get someone stuck looking ineligible for the
+  // rest of their shift. Refresh periodically and when the app regains
+  // focus, same pattern used elsewhere in this app (e.g. Dashboard.jsx).
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') setTick((n) => n + 1) }
+    document.addEventListener('visibilitychange', onVisible)
+    const interval = setInterval(() => setTick((n) => n + 1), 5 * 60 * 1000)
+    return () => { document.removeEventListener('visibilitychange', onVisible); clearInterval(interval) }
+  }, [])
   return { entries, completedSeconds }
 }
 
@@ -203,6 +232,22 @@ export default function ClockPanel({ showHeader = true }) {
   useEffect(() => {
     getStatus().then(setTimeclockData).catch(() => {})
     getChangeRequests().then(d => setMyRequests(d.requests ?? [])).catch(() => {})
+  }, [setTimeclockData])
+
+  // The mount-time sync above is a single attempt — if it fails (a weak-
+  // signal moment is common out in the field) currentEntry.start_time stays
+  // null, liveElapsed stays stuck at 0, and since that now also drives the
+  // Lunch/Dinner hours-worked eligibility check (not just the on-screen
+  // countdown), someone could look permanently ineligible for the rest of
+  // their shift even after really working past the threshold. Keep
+  // resyncing periodically and when the app regains focus so a failed or
+  // stale read self-heals instead of persisting for hours.
+  useEffect(() => {
+    const resync = () => getStatus().then(setTimeclockData).catch(() => {})
+    const onVisible = () => { if (document.visibilityState === 'visible') resync() }
+    document.addEventListener('visibilitychange', onVisible)
+    const interval = setInterval(resync, 5 * 60 * 1000)
+    return () => { document.removeEventListener('visibilitychange', onVisible); clearInterval(interval) }
   }, [setTimeclockData])
   const isOnline = useOnlineStatus()
   const { position, errorCode: gpsErrorCode, loading: gpsLoading, getPosition, requestPosition } = useGPS()
@@ -629,15 +674,16 @@ export default function ClockPanel({ showHeader = true }) {
 
         {/* Lunch — paid, capped at 1 hour, unlocked after 2 hours worked
             today. A full-width, high-contrast card (not a small pill) so it
-            reads clearly at a glance on both phone and desktop. Hidden
-            entirely before eligible (same reasoning as Dinner below — no
-            button that would just 409). Once shown: an inviting "Start
-            Lunch" tap target while working, an unmissable countdown + "End
-            Lunch" once on lunch (turns red past the cap, matching the
+            reads clearly at a glance on both phone and desktop. Always
+            shown once clocked in — before 2 hours it renders gray and
+            non-interactive with a "blocked until" message (MealBreakCard's
+            `eligible` state) rather than disappearing, so it never looks
+            like the feature itself is missing. Once eligible: an inviting
+            "Start Lunch" tap target while working, an unmissable countdown +
+            "End Lunch" once on lunch (turns red past the cap, matching the
             server auto clock-out + lock at the same 60-minute mark), or an
             "already taken today" notice once it's used up. */}
-        {isClockedIn && statusLabel !== 'done'
-          && (statusLabel === 'lunch' || hasTakenLunchToday || lunchEligible) && (
+        {isClockedIn && statusLabel !== 'done' && (
           <MealBreakCard
             type="lunch"
             active={statusLabel === 'lunch'}
@@ -650,6 +696,7 @@ export default function ClockPanel({ showHeader = true }) {
             ready={!!currentEntry?.start_time}
             elapsedSeconds={liveElapsed}
             taken={hasTakenLunchToday}
+            eligible={lunchEligible}
             loading={lunchLoading}
             disabled={!isOnline}
             onStartClick={() => { setError(''); setLunchConfirmModal(true) }}
