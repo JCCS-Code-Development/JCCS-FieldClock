@@ -62,6 +62,7 @@
     "noLocation": "Selecciona una ubicación o escribe el nombre del sitio.",
     "locationDeniedNotice": "Se denegó el acceso a la ubicación, así que no se registrará. Actívalo para FieldClock en la Configuración de tu teléfono si deseas incluirla.",
     "locationRetry": "Intentar de Nuevo",
+    "lockedOutMessage": "Tu descanso superó el límite pagado de 1 hora, así que se registró tu salida automáticamente. Contacta a tu administrador para volver a marcar entrada.",
     "clockInError": "No se pudo registrar. Intenta de nuevo.",
     "now": "ahora",
     "unknown": "Ubicación desconocida",

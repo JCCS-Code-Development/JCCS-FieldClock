@@ -226,7 +226,7 @@ export default function ClockPanel({ showHeader = true }) {
   const { t, i18n } = useTranslation()
   const { user } = useAuthStore()
   const firstName = user?.name?.split(' ')[0] ?? ''
-  const { statusLabel, currentEntry, activeJob, dayStarted, setTimeclockData } = useTimeclockStore()
+  const { statusLabel, currentEntry, activeJob, dayStarted, lunch_locked_at: lunchLockedAt, setTimeclockData } = useTimeclockStore()
 
   // Always sync with server on mount so the UI reflects actual DB state
   useEffect(() => {
@@ -453,7 +453,7 @@ export default function ClockPanel({ showHeader = true }) {
         lat: position?.lat, lng: position?.lng, accuracy: position?.accuracy,
         notes: clockOutNote.trim() || undefined,
       })
-      setTimeclockData({ statusLabel: 'done', currentEntry: null, activeJob: null, dayStarted: true })
+      setTimeclockData({ statusLabel: 'done', currentEntry: null, activeJob: null, dayStarted: true, lunch_locked_at: null })
       setOffSiteNotice(null)
       setClockOutModal(false)
       setClockOutNote('')
@@ -488,12 +488,18 @@ export default function ClockPanel({ showHeader = true }) {
         accuracy: fresh?.accuracy ?? null,
         notes:    !jobId && manualLocation.trim() ? manualLocation.trim() : undefined,
       })
-      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
+      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true, lunch_locked_at: null })
       setManualLocation('')
       if (data.within_radius === false) {
         setOffSiteNotice({ distanceMeters: data.distance_meters })
       }
     } catch (err) {
+      // day-start.php's lock rejection carries lunch_locked_at — capture it
+      // right away so the dedicated "contact your administrator" banner
+      // shows immediately, not only after the next periodic status sync.
+      if (err?.response?.data?.lunch_locked) {
+        setTimeclockData({ lunch_locked_at: err.response.data.lunch_locked_at ?? true })
+      }
       setError(err?.response?.data?.error ?? t('home.clockInError'))
     } finally { setLoading(false) }
   }
@@ -505,7 +511,7 @@ export default function ClockPanel({ showHeader = true }) {
     setLunchLoading(true); setError('')
     try {
       const data = await setLunch({ lat: position?.lat, lng: position?.lng, accuracy: position?.accuracy })
-      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
+      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true, lunch_locked_at: null })
       setLunchConfirmModal(false)
     } catch (err) {
       // Leave the modal open so the error is visible right next to the
@@ -518,7 +524,7 @@ export default function ClockPanel({ showHeader = true }) {
     setLunchLoading(true); setError('')
     try {
       const data = await setWorking({ lat: position?.lat, lng: position?.lng, accuracy: position?.accuracy })
-      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
+      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true, lunch_locked_at: null })
     } catch (err) {
       setError(err?.response?.data?.error ?? t('home.lunch.endError'))
     } finally { setLunchLoading(false) }
@@ -528,7 +534,7 @@ export default function ClockPanel({ showHeader = true }) {
     setDinnerLoading(true); setError('')
     try {
       const data = await setDinner({ lat: position?.lat, lng: position?.lng, accuracy: position?.accuracy })
-      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
+      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true, lunch_locked_at: null })
       setDinnerConfirmModal(false)
     } catch (err) {
       setError(err?.response?.data?.error ?? t('home.dinner.startError'))
@@ -539,7 +545,7 @@ export default function ClockPanel({ showHeader = true }) {
     setDinnerLoading(true); setError('')
     try {
       const data = await setWorking({ lat: position?.lat, lng: position?.lng, accuracy: position?.accuracy })
-      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true })
+      setTimeclockData({ statusLabel: data.statusLabel, currentEntry: data.currentEntry, activeJob: data.activeJob, dayStarted: true, lunch_locked_at: null })
     } catch (err) {
       setError(err?.response?.data?.error ?? t('home.dinner.endError'))
     } finally { setDinnerLoading(false) }
@@ -732,14 +738,26 @@ export default function ClockPanel({ showHeader = true }) {
           </p>
         )}
 
-        {/* Location isn't required to clock in — this is informational, not
+        {/* Locked out after a lunch/dinner that ran over 1 hour — shown
+            proactively (not just after a failed clock-in tap) and takes
+            priority over the location notice below: location is irrelevant
+            noise when the real blocker is needing an admin. lunchLockedAt
+            arrives either from status.php on load/periodic sync, or
+            immediately from a 403 on performClockIn. */}
+        {!isClockedIn && lunchLockedAt ? (
+          <div className="w-full flex items-center gap-2.5 bg-red-50 border border-red-200 px-4 py-3 rounded-xl text-center justify-center">
+            <span className="text-base shrink-0">🔒</span>
+            <p className="text-xs text-red-700 font-medium">{t('home.lockedOutMessage')}</p>
+          </div>
+        ) : (
+        /* Location isn't required to clock in — this is informational, not
             a blocker. Shown once the browser has actually finished trying
             (not during the brief initial fetch) so it doesn't flash on every
             normal page load. Denied vs. unavailable get different
             guidance — a denial needs a phone Settings change; the browser
             won't re-prompt on its own. Every clock-in still re-asks for a
-            fresh fix regardless of what's shown here (see performClockIn). */}
-        {!isClockedIn && !gpsLoading && !position && (
+            fresh fix regardless of what's shown here (see performClockIn). */
+        !isClockedIn && !gpsLoading && !position && (
           <div className="w-full flex flex-col items-center gap-2 bg-amber-50 border border-amber-200 px-4 py-3 rounded-xl text-center">
             <p className="text-xs text-amber-700 font-medium">
               {gpsErrorCode === 1 ? t('home.locationDeniedNotice') : t('home.gpsUnavailable')}
@@ -751,7 +769,7 @@ export default function ClockPanel({ showHeader = true }) {
               {t('home.locationRetry')}
             </button>
           </div>
-        )}
+        ))}
 
         {!isOnline && (
           <p className="text-xs text-amber-600 font-medium bg-amber-50 px-4 py-2.5 rounded-xl w-full text-center">

@@ -62,6 +62,7 @@
     "noLocation": "Select a location or type the job site name below.",
     "locationDeniedNotice": "Location access was denied, so it won't be recorded. Enable it for FieldClock in your phone's Settings if you'd like it included.",
     "locationRetry": "Try Again",
+    "lockedOutMessage": "Your break went over the 1-hour paid limit, so you were automatically clocked out. Contact your administrator to clock back in.",
     "clockInError": "Could not clock in. Try again.",
     "now": "now",
     "unknown": "Unknown location",

@@ -26,7 +26,13 @@ $pdo   = getPDO();
 requireHourly($auth, $pdo);
 
 try {
-    beginTimeclockTransaction($pdo, (int)$auth['user_id']);
+    // Ending the day is itself an explicit, proactive action — same
+    // reasoning as returning to work in transitionOpenWorkEntry: skip the
+    // generic meal-cutoff auto-lock so someone who's actively clocking out
+    // (even on an over-cap lunch/dinner) gets a normal clock-out instead of
+    // a lock that would otherwise also block their next day's clock-in
+    // until an admin clears it. The cap itself is still enforced below.
+    beginTimeclockTransaction($pdo, (int)$auth['user_id'], true);
     $open = getOpenWorkEntry($pdo, (int)$auth['user_id']);
     if (!$open) {
         $marker = getTodayDayEndMarker($pdo, (int)$auth['user_id']);
@@ -40,7 +46,19 @@ try {
         http_response_code(422);
         exit(json_encode(['error' => 'Not clocked in']));
     }
-    closeOpenEntry($pdo, $auth['user_id'], $lat, $lng, source: 'day_end', notes: $notes);
+
+    // Cap a lunch/dinner being ended late at the 1-hour mark, same as
+    // transitionOpenWorkEntry does — payroll still never pays past the cap,
+    // it just doesn't lock the account for this explicit action.
+    $endOverride = null;
+    if (in_array($open['status_label'], ['lunch', 'dinner'], true)) {
+        $cap = strtotime($open['start_time']) + LUNCH_CAP_MINUTES * 60;
+        if (time() > $cap) {
+            $endOverride = date('Y-m-d H:i:s', $cap);
+        }
+    }
+
+    closeOpenEntry($pdo, $auth['user_id'], $lat, $lng, source: 'day_end', notes: $notes, endTimeOverride: $endOverride);
     $result = openEntry($pdo, $auth['user_id'], null, 'done', 'day_end', $lat, $lng, $acc, source: 'day_end');
     $pdo->commit();
     echo json_encode($result);

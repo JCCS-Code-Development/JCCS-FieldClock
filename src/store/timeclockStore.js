@@ -8,9 +8,15 @@ export const useTimeclockStore = create(
       currentEntry: null,
       activeJob:    null,
       dayStarted:   false,
+      // Set once status.php reports an active lunch/dinner lock, so the Clock
+      // page can show a dedicated "contact your administrator" banner right
+      // away — not only after a failed clock-in tap. Deliberately not
+      // persisted (see partialize below): it must always come fresh from the
+      // server, same reasoning as currentEntry.
+      lunch_locked_at: null,
 
       setTimeclockData: (data) => set(data),
-      clear: () => set({ statusLabel: null, currentEntry: null, activeJob: null, dayStarted: false }),
+      clear: () => set({ statusLabel: null, currentEntry: null, activeJob: null, dayStarted: false, lunch_locked_at: null }),
     }),
     {
       name: 'timeclock-state',

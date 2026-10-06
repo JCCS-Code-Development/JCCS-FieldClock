@@ -55,7 +55,10 @@ function logTimeEntryHistory(
 // screen. A second registration (day-start.php still has its own) is a safe
 // no-op: whichever runs first rolls back, and $pdo->inTransaction() is false
 // for the other.
-function beginTimeclockTransaction(PDO $pdo, int $userId): void {
+//
+// $skipMealCutoff: set by transitionOpenWorkEntry when the employee is
+// explicitly returning to work from a break — see its own comment for why.
+function beginTimeclockTransaction(PDO $pdo, int $userId, bool $skipMealCutoff = false): void {
     $pdo->beginTransaction();
     register_shutdown_function(function () use ($pdo) {
         if ($pdo->inTransaction()) {
@@ -68,7 +71,9 @@ function beginTimeclockTransaction(PDO $pdo, int $userId): void {
         $pdo->rollBack();
         throw new RuntimeException('User not found');
     }
-    enforceMealCutoff($pdo, $userId);
+    if (!$skipMealCutoff) {
+        enforceMealCutoff($pdo, $userId);
+    }
 }
 
 // Lunch and Dinner are both paid, capped at this many minutes each.
@@ -251,7 +256,19 @@ function transitionOpenWorkEntry(
     ?float $accuracy,
     string $source
 ): array {
-    beginTimeclockTransaction($pdo, $userId);
+    // Returning to 'working' from a break is the employee's own explicit
+    // "I'm back" signal. Skip the generic meal-cutoff auto-lock for this
+    // specific transition: if the request happens to land a few
+    // seconds/minutes after the 1-hour cap — ordinary network/processing
+    // delay, or simply tapping End Lunch right at the boundary — the blind
+    // cutoff would otherwise snatch the entry away, end the whole day, and
+    // lock the account instead of just returning them to work. Reported as
+    // "I clicked to end lunch and it clocked me out completely." The cap is
+    // still enforced below for payroll accuracy, just without the lock /
+    // day-end side effects — see the overrun check right after the no-op
+    // check, once we know there's actually a lunch/dinner entry to cap.
+    $returningToWork = $statusLabel === 'working';
+    beginTimeclockTransaction($pdo, $userId, $returningToWork);
     $open = getOpenWorkEntry($pdo, $userId);
     if (!$open) {
         exitIfLunchLocked($pdo, $userId);
@@ -267,7 +284,15 @@ function transitionOpenWorkEntry(
         return $result;
     }
 
-    closeOpenEntry($pdo, $userId, $lat, $lng, source: $source);
+    $endOverride = null;
+    if ($returningToWork && in_array($open['status_label'], ['lunch', 'dinner'], true)) {
+        $cap = strtotime($open['start_time']) + LUNCH_CAP_MINUTES * 60;
+        if (time() > $cap) {
+            $endOverride = date('Y-m-d H:i:s', $cap);
+        }
+    }
+
+    closeOpenEntry($pdo, $userId, $lat, $lng, source: $source, endTimeOverride: $endOverride);
     $result = openEntry(
         $pdo,
         $userId,
@@ -294,8 +319,12 @@ function transitionOpenWorkEntry(
 // Close the current open entry and return its id (or null if none). $notes,
 // when given, is the employee's own clock-out note (e.g. from day-end.php) —
 // left null for every other caller (switching activities mid-shift, etc.) so
-// it never overwrites anything on those transitions.
-function closeOpenEntry(PDO $pdo, int $userId, ?float $lat, ?float $lng, string $source = 'self_service', ?string $notes = null): ?int {
+// it never overwrites anything on those transitions. $endTimeOverride, when
+// given, is used instead of right-now — transitionOpenWorkEntry passes the
+// 1-hour cap timestamp when capping a lunch/dinner being ended late, so the
+// paid duration still can't exceed the cap even though this path (unlike
+// enforceMealCutoff) doesn't lock the account.
+function closeOpenEntry(PDO $pdo, int $userId, ?float $lat, ?float $lng, string $source = 'self_service', ?string $notes = null, ?string $endTimeOverride = null): ?int {
     // day_end rows are permanent status markers, not active paid work. Never
     // close one when transitioning or ending a later shift.
     $stmt = $pdo->prepare(
@@ -306,12 +335,13 @@ function closeOpenEntry(PDO $pdo, int $userId, ?float $lat, ?float $lng, string 
     $stmt->execute([$userId]);
     $open = $stmt->fetch();
     if (!$open) return null;
+    $endTime = $endTimeOverride ?? date('Y-m-d H:i:s');
     if ($notes !== null && $notes !== '') {
-        $pdo->prepare('UPDATE time_entries SET end_time = NOW(), end_lat = ?, end_lng = ?, notes = ?, last_edited_by = ?, last_edited_at = NOW() WHERE id = ?')
-            ->execute([$lat, $lng, $notes, $userId, $open['id']]);
+        $pdo->prepare('UPDATE time_entries SET end_time = ?, end_lat = ?, end_lng = ?, notes = ?, last_edited_by = ?, last_edited_at = NOW() WHERE id = ?')
+            ->execute([$endTime, $lat, $lng, $notes, $userId, $open['id']]);
     } else {
-        $pdo->prepare('UPDATE time_entries SET end_time = NOW(), end_lat = ?, end_lng = ?, last_edited_by = ?, last_edited_at = NOW() WHERE id = ?')
-            ->execute([$lat, $lng, $userId, $open['id']]);
+        $pdo->prepare('UPDATE time_entries SET end_time = ?, end_lat = ?, end_lng = ?, last_edited_by = ?, last_edited_at = NOW() WHERE id = ?')
+            ->execute([$endTime, $lat, $lng, $userId, $open['id']]);
     }
 
     $new = $pdo->prepare('SELECT * FROM time_entries WHERE id = ?');
