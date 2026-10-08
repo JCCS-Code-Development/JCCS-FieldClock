@@ -23,18 +23,20 @@ $acc  = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
 $pdo  = getPDO();
 requireHourly($auth, $pdo);
 
-// Only one dinner per day — same rule and reasoning as lunch.php. A CLOSED
-// dinner entry today means it's already been taken; no self-service second
-// one, only an admin adjusting the timesheet. An OPEN dinner entry doesn't
-// trigger this — that's the normal idempotent retry transitionOpenWorkEntry
-// already handles below.
+// Only one dinner per day — "day" meaning this shift, not the calendar date
+// (see currentShiftStartBoundary; same reasoning as lunch.php). A CLOSED
+// dinner entry this shift means it's already been taken; no self-service
+// second one, only an admin adjusting the timesheet. An OPEN dinner entry
+// doesn't trigger this — that's the normal idempotent retry
+// transitionOpenWorkEntry already handles below.
+$shiftStart = currentShiftStartBoundary($pdo, (int)$auth['user_id']);
 $already = $pdo->prepare(
     "SELECT id FROM time_entries
      WHERE user_id = ? AND status_label = 'dinner' AND end_time IS NOT NULL
-       AND DATE(start_time) = CURDATE()
+       AND start_time > ?
      LIMIT 1"
 );
-$already->execute([(int)$auth['user_id']]);
+$already->execute([(int)$auth['user_id'], $shiftStart]);
 if ($already->fetch()) {
     http_response_code(409);
     exit(json_encode(['error' => "You've already taken your dinner break today. Contact your administrator if you need another."]));
@@ -47,10 +49,10 @@ if ($already->fetch()) {
 $lunchTaken = $pdo->prepare(
     "SELECT id FROM time_entries
      WHERE user_id = ? AND status_label = 'lunch' AND end_time IS NOT NULL
-       AND DATE(start_time) = CURDATE()
+       AND start_time > ?
      LIMIT 1"
 );
-$lunchTaken->execute([(int)$auth['user_id']]);
+$lunchTaken->execute([(int)$auth['user_id'], $shiftStart]);
 if (!$lunchTaken->fetch()) {
     http_response_code(403);
     exit(json_encode(['error' => "Dinner is only available after you've taken your lunch today."]));

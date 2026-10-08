@@ -23,19 +23,21 @@ $acc  = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
 $pdo  = getPDO();
 requireHourly($auth, $pdo);
 
-// Only one lunch per day. A CLOSED lunch entry today (ended normally, or
-// auto-cut off at the 1-hour cap — see enforceMealCutoff) means they already
-// took it; there is no self-service way to get another, only an admin
-// manually adjusting their timesheet. An OPEN lunch entry today doesn't
-// trigger this — that's just the normal idempotent retry
-// transitionOpenWorkEntry already handles below.
+// Only one lunch per day — "day" meaning this shift, not the calendar date,
+// since a shift can span midnight (see currentShiftStartBoundary). A CLOSED
+// lunch entry this shift (ended normally, or auto-cut off at the 1-hour cap —
+// see enforceMealCutoff) means they already took it; there is no self-service
+// way to get another, only an admin manually adjusting their timesheet. An
+// OPEN lunch entry doesn't trigger this — that's just the normal idempotent
+// retry transitionOpenWorkEntry already handles below.
+$shiftStart = currentShiftStartBoundary($pdo, (int)$auth['user_id']);
 $already = $pdo->prepare(
     "SELECT id FROM time_entries
      WHERE user_id = ? AND status_label = 'lunch' AND end_time IS NOT NULL
-       AND DATE(start_time) = CURDATE()
+       AND start_time > ?
      LIMIT 1"
 );
-$already->execute([(int)$auth['user_id']]);
+$already->execute([(int)$auth['user_id'], $shiftStart]);
 if ($already->fetch()) {
     http_response_code(409);
     exit(json_encode(['error' => "You've already taken your lunch today. Contact your administrator if you need another."]));

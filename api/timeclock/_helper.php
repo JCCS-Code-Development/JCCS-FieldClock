@@ -159,20 +159,43 @@ function closeStaleMealEntries(PDO $pdo, int $userId): void {
     }
 }
 
-// Sum of actual worked minutes today — everything except a lunch/dinner
+// The real boundary this app uses for "a day" is a day_end marker, not the
+// calendar date — a shift can span midnight (clock in 8pm, work past
+// midnight). Scoping "today" by DATE(start_time) = CURDATE() would make an
+// overnight shift's earlier entries (dated the prior calendar day) invisible
+// to every "today" rule the instant the clock ticks past midnight — the
+// worked-hours eligibility check, and the one-lunch/one-dinner-per-day
+// checks in lunch.php/dinner.php would all wrongly reset mid-shift. Returns
+// the start_time of this user's most recent day_end marker (their last
+// clock-out, whenever that was) to use as the lower bound for "since this
+// shift began" — or midnight today if they don't have one yet (effectively
+// their first-ever shift).
+function currentShiftStartBoundary(PDO $pdo, int $userId): string {
+    $stmt = $pdo->prepare(
+        "SELECT start_time FROM time_entries
+         WHERE user_id = ? AND cost_category = 'day_end'
+         ORDER BY start_time DESC LIMIT 1"
+    );
+    $stmt->execute([$userId]);
+    return $stmt->fetchColumn() ?: date('Y-m-d 00:00:00');
+}
+
+// Sum of actual worked minutes this shift — everything except a lunch/dinner
 // break or a day_end marker — closed entries by their real duration, plus
 // the currently open entry (if any) counted up to right now. Powers the
 // "Dinner unlocks after 10 hours worked" rule in dinner.php; deliberately
 // excludes lunch/dinner time itself, so taking a break doesn't help reach
-// the threshold.
+// the threshold. Scoped by currentShiftStartBoundary(), not the calendar
+// date — see its comment.
 function getWorkedMinutesToday(PDO $pdo, int $userId): int {
+    $since = currentShiftStartBoundary($pdo, $userId);
     $stmt = $pdo->prepare(
         "SELECT COALESCE(SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, NOW()))), 0) AS secs
          FROM time_entries
-         WHERE user_id = ? AND DATE(start_time) = CURDATE()
+         WHERE user_id = ? AND start_time > ?
            AND cost_category NOT IN ('paid_lunch', 'paid_dinner', 'day_end')"
     );
-    $stmt->execute([$userId]);
+    $stmt->execute([$userId, $since]);
     return (int) round(((int) $stmt->fetchColumn()) / 60);
 }
 

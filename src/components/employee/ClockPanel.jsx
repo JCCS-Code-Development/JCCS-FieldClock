@@ -183,9 +183,25 @@ function useTodayData(statusLabel) {
   const [completedSeconds, setCompletedSeconds] = useState(0)
   const [tick, setTick] = useState(0)
   useEffect(() => {
-    const today = format(new Date(), 'yyyy-MM-dd')
-    getEntries({ start: today, end: today }).then((d) => {
-      const list = d.entries ?? []
+    // Fetch a 2-day window (yesterday + today), not just today — a shift can
+    // span midnight, and scoping to the calendar date alone would make an
+    // overnight shift's earlier entries vanish the instant the clock ticks
+    // past midnight, breaking the Lunch/Dinner eligibility math mid-shift.
+    // Mirrors currentShiftStartBoundary() on the server: narrow back down to
+    // just the current continuous shift by cutting off at the most recent
+    // day_end marker (the real shift boundary this app uses), not the
+    // calendar date.
+    const now = new Date()
+    const yesterday = format(new Date(now.getTime() - 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
+    const today = format(now, 'yyyy-MM-dd')
+    getEntries({ start: yesterday, end: today }).then((d) => {
+      const all = d.entries ?? []
+      const lastDayEnd = all
+        .filter((e) => e.cost_category === 'day_end')
+        .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))[0]
+      const list = lastDayEnd
+        ? all.filter((e) => new Date(e.start_time) > new Date(lastDayEnd.start_time))
+        : all.filter((e) => e.start_time.slice(0, 10) === today)
       setEntries(list)
       const finished = list.filter((e) => e.end_time && e.cost_category !== 'day_end')
       const total = finished.reduce(

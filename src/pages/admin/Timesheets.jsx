@@ -226,20 +226,27 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
       const endDate = (!stillClockedIn && endTime && isOvernight(startTime, endTime))
         ? format(addDays(parseISO(entryDate), 1), 'yyyy-MM-dd')
         : entryDate
+      // Visit category (work order/estimate/PTO/etc.) only applies to a
+      // Working entry — a Lunch/Dinner break isn't a job visit. Checking
+      // specifically for the meal types here (not just "!== working") so
+      // this never wipes visit_category/work_order_number/etc. off a
+      // material_run or waiting entry — those aren't selectable from the
+      // Entry Type buttons above, but a pre-existing one (created via the
+      // self-service app, e.g. a job switch while on Material Run) can still
+      // be opened here to fix just its times, and does carry that data.
+      const isMealType = statusLabel === 'lunch' || statusLabel === 'dinner'
       const payload = {
         status_label: statusLabel,
         start_time:   `${entryDate} ${startTime}:00`,
         end_time:     stillClockedIn ? null : (endTime ? `${endDate} ${endTime}:00` : null),
         job_id:             jobId ? parseInt(jobId) : null,
         notes:              notes.trim() || null,
-        // Visit category (work order/estimate/PTO/etc.) only applies to a
-        // Working entry — a Lunch/Dinner break isn't a job visit.
-        visit_category:     statusLabel === 'working' ? (visitCategory || null) : null,
-        estimate_id:        statusLabel === 'working' && visitCategory === 'estimate' && estimateId ? parseInt(estimateId) : null,
-        estimate_subtype:   statusLabel === 'working' && visitCategory === 'estimate' ? (estimateSubtype || null) : null,
-        work_order_number:  statusLabel === 'working' && visitCategory === 'work_order' ? (workOrderNumber.trim() || null) : null,
-        engineer_name:      statusLabel === 'working' && isNewLocationCategory ? (engineerName.trim() || null) : null,
-        visit_description:  statusLabel === 'working' && isNewLocationCategory ? (visitDescription.trim() || null) : null,
+        visit_category:     !isMealType ? (visitCategory || null) : null,
+        estimate_id:        !isMealType && visitCategory === 'estimate' && estimateId ? parseInt(estimateId) : null,
+        estimate_subtype:   !isMealType && visitCategory === 'estimate' ? (estimateSubtype || null) : null,
+        work_order_number:  !isMealType && visitCategory === 'work_order' ? (workOrderNumber.trim() || null) : null,
+        engineer_name:      !isMealType && isNewLocationCategory ? (engineerName.trim() || null) : null,
+        visit_description:  !isMealType && isNewLocationCategory ? (visitDescription.trim() || null) : null,
       }
       await onSave(isNew ? { ...payload, user_id: userId } : { ...payload, id: entry.id })
       onClose()
