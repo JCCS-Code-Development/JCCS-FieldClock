@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../store/authStore'
 import { listAgreements } from '../api/agreements'
+import { listMyLoanNotes } from '../api/loans'
 
 const REQUIRED_ALL = ['at_will', 'non_solicitation', 'conflict_of_interest', 'emergency_contact']
 const REQUIRED_W2  = ['i9', 'w4']
@@ -30,13 +31,19 @@ export default function PendingDocsBanner() {
     // Must scope to our own record by user_id — without it an admin hits the
     // HR-overview branch, which returns { employees } instead of { agreements },
     // so nothing reads as signed and the count is stuck at the full total.
-    listAgreements({ user_id: user.id }).then((d) => {
+    // Onboarding documents + any loan pagaré still waiting for the
+    // employee's own signature (both are signed on /my-docs).
+    Promise.all([
+      listAgreements({ user_id: user.id }),
+      listMyLoanNotes().catch(() => []),
+    ]).then(([d, notes]) => {
       const signed = new Set((d.agreements ?? []).filter((a) => a.signed_at).map((a) => a.agreement_type))
       const required = [
         ...REQUIRED_ALL,
         ...(user.pay_type === 'w2' ? REQUIRED_W2 : []),
       ]
-      setPendingCount(required.filter((r) => !signed.has(r)).length)
+      const unsignedNotes = notes.filter((n) => !n.borrower_signed_at).length
+      setPendingCount(required.filter((r) => !signed.has(r)).length + unsignedNotes)
     }).catch(() => {})
   }
 

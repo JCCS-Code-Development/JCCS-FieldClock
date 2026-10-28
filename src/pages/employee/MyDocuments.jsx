@@ -8,6 +8,9 @@ import { listAgreements, signAgreement, getAgreement } from '../../api/agreement
 import SignaturePad from '../../components/ui/SignaturePad'
 import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
+import LoanNoteOverlay from '../../components/LoanNoteOverlay'
+import { listMyLoanNotes } from '../../api/loans'
+import { formatCurrency } from '../../utils/format'
 
 const COMPANY = { name: 'JCCS Services LLC', state: 'South Carolina' }
 
@@ -424,6 +427,16 @@ export default function MyDocuments() {
   const [error, setError]               = useState('')
   const sigRef = useRef(null)
 
+  // Loan pagarés — signed separately from the onboarding documents above,
+  // and only listed when the employee has any.
+  const [loanNotes, setLoanNotes]   = useState([])
+  const [activeNote, setActiveNote] = useState(null)
+  const [noteMsg, setNoteMsg]       = useState('')
+  const loadNotes = useCallback(() => {
+    listMyLoanNotes().then(setLoanNotes).catch(() => setLoanNotes([]))
+  }, [])
+  useEffect(() => { loadNotes() }, [loadNotes])
+
   const requiredDefs = AGREEMENT_DEFS.filter((d) =>
     d.required_for.includes('all') || (d.required_for.includes('w2') && user?.pay_type === 'w2')
   )
@@ -580,6 +593,53 @@ export default function MyDocuments() {
             )
           })}
         </div>
+      )}
+
+      {/* ── Loan pagarés ─────────────────────────────────────────────────── */}
+      {loanNotes.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-base font-bold text-gray-900">{t('pagare.sectionTitle')}</h2>
+          <p className="text-sm text-gray-500 mt-0.5 mb-3">{t('pagare.sectionDesc')}</p>
+          {noteMsg && <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">{noteMsg}</p>}
+          <div className="flex flex-col gap-3">
+            {loanNotes.map((n) => {
+              const needsMe  = !n.borrower_signed_at
+              const complete = !!n.company_signed_at
+              return (
+                <button key={n.id}
+                  onClick={() => { setNoteMsg(''); setActiveNote(n) }}
+                  className={`w-full text-left p-4 rounded-2xl border-2 transition-all flex items-center justify-between gap-4 ${
+                    complete ? 'bg-green-50 border-green-200 hover:border-green-300'
+                      : needsMe ? 'bg-white border-amber-300 hover:border-amber-400' : 'bg-white border-gray-100 hover:border-brand-300'
+                  }`}>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {t(`pagare.kind_${n.kind}`, { amount: formatCurrency(n.principal) })}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {t('pagare.weekly', { amount: formatCurrency(n.weekly_amount), date: fmtDate(n.first_due_date) })}
+                    </p>
+                  </div>
+                  <span className={`flex-shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${
+                    complete ? 'bg-green-100 text-green-700' : needsMe ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {complete ? t('pagare.signedBoth') : needsMe ? t('pagare.toSign') : t('pagare.waitingCompany')}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {activeNote && (
+        <LoanNoteOverlay
+          note={activeNote}
+          mode={activeNote.borrower_signed_at ? 'view' : 'sign'}
+          onClose={() => setActiveNote(null)}
+          onDone={() => { setActiveNote(null); loadNotes() }}
+          onStale={() => { setActiveNote(null); setNoteMsg(t('pagare.stale')); loadNotes() }}
+        />
       )}
 
       {/* ── Signing overlay ──────────────────────────────────────────────── */}

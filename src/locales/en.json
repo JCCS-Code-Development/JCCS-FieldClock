@@ -455,5 +455,28 @@
       "previousVersions": "Previous versions",
       "footer": "Documents are stored securely and are only accessible to you and JCCS administrators. Once uploaded, documents cannot be deleted."
     }
+  },
+  "pagare": {
+    "title": "Promissory Note (Pagaré)",
+    "sectionTitle": "Loan agreements (Pagarés)",
+    "sectionDesc": "Promissory notes for loans from JCCS Services LLC.",
+    "consent": "I agree to sign this document electronically. My electronic signature has the same effect as a handwritten one.",
+    "langAck": "I read this document in English and I understand it.",
+    "signBtn": "Sign promissory note",
+    "afterSign": "Once signed it cannot be changed. The loan starts after JCCS Services LLC also signs, and you will receive a copy by email.",
+    "errConsent": "You must agree to sign electronically.",
+    "errLangAck": "You must confirm you read and understood the document.",
+    "errSignature": "Please draw your signature before signing.",
+    "errGeneric": "Could not sign. Try again.",
+    "stale": "The payment schedule was updated. Please review the document again before signing.",
+    "toSign": "Needs your signature",
+    "waitingCompany": "Waiting for company signature",
+    "signedBoth": "Signed",
+    "kind_original": "Loan of {{amount}}",
+    "kind_amendment": "Loan change — balance {{amount}}",
+    "kind_repaper": "Existing loan — balance {{amount}}",
+    "weekly": "{{amount}}/week from {{date}}",
+    "statusPendingSignature": "Needs your signature",
+    "statusPendingCountersign": "Waiting for company signature"
   }
 }

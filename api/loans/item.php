@@ -15,7 +15,8 @@ function fetchLoan(PDO $pdo, int $id): array|false {
     $stmt = $pdo->prepare(
         'SELECT l.id, l.user_id, u.name AS user_name, u.address AS user_address, u.pay_type,
                 l.amount, l.weekly_deduction, l.deduction_start_date, l.check_printed_at,
-                l.description, l.status, l.created_at,
+                l.description, l.status, l.created_at, l.installments,
+                l.separated_at, l.final_pay_deduction, l.balance_due_date, l.late_notice_at, l.demand_letter_at,
                 COALESCE(SUM(lp.amount), 0) AS paid_total,
                 GREATEST(l.amount - COALESCE(SUM(lp.amount), 0), 0) AS remaining
          FROM employee_loans l
@@ -36,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $loan = fetchLoan($pdo, $id);
     if (!$loan) { http_response_code(404); exit(json_encode(['error' => 'Not found'])); }
 
-    if ($auth['role'] !== 'admin' && $loan['user_id'] != $auth['user_id']) {
+    if ($auth['role'] !== 'admin' && ($loan['user_id'] != $auth['user_id'] || $loan['status'] === 'void')) {
         http_response_code(403); exit(json_encode(['error' => 'Forbidden']));
     }
 
@@ -64,9 +65,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     $id   = (int)($body['id'] ?? 0);
     if (!$id) { http_response_code(422); exit(json_encode(['error' => 'id required'])); }
 
+    $cur = fetchLoan($pdo, $id);
+    if (!$cur) { http_response_code(404); exit(json_encode(['error' => 'Not found'])); }
+
+    // A loan's terms are what its signed pagaré says. While it's still
+    // waiting for signatures they can't be edited (cancel it via void.php and
+    // create a new one); once active, the weekly amount can only go DOWN or
+    // start LATER here — raising it, or starting sooner, needs a signed
+    // amendment (amend.php) with 7 days' notice.
+    $editingTerms = array_key_exists('weekly_deduction', $body) || array_key_exists('deduction_start_date', $body);
+    if ($editingTerms && !in_array($cur['status'], ['active', 'paid_off'], true)) {
+        http_response_code(409); exit(json_encode(['error' => 'Terms of a loan waiting for signatures cannot be changed — cancel it and create a new one.']));
+    }
+
     $sets = []; $params = [];
 
     if (array_key_exists('status', $body)) {
+        if (!in_array($cur['status'], ['active', 'paid_off'], true)) {
+            http_response_code(409); exit(json_encode(['error' => 'Status of a loan waiting for signatures is set by signing, not edited']));
+        }
         $status = sanitizeString($body['status']);
         if (!in_array($status, ['active', 'paid_off'])) {
             http_response_code(422); exit(json_encode(['error' => 'Invalid status']));
@@ -79,6 +96,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         if ($weekly <= 0) {
             http_response_code(422); exit(json_encode(['error' => 'Weekly deduction amount must be greater than zero']));
         }
+        if ($cur['weekly_deduction'] !== null && $weekly > (float)$cur['weekly_deduction'] + 0.004) {
+            http_response_code(409); exit(json_encode(['error' => 'Raising the weekly amount needs a signed amendment (Amend).']));
+        }
         $sets[] = 'weekly_deduction = ?'; $params[] = $weekly;
     }
 
@@ -88,6 +108,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         if (!$parsedStart || $parsedStart->format('Y-m-d') !== $startAt) {
             http_response_code(422); exit(json_encode(['error' => 'Invalid deduction start date']));
         }
+        if ($cur['deduction_start_date'] !== null && $startAt < $cur['deduction_start_date']) {
+            http_response_code(409); exit(json_encode(['error' => 'Starting deductions sooner needs a signed amendment (Amend).']));
+        }
         $sets[] = 'deduction_start_date = ?'; $params[] = $startAt;
     }
 
@@ -96,6 +119,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     if (!empty($body['mark_check_printed'])) {
         $sets[] = 'check_printed_at = COALESCE(check_printed_at, NOW())';
     }
+
+    // Record that the W-2 7-day late-payment notice / post-separation demand
+    // letter was printed and given (set once, never cleared).
+    if (!empty($body['mark_late_notice']))   $sets[] = 'late_notice_at = COALESCE(late_notice_at, NOW())';
+    if (!empty($body['mark_demand_letter'])) $sets[] = 'demand_letter_at = COALESCE(demand_letter_at, NOW())';
 
     if (!$sets) { http_response_code(422); exit(json_encode(['error' => 'Nothing to update'])); }
 
@@ -111,6 +139,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     $id = (int)($_GET['id'] ?? 0);
     if (!$id) { http_response_code(422); exit(json_encode(['error' => 'id required'])); }
 
+    // A signed pagaré must be kept (6 years after payoff) — such a loan can
+    // only be cancelled (void.php) before countersigning, never deleted.
+    $signed = $pdo->prepare('SELECT COUNT(*) FROM loan_notes WHERE loan_id = ? AND borrower_signed_at IS NOT NULL');
+    $signed->execute([$id]);
+    if ((int)$signed->fetchColumn() > 0) {
+        http_response_code(422);
+        exit(json_encode(['error' => 'Cannot delete a loan with a signed pagaré']));
+    }
+
     $count = $pdo->prepare('SELECT COUNT(*) FROM loan_payments WHERE loan_id = ?');
     $count->execute([$id]);
     if ((int)$count->fetchColumn() > 0) {
@@ -118,6 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         exit(json_encode(['error' => 'Cannot delete a loan that has recorded payments']));
     }
 
+    $pdo->prepare('DELETE FROM loan_notes WHERE loan_id = ? AND borrower_signed_at IS NULL')->execute([$id]);
     $pdo->prepare('DELETE FROM employee_loans WHERE id = ?')->execute([$id]);
     echo json_encode(['success' => true]);
     exit;

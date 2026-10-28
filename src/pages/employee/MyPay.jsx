@@ -571,13 +571,18 @@ export default function MyPay() {
                     {myLoans.map((loan) => {
                       const pct = loan.amount > 0 ? Math.min((loan.paid_total / loan.amount) * 100, 100) : 0
                       const isPaidOff = loan.status === 'paid_off'
+                      // Not started until the pagaré is signed by both sides.
+                      const pendingLabel = loan.status === 'pending_signature' ? t('pagare.statusPendingSignature')
+                                         : loan.status === 'pending_countersign' ? t('pagare.statusPendingCountersign') : null
                       return (
                         <div key={loan.id} className="bg-white rounded-2xl border border-gray-100 px-5 py-4">
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-semibold text-gray-900">{formatCurrency(loan.amount)} {t('pay.loans.loan')}</span>
-                                {isPaidOff
+                                {pendingLabel
+                                  ? <span className="text-xs bg-gray-100 text-gray-600 font-semibold px-2 py-0.5 rounded-full">{pendingLabel}</span>
+                                  : isPaidOff
                                   ? <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">{t('pay.loans.paidOff')}</span>
                                   : <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">{t('pay.loans.active')}</span>}
                               </div>

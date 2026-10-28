@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Fetch remaining balance to prevent overpayment
     $stmt = $pdo->prepare(
-        'SELECT l.amount - COALESCE(SUM(lp.amount), 0) AS remaining
+        'SELECT l.status, l.amount - COALESCE(SUM(lp.amount), 0) AS remaining
          FROM employee_loans l
          LEFT JOIN loan_payments lp ON lp.loan_id = l.id
          WHERE l.id = ? GROUP BY l.id'
@@ -45,6 +45,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([$loanId]);
     $row = $stmt->fetch();
     if (!$row) { http_response_code(404); exit(json_encode(['error' => 'Loan not found'])); }
+    // No money changes hands until the pagaré is signed by both sides.
+    if (!in_array($row['status'], ['active', 'paid_off'], true)) {
+        http_response_code(409);
+        exit(json_encode(['error' => 'This loan is not active yet — its pagaré still needs to be signed']));
+    }
 
     if ($amount > (float)$row['remaining'] + 0.01) {
         http_response_code(422);
