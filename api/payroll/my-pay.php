@@ -41,6 +41,16 @@ foreach ($rows as $r) {
     if (date('Y-m-d', strtotime($r['start_time'])) === $today) $todayMinutes += $r['minutes'];
 }
 $weeksWorked = count($weeks);
+
+// Applied "no lunch registered" penalties (admin-only action, see
+// api/payroll/lunch-penalties.php) — subtracted from approved paid time and
+// listed per day so the employee can see why their hours went down.
+$penaltyByWeek = lunchPenaltyMinutesByWeek($pdo, $start, $end, (int)$uid)[(int)$uid] ?? [];
+$penaltyStmt = $pdo->prepare('SELECT work_date, minutes FROM lunch_penalties WHERE user_id = ? AND work_date BETWEEN ? AND ? ORDER BY work_date');
+$penaltyStmt->execute([$uid, $start, $end]);
+$lunchPenalties = $penaltyStmt->fetchAll();
+$approvedMinutes = max(0, $approvedMinutes - array_sum($penaltyByWeek));
+
 $totalApproved = $approvedMinutes / 60;
 $totalPending  = $pendingMinutes / 60;
 
@@ -68,7 +78,8 @@ if ($isSalary) {
             $weekMins[$r['iso_week']] = ($weekMins[$r['iso_week']] ?? 0) + $r['minutes'];
         }
     }
-    foreach ($weekMins as $m) {
+    foreach ($weekMins as $wk => $m) {
+        $m -= min($penaltyByWeek[$wk] ?? 0, $m);
         $h = $m / 60; $regHours += min($h, 40); $otHours += max(0, $h - 40);
     }
     // No overtime multiplier at this company — every hour is paid at the same rate.
@@ -104,6 +115,7 @@ echo json_encode([
     'adjustments'       => $adjustments,
     'adjustments_total' => round($adjTotal, 2),
     'estimated_total'   => round($baseGross + $adjTotal, 2),
+    'lunch_penalties'   => $isSalary ? [] : $lunchPenalties,
     'category_hours'    => array_map(fn($h) => round($h, 2), $categoryHours),
     'weeks_worked'      => $weeksWorked,
     'today_hours'       => round($todayMinutes / 60, 2),

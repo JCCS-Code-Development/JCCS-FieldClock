@@ -23,3 +23,14 @@ export const deleteAdjustment = (id) =>
 
 export const getAnnualSummary = (year) =>
   client.get('/payroll/annual-summary.php', { params: { year } }).then((r) => r.data)
+
+// "No lunch registered" 1-hour penalties — suggested on the admin Timesheets
+// page, only ever recorded when an admin applies one.
+export const listLunchPenalties = (params) =>
+  client.get('/payroll/lunch-penalties.php', { params }).then((r) => r.data)
+
+export const applyLunchPenalty = (data) =>
+  client.post('/payroll/lunch-penalties.php', data).then((r) => r.data)
+
+export const removeLunchPenalty = (id) =>
+  client.delete('/payroll/lunch-penalties.php', { params: { id } }).then((r) => r.data)

@@ -276,6 +276,7 @@
     },
     "regularHours": "Regular",
     "overtimeHours": "Tiempo Extra",
+    "lunchPenalty": "Almuerzo no registrado",
     "loanDeduction": "Descuento de Préstamo",
     "weeklyRate": "Salario Semanal",
     "paycheck": {

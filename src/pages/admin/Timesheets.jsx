@@ -13,6 +13,7 @@ import { listSalaryHistory } from '../../api/salaryHistory'
 import { listJobs } from '../../api/jobs'
 import { listEstimates } from '../../api/estimates'
 import { getDailyMileage } from '../../api/gps'
+import { listLunchPenalties, applyLunchPenalty, removeLunchPenalty } from '../../api/payroll'
 import { formatTime } from '../../utils/format'
 import { groupJobsByCompany } from '../../utils/jobs'
 
@@ -131,6 +132,26 @@ function totalMins(entries) {
   return entries
     .filter(e => e.cost_category !== 'day_end')
     .reduce((s, e) => s + entryMins(e), 0)
+}
+
+// A day with at least this much worked time and no Lunch entry gets a
+// "no lunch registered — deduct 1 hour?" suggestion. Never applied
+// automatically — the admin decides per day (see api/payroll/lunch-penalties.php).
+const LUNCH_PENALTY_SUGGEST_MINUTES = 6 * 60
+
+// Worked time for the lunch-penalty check — excludes the meal breaks
+// themselves and PTO, which isn't a day on site.
+function workedMinsForPenalty(entries) {
+  return entries
+    .filter(e => e.cost_category !== 'day_end' && e.status_label !== 'lunch' && e.status_label !== 'dinner' && e.visit_category !== 'pto')
+    .reduce((s, e) => s + entryMins(e), 0)
+}
+
+function suggestsLunchPenalty(entries) {
+  if (entries.some(e => e.status_label === 'lunch')) return false
+  // Still on the clock — the day isn't over, so lunch may yet be taken.
+  if (entries.some(e => !e.end_time && e.cost_category !== 'day_end')) return false
+  return workedMinsForPenalty(entries) >= LUNCH_PENALTY_SUGGEST_MINUTES
 }
 
 // Flags a clock-in whose GPS didn't match the selected job site (replaces
@@ -462,8 +483,14 @@ function EntryModal({ entry, defaultDate, weekDays, userId, jobs, onSave, onClos
 }
 
 // ── Day group ────────────────────────────────────────────────────
-function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
+function DayGroup({ day, entries, miles, penalty, onApplyPenalty, onRemovePenalty, onEdit, onDelete, onAdd }) {
   const dayMins   = totalMins(entries)
+  const suggestPenalty = !penalty && suggestsLunchPenalty(entries)
+  const [penaltyBusy, setPenaltyBusy] = useState(false)
+  const runPenalty = async (fn) => {
+    setPenaltyBusy(true)
+    try { await fn() } finally { setPenaltyBusy(false) }
+  }
   const dayLabel  = format(parseISO(day), 'EEEE, MMMM d')
   const isWeekend = [0, 6].includes(parseISO(day).getDay())
 
@@ -479,7 +506,11 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
             <span className="text-sm font-semibold text-sky-600">{miles.toFixed(1)} mi</span>
           )}
           {dayMins > 0 && (
-            <span className="text-sm font-semibold text-brand-600">{fmtDur(dayMins)} total</span>
+            <span className="text-sm font-semibold text-brand-600">
+              {penalty
+                ? <><span className="line-through text-gray-400 font-medium mr-1.5">{fmtDur(dayMins)}</span>{fmtDur(Math.max(0, dayMins - penalty.minutes))} total</>
+                : <>{fmtDur(dayMins)} total</>}
+            </span>
           )}
           <button onClick={() => onAdd(day)}
             className="flex items-center gap-1.5 text-xs text-brand-500 hover:text-brand-700 font-semibold transition-colors bg-brand-50 hover:bg-brand-100 px-2.5 py-1.5 rounded-lg">
@@ -487,6 +518,30 @@ function DayGroup({ day, entries, miles, onEdit, onDelete, onAdd }) {
           </button>
         </div>
       </div>
+      {/* No-lunch penalty — suggested for a 6h+ day with no Lunch entry,
+          applied only if the admin chooses to. */}
+      {suggestPenalty && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-amber-50 border-b border-amber-100">
+          <p className="text-xs text-amber-800">
+            <span className="font-semibold">No lunch registered.</span> Deduct 1 hour?
+          </p>
+          <button disabled={penaltyBusy} onClick={() => runPenalty(() => onApplyPenalty(day))}
+            className="shrink-0 text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors">
+            Apply −1h
+          </button>
+        </div>
+      )}
+      {penalty && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-red-50 border-b border-red-100">
+          <p className="text-xs text-red-700">
+            <span className="font-semibold">−{fmtDur(penalty.minutes)} penalty applied</span> · no lunch registered
+          </p>
+          <button disabled={penaltyBusy} onClick={() => runPenalty(() => onRemovePenalty(penalty.id))}
+            className="shrink-0 text-xs font-semibold text-red-600 hover:text-red-800 hover:bg-red-100 disabled:opacity-60 px-2.5 py-1.5 rounded-lg transition-colors">
+            Undo
+          </button>
+        </div>
+      )}
       {entries.length === 0 && (
         <div className="px-4 py-3 text-center">
           <p className="text-xs text-gray-300">No entries — tap Add to log a shift</p>
@@ -722,6 +777,7 @@ export default function AdminTimesheets() {
   const [weekMiles,   setWeekMiles]   = useState({})
   const [salaryHistory, setSalaryHistory] = useState([])
   const [allJobs,     setAllJobs]     = useState([])
+  const [penalties,   setPenalties]   = useState([])
 
   useEffect(() => {
     listEmployees().then(d => {
@@ -770,9 +826,18 @@ export default function AdminTimesheets() {
       .finally(() => setLoadingEnt(false))
   }
 
+  const loadPenalties = (empId, from, to) => {
+    if (!empId) return
+    listLunchPenalties({ user_id: empId, start: from, end: to })
+      .then(d => setPenalties(d.penalties ?? []))
+      .catch(() => setPenalties([]))
+  }
+
   useEffect(() => {
     if (!selectedEmp) return
     loadEntries(selectedEmp.id, dateFrom, dateTo)
+    setPenalties([])
+    loadPenalties(selectedEmp.id, dateFrom, dateTo)
     // Fetch mileage for each day in the week
     const days = []
     let d = new Date(dateFrom)
@@ -839,7 +904,16 @@ export default function AdminTimesheets() {
     }
     return map
   }, [entries])
-  const periodMins   = useMemo(() => totalMins(entries), [entries])
+  const penaltyByDay = useMemo(
+    () => Object.fromEntries(penalties.map(p => [p.work_date, { ...p, minutes: parseInt(p.minutes) }])),
+    [penalties]
+  )
+  const penaltyMins  = penalties.reduce((s, p) => s + parseInt(p.minutes), 0)
+  const suggestedPenaltyDays = useMemo(
+    () => weekDays.filter(d => !penaltyByDay[d] && suggestsLunchPenalty(dayEntriesMap[d] ?? [])),
+    [weekDays, penaltyByDay, dayEntriesMap]
+  )
+  const periodMins   = useMemo(() => Math.max(0, totalMins(entries) - penaltyMins), [entries, penaltyMins])
   const isSalary     = periodPay.pay_structure === 'salary'
   const grossEst     = selectedEmp
     ? isSalary
@@ -860,6 +934,16 @@ export default function AdminTimesheets() {
     setDeleting(true)
     try { await adminDeleteEntry(deleteId); setDeleteId(null); loadEntries(selectedEmp.id, dateFrom, dateTo) }
     finally { setDeleting(false) }
+  }
+
+  const handleApplyPenalty = async (day) => {
+    await applyLunchPenalty({ user_id: selectedEmp.id, work_date: day })
+    loadPenalties(selectedEmp.id, dateFrom, dateTo)
+  }
+
+  const handleRemovePenalty = async (id) => {
+    await removeLunchPenalty(id)
+    loadPenalties(selectedEmp.id, dateFrom, dateTo)
   }
 
   const handleReview = async (data) => {
@@ -959,7 +1043,10 @@ export default function AdminTimesheets() {
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Hours</p>
                   {isSalary
                     ? <p className="text-xs font-semibold text-brand-500 mt-1.5">Fixed</p>
-                    : <p className="text-lg font-bold text-gray-900">{(periodMins / 60).toFixed(1)}h</p>
+                    : <>
+                        <p className="text-lg font-bold text-gray-900">{(periodMins / 60).toFixed(1)}h</p>
+                        {penaltyMins > 0 && <p className="text-[10px] font-semibold text-red-500">−{(penaltyMins / 60).toFixed(1)}h no lunch</p>}
+                      </>
                   }
                 </div>
                 <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex flex-col items-center justify-center text-center">
@@ -1032,6 +1119,14 @@ export default function AdminTimesheets() {
                 : loadingEnt
                   ? <div className="flex justify-center py-16"><Spinner size="lg" /></div>
                   : <div className="flex flex-col gap-3">
+                      {suggestedPenaltyDays.length > 0 && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-800">
+                          <span className="font-semibold">
+                            {suggestedPenaltyDays.length} {suggestedPenaltyDays.length === 1 ? 'day' : 'days'} with no lunch registered
+                          </span>
+                          {' '}({suggestedPenaltyDays.map(d => format(parseISO(d), 'EEE')).join(', ')}) — review below and apply the 1-hour penalty where it's due.
+                        </div>
+                      )}
                       <button onClick={() => setAddDate('__any__')}
                         className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-brand-200 text-brand-500 font-semibold text-sm hover:bg-brand-50 hover:border-brand-300 active:bg-brand-100 transition-colors">
                         <PlusIcon /> Add Shift for Any Day
@@ -1039,6 +1134,8 @@ export default function AdminTimesheets() {
                       {weekDays.map(day => (
                         <DayGroup key={day} day={day} entries={dayEntriesMap[day] ?? []}
                           miles={weekMiles[day] ?? 0}
+                          penalty={penaltyByDay[day]}
+                          onApplyPenalty={handleApplyPenalty} onRemovePenalty={handleRemovePenalty}
                           onEdit={setEditModal} onDelete={setDeleteId} onAdd={setAddDate} />
                       ))}
                     </div>

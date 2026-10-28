@@ -27,3 +27,26 @@ function payRateForPeriod(PDO $pdo, int $userId, string $periodStart, ?float $fa
     // whatever's on the user record so payroll never silently zeroes out.
     return ['pay_rate' => (float)($fallbackRate ?? 0), 'pay_structure' => $fallbackStructure ?? 'hourly'];
 }
+
+// "No lunch registered" penalty — see api/payroll/lunch-penalties.php.
+const LUNCH_PENALTY_MINUTES = 60;
+
+// Applied lunch penalties in [start, end], as minutes keyed by
+// user_id → YEARWEEK(work_date, 3) — the same ISO-week key the payroll
+// endpoints group time entries by, so each week's paid minutes can have its
+// penalties subtracted before the hours/pay math. Pass $userId to limit to
+// one employee.
+function lunchPenaltyMinutesByWeek(PDO $pdo, string $start, string $end, ?int $userId = null): array {
+    $sql = 'SELECT user_id, YEARWEEK(work_date, 3) AS iso_week, SUM(minutes) AS minutes
+            FROM lunch_penalties WHERE work_date BETWEEN ? AND ?';
+    $params = [$start, $end];
+    if ($userId !== null) { $sql .= ' AND user_id = ?'; $params[] = $userId; }
+    $sql .= ' GROUP BY user_id, YEARWEEK(work_date, 3)';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $out = [];
+    foreach ($stmt->fetchAll() as $r) {
+        $out[(int)$r['user_id']][(string)$r['iso_week']] = (int)$r['minutes'];
+    }
+    return $out;
+}

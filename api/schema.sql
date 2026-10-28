@@ -259,6 +259,18 @@ CREATE TABLE `loan_payments` (
   CONSTRAINT `fk_lp_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE `lunch_penalties` (
+  `id`         INT UNSIGNED      NOT NULL AUTO_INCREMENT,
+  `user_id`    INT UNSIGNED      NOT NULL,
+  `work_date`  DATE              NOT NULL,
+  `minutes`    SMALLINT UNSIGNED NOT NULL DEFAULT 60,
+  `created_by` INT UNSIGNED      NULL,
+  `created_at` TIMESTAMP         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_lpen_user_date` (`user_id`, `work_date`),
+  CONSTRAINT `fk_lpen_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS `flat_rate_payments` (
   `id`           INT          NOT NULL AUTO_INCREMENT,
   `user_id`      INT          NOT NULL,

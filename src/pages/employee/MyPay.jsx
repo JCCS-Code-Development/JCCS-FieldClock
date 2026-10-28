@@ -443,6 +443,16 @@ export default function MyPay() {
                                       return <Row label={`${t('pay.regularHours')} (${formatHours(totalHours)})`} value={formatCurrency(totalHours * rate)} />
                                     })()
                                 }
+                                {/* Already subtracted from the hours above — listed so
+                                    the employee can see which day and why. */}
+                                {!isSalary && data.lunch_penalties?.map((pen) => (
+                                  <Row key={pen.work_date}
+                                    label={t('pay.lunchPenalty')}
+                                    value={`−${formatHours(pen.minutes / 60)}`}
+                                    note={format(parseISO(pen.work_date), 'EEE, MMM d', { locale: dfLocale() })}
+                                    accent
+                                  />
+                                ))}
                                 {gas > 0 && <Row label={t('pay.gasAllowance')} value={formatCurrency(gas)} />}
                                 {data.adjustments?.filter((a) => a.type !== 'gas_allowance').map((adj, i) => (
                                   <Row key={i}

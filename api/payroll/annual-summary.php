@@ -35,6 +35,18 @@ foreach ($entries->fetchAll() as $r) {
     ];
 }
 
+// Subtract applied "no lunch registered" penalties from each week's paid
+// minutes (capped at that week's own minutes — never negative)
+foreach (lunchPenaltyMinutesByWeek($pdo, "$year-01-01", "$year-12-31") as $uid => $penWeeks) {
+    foreach ($penWeeks as $wk => $pen) {
+        if (isset($byUser[$uid]['weeks'][(string)$wk])) {
+            $w = &$byUser[$uid]['weeks'][(string)$wk];
+            $w['minutes'] -= min($pen, $w['minutes']);
+            unset($w);
+        }
+    }
+}
+
 // Adjustments grouped by user + quarter
 $adjs = $pdo->prepare("
     SELECT user_id, type, SUM(amount) AS total, QUARTER(period_start) AS quarter

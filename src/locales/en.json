@@ -276,6 +276,7 @@
     },
     "regularHours": "Regular",
     "overtimeHours": "Overtime",
+    "lunchPenalty": "No lunch registered",
     "loanDeduction": "Loan Deduction",
     "weeklyRate": "Weekly Salary",
     "paycheck": {

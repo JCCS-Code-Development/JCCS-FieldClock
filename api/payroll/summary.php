@@ -47,6 +47,9 @@ foreach ($adjRows->fetchAll() as $adj) {
     $byUser[$adj['user_id']]['adjustments'][] = $adj;
 }
 
+// Applied "no lunch registered" penalties, per user → ISO week
+$penalties = lunchPenaltyMinutesByWeek($pdo, $start, $end);
+
 // User info
 // Include all users — even deactivated ones may have entries in this period.
 // Contractors invoice per job/estimate, not through this employee payroll
@@ -76,15 +79,22 @@ foreach ($byUser as $uid => $data) {
     $weeks = $data['weeks'] ?? [];
     $weeksWorked = count($weeks);
 
-    // Payable categories (exclude day_end — already filtered)
+    // Payable categories (exclude day_end — already filtered), minus any
+    // applied lunch penalties — capped at that week's own minutes, so a
+    // penalty left behind on a day whose entries were later deleted can
+    // never push a week negative.
     $totalMinutes = 0;
     $categoryHours = [];
-    foreach ($weeks as $weekData) {
+    $weekPenalty = [];
+    foreach ($weeks as $wk => $weekData) {
         foreach ($weekData as $cat => $mins) {
             $totalMinutes += $mins;
             $categoryHours[$cat] = ($categoryHours[$cat] ?? 0) + $mins / 60;
         }
+        $weekPenalty[$wk] = min($penalties[$uid][$wk] ?? 0, array_sum($weekData));
     }
+    $penaltyMinutes = array_sum($weekPenalty);
+    $totalMinutes  -= $penaltyMinutes;
 
     // The rate actually in effect for THIS period, per salary_history — not
     // necessarily u['pay_rate'], which may already show a rate scheduled for
@@ -102,8 +112,8 @@ foreach ($byUser as $uid => $data) {
         $baseGross   = $periodPay['pay_rate'] * $weeksForPay;
         $weeksWorked = $weeksForPay;
     } elseif ($u['pay_type'] === 'w2') {
-        foreach ($weeks as $weekData) {
-            $weekMins = array_sum($weekData);
+        foreach ($weeks as $wk => $weekData) {
+            $weekMins = array_sum($weekData) - $weekPenalty[$wk];
             $weekHrs  = $weekMins / 60;
             $regHours += min($weekHrs, 40);
             $otHours  += max(0, $weekHrs - 40);
@@ -141,6 +151,7 @@ foreach ($byUser as $uid => $data) {
         'gas_total'       => round($gasTotal, 2),
         'adjustments_total' => round($adjTotal, 2),
         'estimated_total' => round($baseGross + $adjTotal, 2),
+        'lunch_penalty_hours' => $isSalary ? 0 : round($penaltyMinutes / 60, 2),
         'category_hours'  => array_map(fn($h) => round($h, 2), $categoryHours),
         'weeks_worked'    => $weeksWorked,
     ];

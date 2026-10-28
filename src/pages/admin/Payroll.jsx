@@ -786,6 +786,12 @@ export default function AdminPayroll() {
               )
             })()}
 
+            {drillDown?.lunch_penalty_hours > 0 && (
+              <div className="bg-red-50 rounded-xl px-4 py-3 text-sm text-red-700">
+                <span className="font-semibold">−{formatHours(drillDown.lunch_penalty_hours)}</span> no-lunch penalty already deducted from hours (applied on Timesheets).
+              </div>
+            )}
+
             {/* Time entry breakdown by day */}
             {Object.entries(breakdown).length === 0 && <p className="text-gray-400 text-center py-4">No entries for this period.</p>}
             {Object.entries(breakdown).map(([date, entries]) => (
