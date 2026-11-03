@@ -166,10 +166,8 @@ function closeStaleMealEntries(PDO $pdo, int $userId): void {
 // to every "today" rule the instant the clock ticks past midnight — the
 // worked-hours eligibility check, and the one-lunch/one-dinner-per-day
 // checks in lunch.php/dinner.php would all wrongly reset mid-shift. Returns
-// the start_time of this user's most recent day_end marker (their last
-// clock-out, whenever that was) to use as the lower bound for "since this
-// shift began" — or midnight today if they don't have one yet (effectively
-// their first-ever shift).
+// the earlier of this user's most recent day_end marker (their last
+// clock-out) and midnight today, as the lower bound for "today".
 function currentShiftStartBoundary(PDO $pdo, int $userId): string {
     $stmt = $pdo->prepare(
         "SELECT start_time FROM time_entries
@@ -177,7 +175,15 @@ function currentShiftStartBoundary(PDO $pdo, int $userId): string {
          ORDER BY start_time DESC LIMIT 1"
     );
     $stmt->execute([$userId]);
-    return $stmt->fetchColumn() ?: date('Y-m-d 00:00:00');
+    $lastDayEnd = $stmt->fetchColumn();
+    // Never later than midnight: clocking out and back in the same calendar
+    // day must not reset "today" (it used to wipe the morning's hours off the
+    // worked-hours count and re-allow a second lunch). Callers compare with
+    // `start_time > boundary`, so use one second before midnight so an entry
+    // starting exactly at 00:00:00 still counts. An earlier day_end (an
+    // overnight shift still in progress) keeps reaching back before midnight.
+    $midnight = date('Y-m-d H:i:s', strtotime('today') - 1);
+    return ($lastDayEnd && $lastDayEnd < $midnight) ? $lastDayEnd : $midnight;
 }
 
 // Sum of actual worked minutes this shift — everything except a lunch/dinner

@@ -199,17 +199,19 @@ function useTodayData(statusLabel) {
       const lastDayEnd = all
         .filter((e) => e.cost_category === 'day_end')
         .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))[0]
-      const list = lastDayEnd
-        ? all.filter((e) => new Date(e.start_time) > new Date(lastDayEnd.start_time))
-        : all.filter((e) => e.start_time.slice(0, 10) === today)
+      // "Today" never starts later than midnight, so clocking out and back
+      // in the same day keeps the morning's entries (total, activity list,
+      // lunch eligibility). An earlier day_end means an overnight shift is
+      // still running, so reach back to it. Same rule as the server's
+      // currentShiftStartBoundary(). Timestamps are 'YYYY-MM-DD HH:MM:SS'
+      // strings, so they compare correctly as strings.
+      const midnight = `${today} 00:00:00`
+      const boundary = lastDayEnd && lastDayEnd.start_time < midnight ? lastDayEnd.start_time : null
+      const list = boundary
+        ? all.filter((e) => e.start_time > boundary)
+        : all.filter((e) => e.start_time >= midnight)
       setEntries(list)
-      // "Today's Total" is the whole calendar day, not just the current
-      // shift: clocking out and back in later the same day starts a new
-      // shift (new day_end boundary) but must not wipe the morning's hours
-      // off the total. Union with the shift list keeps an overnight shift's
-      // pre-midnight hours counted too.
-      const totalList = all.filter((e) => e.start_time.slice(0, 10) === today || list.includes(e))
-      const finished = totalList.filter((e) => e.end_time && e.cost_category !== 'day_end')
+      const finished = list.filter((e) => e.end_time && e.cost_category !== 'day_end')
       const total = finished.reduce(
         (sum, e) => sum + (new Date(e.end_time) - new Date(e.start_time)) / 1000, 0
       )
