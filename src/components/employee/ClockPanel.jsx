@@ -203,7 +203,13 @@ function useTodayData(statusLabel) {
         ? all.filter((e) => new Date(e.start_time) > new Date(lastDayEnd.start_time))
         : all.filter((e) => e.start_time.slice(0, 10) === today)
       setEntries(list)
-      const finished = list.filter((e) => e.end_time && e.cost_category !== 'day_end')
+      // "Today's Total" is the whole calendar day, not just the current
+      // shift: clocking out and back in later the same day starts a new
+      // shift (new day_end boundary) but must not wipe the morning's hours
+      // off the total. Union with the shift list keeps an overnight shift's
+      // pre-midnight hours counted too.
+      const totalList = all.filter((e) => e.start_time.slice(0, 10) === today || list.includes(e))
+      const finished = totalList.filter((e) => e.end_time && e.cost_category !== 'day_end')
       const total = finished.reduce(
         (sum, e) => sum + (new Date(e.end_time) - new Date(e.start_time)) / 1000, 0
       )
