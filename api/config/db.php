@@ -34,11 +34,21 @@ function getPDO(): PDO {
             ]
         );
 
-        // Use a numeric offset because many shared MySQL hosts do not load
-        // named timezone tables. Recomputed on each connection so DST is
-        // handled automatically (-04:00 in summer, -05:00 in winter).
-        $offset = (new DateTimeImmutable('now', new DateTimeZone(FIELDCLOCK_TIMEZONE)))->format('P');
-        $pdo->exec('SET time_zone = ' . $pdo->quote($offset));
+        // Prefer the NAMED zone. A numeric offset (-04:00 / -05:00) is applied
+        // to EVERY stored value, so after a DST change all entries from the
+        // other side of the change read one hour off (e.g. after Nov 1, an
+        // Oct 30 8:00 AM clock-in showed as 7:00 AM). The named zone converts
+        // each value with the rule in effect on that value's own date.
+        try {
+            $pdo->exec('SET time_zone = ' . $pdo->quote(FIELDCLOCK_TIMEZONE));
+        } catch (PDOException $e) {
+            // Host has no MySQL timezone tables loaded: fall back to today's
+            // offset. Correct for current data, but values from before the
+            // last DST change will display one hour off until tables load.
+            error_log('FieldClock: MySQL timezone tables missing, falling back to numeric offset (DST-shifted history): ' . $e->getMessage());
+            $offset = (new DateTimeImmutable('now', new DateTimeZone(FIELDCLOCK_TIMEZONE)))->format('P');
+            $pdo->exec('SET time_zone = ' . $pdo->quote($offset));
+        }
     }
     return $pdo;
 }
