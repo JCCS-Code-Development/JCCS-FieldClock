@@ -11,6 +11,7 @@ import Spinner from '../../components/ui/Spinner'
 import LoanNoteOverlay from '../../components/LoanNoteOverlay'
 import { listMyLoanNotes } from '../../api/loans'
 import { formatCurrency } from '../../utils/format'
+import { WC_PLANS, WC_TRADES, WC_TIERS, WC_DEPENDENT_SLOTS, WC_PROPERTY_TYPES } from '../../utils/workersComp'
 
 const COMPANY = { name: 'JCCS Services LLC', state: 'South Carolina' }
 
@@ -423,36 +424,6 @@ function W4Form({ data, onChange, disabled }) {
 // with JCCS) or a premium plan that adds health coverage at a higher cost.
 // Bilingual inline since most of the crew reads Spanish; the other onboarding
 // forms are English-only.
-const WC_PLANS = {
-  ghost:   { en: 'Ghost Policy (default)',            es: 'Póliza Fantasma (predeterminada)' },
-  premium: { en: 'Premium Plan — with Health Coverage', es: 'Plan Premium — con Cobertura de Salud' },
-}
-const WC_TRADES = [
-  ['general_labor', 'General Labor', 'Labor General'],
-  ['carpentry',     'Carpentry',     'Carpintería'],
-  ['drywall',       'Drywall',       'Drywall / Tablaroca'],
-  ['painting',      'Painting',      'Pintura'],
-  ['flooring',      'Flooring',      'Pisos'],
-  ['electrical',    'Electrical',    'Electricidad'],
-  ['plumbing',      'Plumbing',      'Plomería'],
-  ['roofing',       'Roofing',       'Techos'],
-  ['other',         'Other',         'Otro'],
-]
-const WC_TIERS = [
-  ['self',     'Me only',               'Solo yo'],
-  ['spouse',   'Me + spouse',           'Yo + cónyuge'],
-  ['children', 'Me + child(ren)',       'Yo + hijo(s)'],
-  ['family',   'Me + spouse + children', 'Yo + cónyuge + hijos'],
-]
-const WC_DEPENDENT_SLOTS = 4
-const WC_PROPERTY_TYPES = [
-  ['residential',  'Houses (residential)',          'Casas (residencial)'],
-  ['multifamily',  'Apartments / multi-family',     'Apartamentos / multifamiliar'],
-  ['commercial',   'Commercial (offices, stores)',  'Comercial (oficinas, tiendas)'],
-  ['industrial',   'Industrial / warehouses',       'Industrial / bodegas'],
-  ['new_build',    'New construction',              'Construcción nueva'],
-  ['remodel',      'Remodels / repairs',            'Remodelaciones / reparaciones'],
-]
 
 // Shrink a phone-camera ID photo to a JPEG data URL (~200–400 KB) so it can
 // travel inside the signed form's JSON — same as the signature image — rather

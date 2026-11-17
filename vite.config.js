@@ -61,6 +61,9 @@ export default defineConfig({
       },
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Admin-only Excel export library — load on demand, don't push ~1 MB
+        // into every employee phone's offline cache.
+        globIgnores: ['**/exceljs*.js', '**/workersCompExcel*.js'],
       },
       devOptions: {
         enabled: false,

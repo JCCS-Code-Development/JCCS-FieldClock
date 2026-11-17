@@ -5,7 +5,7 @@ import Spinner from '../../components/ui/Spinner'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
-import { listAgreements, getAgreement, resetAgreement } from '../../api/agreements'
+import { listAgreements, getAgreement, resetAgreement, getWorkersCompExport } from '../../api/agreements'
 
 const ALL_TYPES = [
   { id: 'at_will',              short: 'At-Will',    color: 'indigo' },
@@ -40,6 +40,22 @@ export default function HRDocuments() {
   const [viewModal, setViewModal]       = useState(null) // { emp, type, data }
   const [viewLoading, setViewLoading]   = useState(false)
   const [resetting, setResetting]       = useState(null)
+  const [exporting, setExporting]       = useState(false)
+  const [exportMsg, setExportMsg]       = useState('')
+
+  const handleExport = async () => {
+    setExporting(true); setExportMsg('')
+    try {
+      const data = await getWorkersCompExport()
+      if (!data.forms?.length) { setExportMsg('No workers\' comp forms have been submitted yet.'); return }
+      const { downloadWorkersCompExcel } = await import('../../utils/workersCompExcel')
+      await downloadWorkersCompExcel(data)
+    } catch (err) {
+      setExportMsg(err?.response?.data?.error ?? 'Could not build the Excel file. Try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const load = () => {
     setLoading(true)
@@ -87,7 +103,13 @@ export default function HRDocuments() {
       <PageHeader
         title="HR Compliance"
         subtitle="Track agreement and document signing status for every employee, past and present"
+        actions={
+          <Button onClick={handleExport} loading={exporting}>
+            Workers' Comp → Excel
+          </Button>
+        }
       />
+      {exportMsg && <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4">{exportMsg}</p>}
 
       {loading ? (
         <div className="flex justify-center py-16"><Spinner size="lg" /></div>
