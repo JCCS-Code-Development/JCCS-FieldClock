@@ -141,6 +141,11 @@ export default function HRDocuments() {
                               className={isSigned ? 'cursor-pointer' : 'cursor-default'}
                             >
                               <StatusChip status={status} />
+                              {isSigned && (
+                                <span className="block mt-1 text-[10px] text-gray-500 whitespace-nowrap">
+                                  {format(parseISO(emp.agreements[t.id]), 'MMM d, yyyy')}
+                                </span>
+                              )}
                               {t.id === 'workers_comp' && isSigned && emp.wc_plan && (
                                 <span className={`block mt-1 text-[10px] font-semibold ${emp.wc_plan === 'premium' ? 'text-teal-700' : 'text-gray-500'}`}>
                                   {WC_PLAN_LABEL[emp.wc_plan] ?? emp.wc_plan}
