@@ -45,6 +45,22 @@ if ($existing && $existing['signed_at']) {
     exit;
 }
 
+// Workers' comp carries the employee's ID photo inline as a JPEG data URL
+// (compressed client-side). Require it, and keep it to a sane size/type.
+if ($type === 'workers_comp') {
+    $photo = $body['form_data']['id_photo'] ?? '';
+    if (!is_string($photo) || !preg_match('#^data:image/(jpeg|png|webp);base64,#', $photo)) {
+        http_response_code(422);
+        echo json_encode(['error' => 'A photo of your ID is required.']);
+        exit;
+    }
+    if (strlen($photo) > 4 * 1024 * 1024) {
+        http_response_code(422);
+        echo json_encode(['error' => 'ID photo is too large — please retake it.']);
+        exit;
+    }
+}
+
 $formData = isset($body['form_data']) ? json_encode($body['form_data']) : null;
 
 // Behind a proxy/CDN, X-Forwarded-For is often a comma-separated list

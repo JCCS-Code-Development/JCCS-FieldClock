@@ -445,6 +445,75 @@ const WC_TIERS = [
   ['family',   'Me + spouse + children', 'Yo + cónyuge + hijos'],
 ]
 const WC_DEPENDENT_SLOTS = 4
+const WC_PROPERTY_TYPES = [
+  ['residential',  'Houses (residential)',          'Casas (residencial)'],
+  ['multifamily',  'Apartments / multi-family',     'Apartamentos / multifamiliar'],
+  ['commercial',   'Commercial (offices, stores)',  'Comercial (oficinas, tiendas)'],
+  ['industrial',   'Industrial / warehouses',       'Industrial / bodegas'],
+  ['new_build',    'New construction',              'Construcción nueva'],
+  ['remodel',      'Remodels / repairs',            'Remodelaciones / reparaciones'],
+]
+
+// Shrink a phone-camera ID photo to a JPEG data URL (~200–400 KB) so it can
+// travel inside the signed form's JSON — same as the signature image — rather
+// than as a file under the web-served uploads/ folder.
+function compressIdPhoto(file, maxDim = 1600, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const scale  = Math.min(1, maxDim / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width  = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable')) }
+    img.src = url
+  })
+}
+
+function IdPhotoField({ value, onChange, disabled, L }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr]   = useState('')
+  const pick = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setBusy(true); setErr('')
+    try { onChange(await compressIdPhoto(file)) }
+    catch { setErr(L('Could not read that photo. Try another one.', 'No se pudo leer esa foto. Intente con otra.')) }
+    finally { setBusy(false) }
+  }
+  return (
+    <div>
+      {value ? (
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-2">
+          <img src={value} alt={L('Photo ID', 'Foto de identificación')} className="max-h-64 mx-auto rounded-lg object-contain" />
+        </div>
+      ) : (
+        <div className="rounded-xl border-2 border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+          {L('No photo yet', 'Sin foto todavía')}
+        </div>
+      )}
+      {!disabled && (
+        <label className={`mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer ${
+          busy ? 'bg-gray-100 text-gray-400' : 'bg-brand-500 text-white hover:bg-brand-600'
+        }`}>
+          <input type="file" accept="image/*" className="hidden" onChange={pick} disabled={busy} />
+          {busy ? L('Processing…', 'Procesando…') : value ? L('Retake / change photo', 'Tomar otra / cambiar foto') : L('Take or upload photo', 'Tomar o subir foto')}
+        </label>
+      )}
+      {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
+      <p className="text-xs text-gray-400 mt-1">
+        {L("Driver's license, state ID, passport, or consular ID (matrícula). Make sure the name and photo are readable.",
+           'Licencia de conducir, ID estatal, pasaporte o matrícula consular. Asegúrese de que el nombre y la foto se lean bien.')}
+      </p>
+    </div>
+  )
+}
 
 function WcPlanCard({ id, plan, desc, bullets, onChange, disabled, L }) {
   const active = plan === id
@@ -524,7 +593,7 @@ function WorkersCompForm({ data, onChange, disabled, isEs }) {
           <FI label={L('Full Legal Name', 'Nombre Legal Completo')} required>
             <input disabled={disabled} className={inputCls} value={fmt(data.legal_name)} onChange={set('legal_name')} />
           </FI>
-          <FI label={L('Date of Birth', 'Fecha de Nacimiento')} required>
+          <FI label={L('Date of Birth', 'Fecha de Nacimiento')}>
             <input disabled={disabled} className={inputCls} type="date" value={fmt(data.dob)} onChange={set('dob')} />
           </FI>
           <FI label={L('Tax ID Type', 'Tipo de Número Fiscal')} required>
@@ -541,7 +610,7 @@ function WorkersCompForm({ data, onChange, disabled, isEs }) {
           <FI label={L('Business Name / DBA (if any)', 'Nombre del Negocio / DBA (si tiene)')}>
             <input disabled={disabled} className={inputCls} value={fmt(data.business_name)} onChange={set('business_name')} />
           </FI>
-          <FI label={L('Phone', 'Teléfono')} required>
+          <FI label={L('Phone', 'Teléfono')}>
             <input disabled={disabled} className={inputCls} type="tel" value={fmt(data.phone)} onChange={set('phone')} placeholder="(555) 000-0000" />
           </FI>
           <FI label={L('Email', 'Correo Electrónico')}>
@@ -552,6 +621,11 @@ function WorkersCompForm({ data, onChange, disabled, isEs }) {
           </FI>
           <FI label={L('City, State, ZIP', 'Ciudad, Estado, Código Postal')} required>
             <input disabled={disabled} className={inputCls} value={fmt(data.city_state_zip)} onChange={set('city_state_zip')} />
+          </FI>
+        </div>
+        <div className="mt-4">
+          <FI label={L('Photo of Your ID', 'Foto de Su Identificación')} required>
+            <IdPhotoField value={data.id_photo} onChange={(v) => onChange({ ...data, id_photo: v })} disabled={disabled} L={L} />
           </FI>
         </div>
       </div>
@@ -575,10 +649,30 @@ function WorkersCompForm({ data, onChange, disabled, isEs }) {
                 placeholder={L('e.g. hang and finish drywall, interior trim, ladder work up to 12 ft', 'ej. instalar y terminar drywall, molduras interiores, trabajo en escalera hasta 12 pies')} />
             </FI>
           </div>
-          <FI label={L('Requested Start Date', 'Fecha de Inicio Solicitada')} required>
+          <div className="sm:col-span-2">
+            <FI label={L('What types of properties do you work on? (check all)', '¿En qué tipos de propiedades trabaja? (marque todas)')} required>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                {WC_PROPERTY_TYPES.map(([v, en, es]) => {
+                  const selected = (data.property_types ?? '').split(',').filter(Boolean)
+                  const on = selected.includes(v)
+                  const toggle = () => onChange({
+                    ...data,
+                    property_types: (on ? selected.filter((x) => x !== v) : [...selected, v]).join(','),
+                  })
+                  return (
+                    <label key={v} className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${disabled ? '' : 'cursor-pointer hover:bg-gray-50'}`}>
+                      <input type="checkbox" checked={on} onChange={toggle} disabled={disabled} />
+                      <span className="text-sm text-gray-700">{L(en, es)}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </FI>
+          </div>
+          <FI label={L('Requested Start Date', 'Fecha de Inicio Solicitada')}>
             <input disabled={disabled} className={inputCls} type="date" value={fmt(data.effective_date)} onChange={set('effective_date')} />
           </FI>
-          <FI label={L('Work injury in the last 5 years?', '¿Lesión de trabajo en los últimos 5 años?')} required>
+          <FI label={L('Work injury in the last 5 years?', '¿Lesión de trabajo en los últimos 5 años?')}>
             <select disabled={disabled} className={_selectCls} value={fmt(data.prior_injury)} onChange={set('prior_injury')}>
               <option value="">{L('Select…', 'Seleccione…')}</option>
               <option value="no">{L('No', 'No')}</option>
@@ -653,8 +747,12 @@ function WorkersCompForm({ data, onChange, disabled, isEs }) {
 // Returns an error string, or '' when the workers' comp form is complete.
 function validateWorkersComp(d, isEs) {
   const L = (en, es) => (isEs ? es : en)
-  const req = ['legal_name', 'dob', 'tax_id_type', 'tax_id', 'phone', 'address', 'city_state_zip', 'trade', 'job_duties', 'effective_date', 'prior_injury']
+  // What the insurance carrier needs up front: full name, photo ID, tax ID /
+  // SSN, address, type of work and the kinds of properties worked on.
+  const req = ['legal_name', 'tax_id_type', 'tax_id', 'address', 'city_state_zip', 'trade', 'job_duties']
   if (req.some((f) => !String(d[f] ?? '').trim())) return L('Please complete all required fields.', 'Complete todos los campos obligatorios.')
+  if (!d.id_photo) return L('Please add a photo of your ID.', 'Agregue una foto de su identificación.')
+  if (!d.property_types) return L('Check at least one type of property you work on.', 'Marque al menos un tipo de propiedad en la que trabaja.')
   if (d.prior_injury === 'yes' && !d.prior_injury_details?.trim()) return L('Please describe the prior injury.', 'Describa la lesión anterior.')
   if (d.plan === 'premium' && d.health_tier !== 'self') {
     const has = (n) => d[`dep${n}_name`]?.trim()

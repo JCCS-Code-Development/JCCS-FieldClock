@@ -191,7 +191,7 @@ export default function HRDocuments() {
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Form Data</p>
                 <div className="grid grid-cols-1 gap-1.5 text-sm">
                   {Object.entries(viewModal.data.form_data).map(([k, v]) => {
-                    if (!v || k === 'acknowledged') return null
+                    if (!v || k === 'acknowledged' || k === 'id_photo') return null
                     return (
                       <div key={k} className="flex justify-between gap-4">
                         <span className="text-gray-500 capitalize">{k.replace(/_/g, ' ')}</span>
@@ -200,6 +200,16 @@ export default function HRDocuments() {
                     )
                   })}
                 </div>
+              </div>
+            )}
+
+            {viewModal.data.form_data?.id_photo && (
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Photo ID</p>
+                <a href={viewModal.data.form_data.id_photo} download={`${viewModal.emp?.name ?? 'employee'} - ID.jpg`}
+                   className="block border border-gray-200 rounded-xl p-2 bg-white" title="Download">
+                  <img src={viewModal.data.form_data.id_photo} alt="Photo ID" className="max-h-72 mx-auto object-contain rounded-lg" />
+                </a>
               </div>
             )}
 
