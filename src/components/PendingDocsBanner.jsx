@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/authStore'
 import { listAgreements } from '../api/agreements'
 import { listMyLoanNotes } from '../api/loans'
 
-const REQUIRED_ALL = ['at_will', 'non_solicitation', 'conflict_of_interest', 'emergency_contact', 'workers_comp']
+const REQUIRED_ALL = ['at_will', 'non_solicitation', 'conflict_of_interest', 'emergency_contact']
 const REQUIRED_W2  = ['i9', 'w4']
 
 // Sits directly under the fixed mobile header. Rendered in two parts:
@@ -41,6 +41,9 @@ export default function PendingDocsBanner() {
       const required = [
         ...REQUIRED_ALL,
         ...(user.pay_type === 'w2' ? REQUIRED_W2 : []),
+        // Workers' comp coverage form — everyone except people flagged exempt
+        // (users.wc_exempt, set per employee by an admin).
+        ...(d.wc_exempt ? [] : ['workers_comp']),
       ]
       const unsignedNotes = notes.filter((n) => !n.borrower_signed_at).length
       setPendingCount(required.filter((r) => !signed.has(r)).length + unsignedNotes)

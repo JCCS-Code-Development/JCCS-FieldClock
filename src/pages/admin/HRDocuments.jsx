@@ -25,11 +25,12 @@ const COLOR_CHIP = {
   signed:  'bg-green-100 text-green-700',
   pending: 'bg-amber-100 text-amber-700',
   na:      'bg-gray-100 text-gray-400',
+  exempt:  'bg-gray-100 text-gray-500',
 }
 
 function StatusChip({ status }) {
   const cls = COLOR_CHIP[status] ?? COLOR_CHIP.na
-  const label = status === 'signed' ? '✓ Signed' : status === 'pending' ? 'Pending' : 'N/A'
+  const label = status === 'signed' ? '✓ Signed' : status === 'pending' ? 'Pending' : status === 'exempt' ? 'Exempt' : 'N/A'
   return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cls}`}>{label}</span>
 }
 
@@ -65,10 +66,13 @@ export default function HRDocuments() {
   }
 
   const relevantTypes = (emp) =>
-    ALL_TYPES.filter((t) => !W2_ONLY.includes(t.id) || emp.pay_type === 'w2')
+    ALL_TYPES.filter((t) =>
+      (!W2_ONLY.includes(t.id) || emp.pay_type === 'w2') &&
+      !(t.id === 'workers_comp' && emp.wc_exempt && !emp.agreements?.workers_comp))
 
   const statusFor = (emp, typeId) => {
     if (W2_ONLY.includes(typeId) && emp.pay_type !== 'w2') return 'na'
+    if (typeId === 'workers_comp' && emp.wc_exempt && !emp.agreements?.workers_comp) return 'exempt'
     return emp.agreements?.[typeId] ? 'signed' : 'pending'
   }
 

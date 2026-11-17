@@ -773,6 +773,7 @@ export default function MyDocuments() {
   const fmtDate  = (iso) => format(parseISO(iso), 'MMMM d, yyyy', { locale: dfLocale })
   const fmtDateTime = (iso) => format(parseISO(iso), "MMMM d, yyyy 'at' h:mm a", { locale: dfLocale })
   const [agreements, setAgreements]     = useState([])
+  const [wcExempt, setWcExempt]         = useState(false)
   const [loading, setLoading]           = useState(true)
   const [activeType, setActiveType]     = useState(null)
   const [signedData, setSignedData]     = useState(null)  // full signed doc for view mode
@@ -793,7 +794,8 @@ export default function MyDocuments() {
   useEffect(() => { loadNotes() }, [loadNotes])
 
   const requiredDefs = AGREEMENT_DEFS.filter((d) =>
-    d.required_for.includes('all') || (d.required_for.includes('w2') && user?.pay_type === 'w2')
+    !(d.id === 'workers_comp' && wcExempt) &&
+    (d.required_for.includes('all') || (d.required_for.includes('w2') && user?.pay_type === 'w2'))
   )
 
   // Always ask for our own record by user_id. Without it, an admin viewing
@@ -804,7 +806,7 @@ export default function MyDocuments() {
     if (!user?.id) return
     setLoading(true)
     listAgreements({ user_id: user.id })
-      .then((d) => setAgreements(d.agreements ?? []))
+      .then((d) => { setAgreements(d.agreements ?? []); setWcExempt(!!d.wc_exempt) })
       .finally(() => setLoading(false))
   }, [user?.id])
 
