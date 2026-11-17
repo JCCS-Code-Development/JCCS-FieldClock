@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import Button from '../ui/Button'
-import { WC_TRADES, WC_TIERS, WC_PROPERTY_TYPES, WC_DEPENDENT_SLOTS } from '../../utils/workersComp'
+import { WC_TRADES, WC_TIERS, WC_DEPENDENT_SLOTS } from '../../utils/workersComp'
 
 // On-screen review of every workers' comp form before downloading the Excel
 // file for the insurance agent. Tax IDs are masked here (the Excel file has
@@ -64,7 +64,7 @@ export default function WorkersCompPreview({ data, onDownload, downloading }) {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <Th>ID</Th><Th>Name</Th><Th>Plan</Th><Th>Tax ID</Th><Th>Address</Th><Th>Phone / Email</Th>
-                  <Th>Trade &amp; Work</Th><Th>Property Types</Th><Th>Start</Th><Th>Injury (5 yrs)</Th>
+                  <Th>Trade &amp; Work</Th><Th>Start</Th><Th>Injury (5 yrs)</Th>
                   <Th>Health Coverage</Th><Th>Signed</Th>
                 </tr>
               </thead>
@@ -86,7 +86,6 @@ export default function WorkersCompPreview({ data, onDownload, downloading }) {
                       </Td>
                       <Td className="font-semibold whitespace-nowrap">
                         {d.legal_name || f.name}
-                        {d.business_name && <span className="block text-xs font-normal text-gray-500">{d.business_name}</span>}
                         {d.dob && <span className="block text-xs font-normal text-gray-500">DOB {fmtDate(d.dob)}</span>}
                       </Td>
                       <Td>
@@ -102,9 +101,6 @@ export default function WorkersCompPreview({ data, onDownload, downloading }) {
                       <Td className="min-w-[200px]">
                         <span className="font-medium">{labelOf(WC_TRADES, d.trade)}</span>
                         <span className="block text-xs text-gray-500">{d.job_duties}</span>
-                      </Td>
-                      <Td className="text-xs min-w-[150px]">
-                        {(d.property_types ?? '').split(',').filter(Boolean).map((v) => labelOf(WC_PROPERTY_TYPES, v)).join(', ') || '—'}
                       </Td>
                       <Td className="text-xs whitespace-nowrap">{fmtDate(d.effective_date)}</Td>
                       <Td className="text-xs min-w-[90px]">

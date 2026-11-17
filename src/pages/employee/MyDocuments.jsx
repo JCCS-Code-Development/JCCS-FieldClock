@@ -11,7 +11,7 @@ import Spinner from '../../components/ui/Spinner'
 import LoanNoteOverlay from '../../components/LoanNoteOverlay'
 import { listMyLoanNotes } from '../../api/loans'
 import { formatCurrency } from '../../utils/format'
-import { WC_PLANS, WC_TRADES, WC_TIERS, WC_DEPENDENT_SLOTS, WC_PROPERTY_TYPES } from '../../utils/workersComp'
+import { WC_PLANS, WC_TRADES, WC_TIERS, WC_DEPENDENT_SLOTS } from '../../utils/workersComp'
 
 const COMPANY = { name: 'JCCS Services LLC', state: 'South Carolina' }
 
@@ -578,9 +578,6 @@ function WorkersCompForm({ data, onChange, disabled, isEs }) {
           <FI label={L('Tax ID Number', 'Número Fiscal')} required>
             <input disabled={disabled} className={inputCls} value={fmt(data.tax_id)} onChange={set('tax_id')} placeholder="XXX-XX-XXXX" />
           </FI>
-          <FI label={L('Business Name / DBA (if any)', 'Nombre del Negocio / DBA (si tiene)')}>
-            <input disabled={disabled} className={inputCls} value={fmt(data.business_name)} onChange={set('business_name')} />
-          </FI>
           <FI label={L('Phone', 'Teléfono')}>
             <input disabled={disabled} className={inputCls} type="tel" value={fmt(data.phone)} onChange={set('phone')} placeholder="(555) 000-0000" />
           </FI>
@@ -618,26 +615,6 @@ function WorkersCompForm({ data, onChange, disabled, isEs }) {
             <FI label={L('Describe the work you do', 'Describa el trabajo que hace')} required>
               <textarea disabled={disabled} className={`${inputCls} resize-none`} rows={2} value={fmt(data.job_duties)} onChange={set('job_duties')}
                 placeholder={L('e.g. hang and finish drywall, interior trim, ladder work up to 12 ft', 'ej. instalar y terminar drywall, molduras interiores, trabajo en escalera hasta 12 pies')} />
-            </FI>
-          </div>
-          <div className="sm:col-span-2">
-            <FI label={L('What types of properties do you work on? (check all)', '¿En qué tipos de propiedades trabaja? (marque todas)')} required>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                {WC_PROPERTY_TYPES.map(([v, en, es]) => {
-                  const selected = (data.property_types ?? '').split(',').filter(Boolean)
-                  const on = selected.includes(v)
-                  const toggle = () => onChange({
-                    ...data,
-                    property_types: (on ? selected.filter((x) => x !== v) : [...selected, v]).join(','),
-                  })
-                  return (
-                    <label key={v} className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${disabled ? '' : 'cursor-pointer hover:bg-gray-50'}`}>
-                      <input type="checkbox" checked={on} onChange={toggle} disabled={disabled} />
-                      <span className="text-sm text-gray-700">{L(en, es)}</span>
-                    </label>
-                  )
-                })}
-              </div>
             </FI>
           </div>
           <FI label={L('Requested Start Date', 'Fecha de Inicio Solicitada')}>
@@ -719,11 +696,11 @@ function WorkersCompForm({ data, onChange, disabled, isEs }) {
 function validateWorkersComp(d, isEs) {
   const L = (en, es) => (isEs ? es : en)
   // What the insurance carrier needs up front: full name, photo ID, tax ID /
-  // SSN, address, type of work and the kinds of properties worked on.
+  // SSN, address and type of work. (Property type is always commercial —
+  // filled in on the Excel export, not asked.)
   const req = ['legal_name', 'tax_id_type', 'tax_id', 'address', 'city_state_zip', 'trade', 'job_duties']
   if (req.some((f) => !String(d[f] ?? '').trim())) return L('Please complete all required fields.', 'Complete todos los campos obligatorios.')
   if (!d.id_photo) return L('Please add a photo of your ID.', 'Agregue una foto de su identificación.')
-  if (!d.property_types) return L('Check at least one type of property you work on.', 'Marque al menos un tipo de propiedad en la que trabaja.')
   if (d.prior_injury === 'yes' && !d.prior_injury_details?.trim()) return L('Please describe the prior injury.', 'Describa la lesión anterior.')
   if (d.plan === 'premium' && d.health_tier !== 'self') {
     const has = (n) => d[`dep${n}_name`]?.trim()

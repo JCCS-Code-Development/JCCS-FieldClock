@@ -22,11 +22,5 @@ export const WC_TIERS = [
   ['family',   'Me + spouse + children', 'Yo + cónyuge + hijos'],
 ]
 export const WC_DEPENDENT_SLOTS = 4
-export const WC_PROPERTY_TYPES = [
-  ['residential',  'Houses (residential)',          'Casas (residencial)'],
-  ['multifamily',  'Apartments / multi-family',     'Apartamentos / multifamiliar'],
-  ['commercial',   'Commercial (offices, stores)',  'Comercial (oficinas, tiendas)'],
-  ['industrial',   'Industrial / warehouses',       'Industrial / bodegas'],
-  ['new_build',    'New construction',              'Construcción nueva'],
-  ['remodel',      'Remodels / repairs',            'Remodelaciones / reparaciones'],
-]
+// All JCCS work is commercial; the carrier asks for it, so the export states it.
+export const WC_PROPERTY_TYPE = 'Commercial'

@@ -1,7 +1,7 @@
 // Builds the insurance-agent spreadsheet from the workers' comp coverage forms.
 // exceljs is imported lazily so it's only downloaded when an admin exports.
 import { format, parseISO } from 'date-fns'
-import { WC_PLANS, WC_TRADES, WC_TIERS, WC_PROPERTY_TYPES, WC_DEPENDENT_SLOTS } from './workersComp'
+import { WC_PLANS, WC_TRADES, WC_TIERS, WC_PROPERTY_TYPE, WC_DEPENDENT_SLOTS } from './workersComp'
 
 const labelOf = (list, v) => list.find(([k]) => k === v)?.[1] ?? v ?? ''
 const fmtDate = (v) => {
@@ -31,7 +31,7 @@ export async function downloadWorkersCompExcel({ forms, missing }) {
   const cols = [
     ['Full Legal Name', 26], ['Coverage Plan', 30], ['Tax ID Type', 11], ['Tax ID / SSN', 16],
     ['Date of Birth', 13], ['Phone', 16], ['Email', 28], ['Address', 30], ['City, State, ZIP', 24],
-    ['Business Name / DBA', 22], ['Trade', 16], ['Work Description', 40], ['Property Types', 34],
+    ['Trade', 16], ['Work Description', 40], ['Property Type', 14],
     ['Years Experience', 10], ['Requested Start Date', 14], ['Work Injury (5 yrs)', 10],
     ['Injury Details', 30], ['Health Coverage For', 20], ['Current Health Insurance', 20],
     ['Family Members Covered', 40], ['Form Signed', 13], ['Photo ID', PHOTO_W / 7],
@@ -63,10 +63,9 @@ export async function downloadWorkersCompExcel({ forms, missing }) {
       d.email || f.email || '',
       d.address ?? '',
       d.city_state_zip ?? '',
-      d.business_name ?? '',
       labelOf(WC_TRADES, d.trade),
       d.job_duties ?? '',
-      (d.property_types ?? '').split(',').filter(Boolean).map((v) => labelOf(WC_PROPERTY_TYPES, v)).join(', '),
+      WC_PROPERTY_TYPE,
       d.years_experience ?? '',
       fmtDate(d.effective_date),
       d.prior_injury === 'yes' ? 'Yes' : d.prior_injury === 'no' ? 'No' : '',
