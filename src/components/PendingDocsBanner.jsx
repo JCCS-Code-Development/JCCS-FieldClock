@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/authStore'
 import { listAgreements } from '../api/agreements'
 import { listMyLoanNotes } from '../api/loans'
 
-const REQUIRED_ALL = ['at_will', 'non_solicitation', 'conflict_of_interest', 'emergency_contact']
+const REQUIRED_ALL = ['at_will', 'non_solicitation', 'conflict_of_interest', 'emergency_contact', 'workers_comp']
 const REQUIRED_W2  = ['i9', 'w4']
 
 // Sits directly under the fixed mobile header. Rendered in two parts:

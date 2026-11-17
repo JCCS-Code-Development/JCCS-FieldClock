@@ -22,7 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         // would just be a wall of permanently-pending rows.
         $users = $pdo->query(
             "SELECT u.id, u.name, u.pay_type, u.pay_structure, u.is_active,
-                    ea.agreement_type, ea.signed_at
+                    ea.agreement_type, ea.signed_at,
+                    CASE WHEN ea.agreement_type = 'workers_comp'
+                         THEN JSON_UNQUOTE(JSON_EXTRACT(ea.form_data, '$.plan')) END AS wc_plan
              FROM users u
              LEFT JOIN employee_agreements ea ON ea.user_id = u.id
              WHERE u.role != 'contractor'
@@ -39,10 +41,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     'pay_type'  => $row['pay_type'],
                     'is_active' => (bool)$row['is_active'],
                     'agreements' => [],
+                    'wc_plan'    => null,
                 ];
             }
             if ($row['agreement_type']) {
                 $byUser[$uid]['agreements'][$row['agreement_type']] = $row['signed_at'] ?? null;
+                if ($row['wc_plan'] && $row['signed_at']) $byUser[$uid]['wc_plan'] = $row['wc_plan'];
             }
         }
         echo json_encode(['employees' => array_values($byUser)]);

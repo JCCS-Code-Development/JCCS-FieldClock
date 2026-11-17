@@ -21,7 +21,7 @@ $pdo  = getPDO();
 
 requireFields($body, ['agreement_type', 'signature_data']);
 
-$VALID_TYPES = ['non_solicitation','conflict_of_interest','at_will','emergency_contact','i9','w4'];
+$VALID_TYPES = ['non_solicitation','conflict_of_interest','at_will','emergency_contact','i9','w4','workers_comp'];
 $type = sanitizeString($body['agreement_type']);
 if (!in_array($type, $VALID_TYPES)) {
     http_response_code(422);

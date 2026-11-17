@@ -14,9 +14,12 @@ const ALL_TYPES = [
   { id: 'emergency_contact',    short: 'Emergency',  color: 'sky'    },
   { id: 'i9',                   short: 'I-9',        color: 'amber'  },
   { id: 'w4',                   short: 'W-4',        color: 'amber'  },
+  { id: 'workers_comp',         short: 'Work Comp',  color: 'teal'   },
 ]
 
 const W2_ONLY = ['i9', 'w4']
+
+const WC_PLAN_LABEL = { ghost: 'Ghost', premium: 'Premium + Health' }
 
 const COLOR_CHIP = {
   signed:  'bg-green-100 text-green-700',
@@ -134,6 +137,11 @@ export default function HRDocuments() {
                               className={isSigned ? 'cursor-pointer' : 'cursor-default'}
                             >
                               <StatusChip status={status} />
+                              {t.id === 'workers_comp' && isSigned && emp.wc_plan && (
+                                <span className={`block mt-1 text-[10px] font-semibold ${emp.wc_plan === 'premium' ? 'text-teal-700' : 'text-gray-500'}`}>
+                                  {WC_PLAN_LABEL[emp.wc_plan] ?? emp.wc_plan}
+                                </span>
+                              )}
                             </button>
                           )}
                         </td>
@@ -169,6 +177,14 @@ export default function HRDocuments() {
               <div><p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Signed</p><p className="font-medium">{viewModal.data.signed_at ? format(parseISO(viewModal.data.signed_at), 'MMM d, yyyy h:mm a') : '—'}</p></div>
               <div><p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">IP Address</p><p className="font-medium font-mono text-xs">{viewModal.data.ip_address ?? '—'}</p></div>
             </div>
+
+            {viewModal.type === 'workers_comp' && viewModal.data.form_data?.plan && (
+              <div className={`rounded-xl p-3 border text-sm font-semibold ${
+                viewModal.data.form_data.plan === 'premium' ? 'bg-teal-50 border-teal-200 text-teal-800' : 'bg-gray-50 border-gray-200 text-gray-700'
+              }`}>
+                Coverage elected: {viewModal.data.form_data.plan === 'premium' ? 'Premium Plan with Health Coverage' : 'Ghost Policy'}
+              </div>
+            )}
 
             {viewModal.data.form_data && Object.keys(viewModal.data.form_data).length > 1 && (
               <div className="bg-gray-50 rounded-xl p-4">

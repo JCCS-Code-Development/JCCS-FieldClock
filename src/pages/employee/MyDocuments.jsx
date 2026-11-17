@@ -58,6 +58,13 @@ const AGREEMENT_DEFS = [
     required_for: ['w2'],
     has_form: true,
   },
+  {
+    id: 'workers_comp',
+    title: "Workers' Compensation Coverage",
+    desc: 'Choose a ghost policy (default) or premium plan with health coverage.',
+    required_for: ['all'],
+    has_form: true,
+  },
 ]
 
 // ─── Legal text components ────────────────────────────────────────────────────
@@ -411,10 +418,260 @@ function W4Form({ data, onChange, disabled }) {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
+// ─── Workers' compensation coverage election ─────────────────────────────────
+// Two options: a "ghost" policy (default — the minimum coverage needed to work
+// with JCCS) or a premium plan that adds health coverage at a higher cost.
+// Bilingual inline since most of the crew reads Spanish; the other onboarding
+// forms are English-only.
+const WC_PLANS = {
+  ghost:   { en: 'Ghost Policy (default)',            es: 'Póliza Fantasma (predeterminada)' },
+  premium: { en: 'Premium Plan — with Health Coverage', es: 'Plan Premium — con Cobertura de Salud' },
+}
+const WC_TRADES = [
+  ['general_labor', 'General Labor', 'Labor General'],
+  ['carpentry',     'Carpentry',     'Carpintería'],
+  ['drywall',       'Drywall',       'Drywall / Tablaroca'],
+  ['painting',      'Painting',      'Pintura'],
+  ['flooring',      'Flooring',      'Pisos'],
+  ['electrical',    'Electrical',    'Electricidad'],
+  ['plumbing',      'Plumbing',      'Plomería'],
+  ['roofing',       'Roofing',       'Techos'],
+  ['other',         'Other',         'Otro'],
+]
+const WC_TIERS = [
+  ['self',     'Me only',               'Solo yo'],
+  ['spouse',   'Me + spouse',           'Yo + cónyuge'],
+  ['children', 'Me + child(ren)',       'Yo + hijo(s)'],
+  ['family',   'Me + spouse + children', 'Yo + cónyuge + hijos'],
+]
+const WC_DEPENDENT_SLOTS = 4
+
+function WcPlanCard({ id, plan, desc, bullets, onChange, disabled, L }) {
+  const active = plan === id
+  return (
+    <label className={`block rounded-2xl border-2 p-4 transition-all ${disabled ? '' : 'cursor-pointer'} ${
+      active ? 'border-brand-500 bg-brand-100/40' : 'border-gray-200 bg-white hover:border-gray-300'
+    }`}>
+      <div className="flex items-start gap-3">
+        <input type="radio" name="wc_plan" className="mt-1" value={id} checked={active}
+          onChange={onChange} disabled={disabled} />
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-gray-900">{L(WC_PLANS[id].en, WC_PLANS[id].es)}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+          <ul className="mt-2 space-y-1">
+            {bullets.map(([ok, text]) => (
+              <li key={text} className="flex gap-2 text-xs text-gray-700">
+                <span className={ok ? 'text-green-600' : 'text-gray-400'}>{ok ? '✓' : '✕'}</span>{text}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </label>
+  )
+}
+
+function WorkersCompForm({ data, onChange, disabled, isEs }) {
+  const L    = (en, es) => (isEs ? es : en)
+  const set  = (field) => (e) => onChange({ ...data, [field]: e.target.value })
+  const fmt  = (v) => v ?? ''
+  const plan = data.plan ?? 'ghost'
+  const tier = data.health_tier ?? 'self'
+  const needsDependents = plan === 'premium' && tier !== 'self'
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-900">
+        {L(
+          `Everyone who works on ${COMPANY.name} job sites must have workers' compensation coverage on file. Choose a plan below and complete the information the insurance carrier needs to issue your policy. The office will confirm the final cost with you before coverage starts.`,
+          `Toda persona que trabaje en obras de ${COMPANY.name} debe tener cobertura de compensación laboral registrada. Elija un plan abajo y complete la información que la aseguradora necesita para emitir su póliza. La oficina le confirmará el costo final antes de que empiece la cobertura.`
+        )}
+      </div>
+
+      {/* Plan choice */}
+      <div>
+        <p className="text-sm font-semibold text-gray-800 mb-3">
+          {L('1 — Choose Your Coverage', '1 — Elija Su Cobertura')} <span className="text-red-500">*</span>
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <WcPlanCard
+            id="ghost" plan={plan} onChange={set('plan')} disabled={disabled} L={L}
+            desc={L('The basic insurance required to work with us. Lowest cost.', 'El seguro básico requerido para trabajar con nosotros. Menor costo.')}
+            bullets={[
+              [true,  L('Certificate of insurance that lets you work on our jobs', 'Certificado de seguro que le permite trabajar en nuestras obras')],
+              [true,  L('Meets our company and client requirements', 'Cumple los requisitos de la compañía y de los clientes')],
+              [false, L('Does NOT pay your own medical bills or lost wages if you get hurt', 'NO paga sus propios gastos médicos ni salario perdido si se lastima')],
+              [false, L('No health coverage', 'Sin cobertura de salud')],
+            ]}
+          />
+          <WcPlanCard
+            id="premium" plan={plan} onChange={set('plan')} disabled={disabled} L={L}
+            desc={L('Everything in the ghost policy, plus health coverage. Higher cost.', 'Todo lo de la póliza fantasma, más cobertura de salud. Mayor costo.')}
+            bullets={[
+              [true, L('Certificate of insurance that lets you work on our jobs', 'Certificado de seguro que le permite trabajar en nuestras obras')],
+              [true, L('Meets our company and client requirements', 'Cumple los requisitos de la compañía y de los clientes')],
+              [true, L('Health coverage for you (and family, if added)', 'Cobertura de salud para usted (y su familia, si la agrega)')],
+              [true, L('More expensive than the ghost policy', 'Más caro que la póliza fantasma')],
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* Insured information */}
+      <div>
+        <p className="text-sm font-semibold text-gray-800 mb-3">{L('2 — Your Information', '2 — Su Información')}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FI label={L('Full Legal Name', 'Nombre Legal Completo')} required>
+            <input disabled={disabled} className={inputCls} value={fmt(data.legal_name)} onChange={set('legal_name')} />
+          </FI>
+          <FI label={L('Date of Birth', 'Fecha de Nacimiento')} required>
+            <input disabled={disabled} className={inputCls} type="date" value={fmt(data.dob)} onChange={set('dob')} />
+          </FI>
+          <FI label={L('Tax ID Type', 'Tipo de Número Fiscal')} required>
+            <select disabled={disabled} className={_selectCls} value={fmt(data.tax_id_type)} onChange={set('tax_id_type')}>
+              <option value="">{L('Select…', 'Seleccione…')}</option>
+              <option value="ssn">SSN</option>
+              <option value="itin">ITIN</option>
+              <option value="fein">FEIN / EIN</option>
+            </select>
+          </FI>
+          <FI label={L('Tax ID Number', 'Número Fiscal')} required>
+            <input disabled={disabled} className={inputCls} value={fmt(data.tax_id)} onChange={set('tax_id')} placeholder="XXX-XX-XXXX" />
+          </FI>
+          <FI label={L('Business Name / DBA (if any)', 'Nombre del Negocio / DBA (si tiene)')}>
+            <input disabled={disabled} className={inputCls} value={fmt(data.business_name)} onChange={set('business_name')} />
+          </FI>
+          <FI label={L('Phone', 'Teléfono')} required>
+            <input disabled={disabled} className={inputCls} type="tel" value={fmt(data.phone)} onChange={set('phone')} placeholder="(555) 000-0000" />
+          </FI>
+          <FI label={L('Email', 'Correo Electrónico')}>
+            <input disabled={disabled} className={inputCls} type="email" value={fmt(data.email)} onChange={set('email')} />
+          </FI>
+          <FI label={L('Home Address', 'Dirección')} required>
+            <input disabled={disabled} className={inputCls} value={fmt(data.address)} onChange={set('address')} />
+          </FI>
+          <FI label={L('City, State, ZIP', 'Ciudad, Estado, Código Postal')} required>
+            <input disabled={disabled} className={inputCls} value={fmt(data.city_state_zip)} onChange={set('city_state_zip')} />
+          </FI>
+        </div>
+      </div>
+
+      {/* Work / underwriting */}
+      <div>
+        <p className="text-sm font-semibold text-gray-800 mb-3">{L('3 — Your Work', '3 — Su Trabajo')}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FI label={L('Main Trade', 'Oficio Principal')} required>
+            <select disabled={disabled} className={_selectCls} value={fmt(data.trade)} onChange={set('trade')}>
+              <option value="">{L('Select…', 'Seleccione…')}</option>
+              {WC_TRADES.map(([v, en, es]) => <option key={v} value={v}>{L(en, es)}</option>)}
+            </select>
+          </FI>
+          <FI label={L('Years of Experience', 'Años de Experiencia')}>
+            <input disabled={disabled} className={inputCls} type="number" min="0" step="1" value={fmt(data.years_experience)} onChange={set('years_experience')} />
+          </FI>
+          <div className="sm:col-span-2">
+            <FI label={L('Describe the work you do', 'Describa el trabajo que hace')} required>
+              <textarea disabled={disabled} className={`${inputCls} resize-none`} rows={2} value={fmt(data.job_duties)} onChange={set('job_duties')}
+                placeholder={L('e.g. hang and finish drywall, interior trim, ladder work up to 12 ft', 'ej. instalar y terminar drywall, molduras interiores, trabajo en escalera hasta 12 pies')} />
+            </FI>
+          </div>
+          <FI label={L('Requested Start Date', 'Fecha de Inicio Solicitada')} required>
+            <input disabled={disabled} className={inputCls} type="date" value={fmt(data.effective_date)} onChange={set('effective_date')} />
+          </FI>
+          <FI label={L('Work injury in the last 5 years?', '¿Lesión de trabajo en los últimos 5 años?')} required>
+            <select disabled={disabled} className={_selectCls} value={fmt(data.prior_injury)} onChange={set('prior_injury')}>
+              <option value="">{L('Select…', 'Seleccione…')}</option>
+              <option value="no">{L('No', 'No')}</option>
+              <option value="yes">{L('Yes', 'Sí')}</option>
+            </select>
+          </FI>
+          {data.prior_injury === 'yes' && (
+            <div className="sm:col-span-2">
+              <FI label={L('Injury details (what, when, any open claim)', 'Detalles de la lesión (qué, cuándo, algún reclamo abierto)')} required>
+                <textarea disabled={disabled} className={`${inputCls} resize-none`} rows={2} value={fmt(data.prior_injury_details)} onChange={set('prior_injury_details')} />
+              </FI>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Health coverage — premium only */}
+      {plan === 'premium' && (
+        <div>
+          <p className="text-sm font-semibold text-gray-800 mb-3">{L('4 — Health Coverage', '4 — Cobertura de Salud')}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FI label={L('Who should be covered?', '¿A quién se debe cubrir?')} required>
+              <select disabled={disabled} className={_selectCls} value={tier} onChange={set('health_tier')}>
+                {WC_TIERS.map(([v, en, es]) => <option key={v} value={v}>{L(en, es)}</option>)}
+              </select>
+            </FI>
+            <FI label={L('Current health insurance (if any)', 'Seguro de salud actual (si tiene)')}>
+              <input disabled={disabled} className={inputCls} value={fmt(data.current_insurance)} onChange={set('current_insurance')} placeholder={L('None', 'Ninguno')} />
+            </FI>
+          </div>
+
+          {needsDependents && (
+            <div className="mt-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                {L('Family members to cover', 'Familiares a cubrir')} <span className="text-red-500">*</span>
+              </p>
+              <div className="space-y-2">
+                {Array.from({ length: WC_DEPENDENT_SLOTS }, (_, i) => i + 1).map((n) => (
+                  <div key={n} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <input disabled={disabled} className={inputCls} value={fmt(data[`dep${n}_name`])} onChange={set(`dep${n}_name`)}
+                      placeholder={`${n}. ${L('Full name', 'Nombre completo')}`} />
+                    <select disabled={disabled} className={_selectCls} value={fmt(data[`dep${n}_relationship`])} onChange={set(`dep${n}_relationship`)}>
+                      <option value="">{L('Relationship…', 'Parentesco…')}</option>
+                      <option value="spouse">{L('Spouse', 'Cónyuge')}</option>
+                      <option value="child">{L('Child', 'Hijo/a')}</option>
+                    </select>
+                    <input disabled={disabled} className={inputCls} type="date" value={fmt(data[`dep${n}_dob`])} onChange={set(`dep${n}_dob`)}
+                      aria-label={L('Date of birth', 'Fecha de nacimiento')} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <p className="text-xs text-gray-400 border-t border-gray-200 pt-3">
+        {plan === 'premium'
+          ? L(
+              `By signing below, I elect the Premium Plan with health coverage and understand it costs more than the ghost policy. I certify the information above is true and complete, and I authorize ${COMPANY.name} to share it with its insurance agent and carrier to obtain my coverage.`,
+              `Al firmar abajo, elijo el Plan Premium con cobertura de salud y entiendo que cuesta más que la póliza fantasma. Certifico que la información anterior es verdadera y completa, y autorizo a ${COMPANY.name} a compartirla con su agente y aseguradora para obtener mi cobertura.`
+            )
+          : L(
+              `By signing below, I elect the Ghost Policy. I understand it is the insurance required to work with ${COMPANY.name} and that it does NOT pay my own medical bills or lost wages if I am injured. I certify the information above is true and complete, and I authorize ${COMPANY.name} to share it with its insurance agent and carrier to obtain my coverage.`,
+              `Al firmar abajo, elijo la Póliza Fantasma. Entiendo que es el seguro requerido para trabajar con ${COMPANY.name} y que NO paga mis propios gastos médicos ni salario perdido si me lastimo. Certifico que la información anterior es verdadera y completa, y autorizo a ${COMPANY.name} a compartirla con su agente y aseguradora para obtener mi cobertura.`
+            )}
+      </p>
+    </div>
+  )
+}
+
+// Returns an error string, or '' when the workers' comp form is complete.
+function validateWorkersComp(d, isEs) {
+  const L = (en, es) => (isEs ? es : en)
+  const req = ['legal_name', 'dob', 'tax_id_type', 'tax_id', 'phone', 'address', 'city_state_zip', 'trade', 'job_duties', 'effective_date', 'prior_injury']
+  if (req.some((f) => !String(d[f] ?? '').trim())) return L('Please complete all required fields.', 'Complete todos los campos obligatorios.')
+  if (d.prior_injury === 'yes' && !d.prior_injury_details?.trim()) return L('Please describe the prior injury.', 'Describa la lesión anterior.')
+  if (d.plan === 'premium' && d.health_tier !== 'self') {
+    const has = (n) => d[`dep${n}_name`]?.trim()
+    const listed = Array.from({ length: WC_DEPENDENT_SLOTS }, (_, i) => i + 1).filter(has)
+    if (!listed.length) return L('Add at least one family member to cover.', 'Agregue al menos un familiar a cubrir.')
+    if (listed.some((n) => !d[`dep${n}_relationship`] || !d[`dep${n}_dob`])) {
+      return L('Each family member needs a relationship and date of birth.', 'Cada familiar necesita parentesco y fecha de nacimiento.')
+    }
+  }
+  return ''
+}
+
 export default function MyDocuments() {
   const { user } = useAuthStore()
   const { t, i18n } = useTranslation()
-  const dfLocale = i18n.language.startsWith('es') ? es : enUS
+  const isEs     = i18n.language.startsWith('es')
+  const dfLocale = isEs ? es : enUS
   const fmtDate  = (iso) => format(parseISO(iso), 'MMMM d, yyyy', { locale: dfLocale })
   const fmtDateTime = (iso) => format(parseISO(iso), "MMMM d, yyyy 'at' h:mm a", { locale: dfLocale })
   const [agreements, setAgreements]     = useState([])
@@ -466,7 +723,14 @@ export default function MyDocuments() {
     setActiveType(def)
     setError('')
     setAgreed(false)
-    setFormData({})
+    setFormData(def.id === 'workers_comp' ? {
+      plan: 'ghost',
+      health_tier: 'self',
+      legal_name: user?.name ?? '',
+      phone: user?.phone ?? '',
+      email: user?.email ?? '',
+      effective_date: format(new Date(), 'yyyy-MM-dd'),
+    } : {})
     setSignedData(null)
     if (existing?.signed_at) {
       // Load full data for read-only view
@@ -496,6 +760,11 @@ export default function MyDocuments() {
       if (!formData.first_name?.trim() || !formData.last_name?.trim() || !formData.ssn?.trim() || !formData.filing_status) {
         setError('Please complete all required W-4 fields.'); return
       }
+    }
+
+    if (activeType.id === 'workers_comp') {
+      const msg = validateWorkersComp(formData, isEs)
+      if (msg) { setError(msg); return }
     }
 
     setSaving(true); setError('')
@@ -710,6 +979,15 @@ export default function MyDocuments() {
                 data={signedData?.form_data ?? formData}
                 onChange={setFormData}
                 disabled={!!signedData?.signed_at}
+              />
+            )}
+
+            {activeType.id === 'workers_comp' && (
+              <WorkersCompForm
+                data={signedData?.form_data ?? formData}
+                onChange={setFormData}
+                disabled={!!signedData?.signed_at}
+                isEs={isEs}
               />
             )}
 
