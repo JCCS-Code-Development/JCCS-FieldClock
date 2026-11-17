@@ -620,20 +620,6 @@ function WorkersCompForm({ data, onChange, disabled, isEs }) {
           <FI label={L('Requested Start Date', 'Fecha de Inicio Solicitada')}>
             <input disabled={disabled} className={inputCls} type="date" value={fmt(data.effective_date)} onChange={set('effective_date')} />
           </FI>
-          <FI label={L('Work injury in the last 5 years?', '¿Lesión de trabajo en los últimos 5 años?')}>
-            <select disabled={disabled} className={_selectCls} value={fmt(data.prior_injury)} onChange={set('prior_injury')}>
-              <option value="">{L('Select…', 'Seleccione…')}</option>
-              <option value="no">{L('No', 'No')}</option>
-              <option value="yes">{L('Yes', 'Sí')}</option>
-            </select>
-          </FI>
-          {data.prior_injury === 'yes' && (
-            <div className="sm:col-span-2">
-              <FI label={L('Injury details (what, when, any open claim)', 'Detalles de la lesión (qué, cuándo, algún reclamo abierto)')} required>
-                <textarea disabled={disabled} className={`${inputCls} resize-none`} rows={2} value={fmt(data.prior_injury_details)} onChange={set('prior_injury_details')} />
-              </FI>
-            </div>
-          )}
         </div>
       </div>
 
@@ -701,7 +687,6 @@ function validateWorkersComp(d, isEs) {
   const req = ['legal_name', 'tax_id_type', 'tax_id', 'address', 'city_state_zip', 'trade', 'job_duties']
   if (req.some((f) => !String(d[f] ?? '').trim())) return L('Please complete all required fields.', 'Complete todos los campos obligatorios.')
   if (!d.id_photo) return L('Please add a photo of your ID.', 'Agregue una foto de su identificación.')
-  if (d.prior_injury === 'yes' && !d.prior_injury_details?.trim()) return L('Please describe the prior injury.', 'Describa la lesión anterior.')
   if (d.plan === 'premium' && d.health_tier !== 'self') {
     const has = (n) => d[`dep${n}_name`]?.trim()
     const listed = Array.from({ length: WC_DEPENDENT_SLOTS }, (_, i) => i + 1).filter(has)

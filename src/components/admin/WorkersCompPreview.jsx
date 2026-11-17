@@ -64,7 +64,7 @@ export default function WorkersCompPreview({ data, onDownload, downloading }) {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <Th>ID</Th><Th>Name</Th><Th>Plan</Th><Th>Tax ID</Th><Th>Address</Th><Th>Phone / Email</Th>
-                  <Th>Trade &amp; Work</Th><Th>Start</Th><Th>Injury (5 yrs)</Th>
+                  <Th>Trade &amp; Work</Th><Th>Start</Th>
                   <Th>Health Coverage</Th><Th>Signed</Th>
                 </tr>
               </thead>
@@ -103,11 +103,6 @@ export default function WorkersCompPreview({ data, onDownload, downloading }) {
                         <span className="block text-xs text-gray-500">{d.job_duties}</span>
                       </Td>
                       <Td className="text-xs whitespace-nowrap">{fmtDate(d.effective_date)}</Td>
-                      <Td className="text-xs min-w-[90px]">
-                        {d.prior_injury === 'yes'
-                          ? <><span className="font-semibold text-red-600">Yes</span><span className="block text-gray-500">{d.prior_injury_details}</span></>
-                          : d.prior_injury === 'no' ? 'No' : '—'}
-                      </Td>
                       <Td className="text-xs min-w-[150px]">
                         {premium ? (
                           <>

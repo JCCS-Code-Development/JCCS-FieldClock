@@ -32,8 +32,7 @@ export async function downloadWorkersCompExcel({ forms, missing }) {
     ['Full Legal Name', 26], ['Coverage Plan', 30], ['Tax ID Type', 11], ['Tax ID / SSN', 16],
     ['Date of Birth', 13], ['Phone', 16], ['Email', 28], ['Address', 30], ['City, State, ZIP', 24],
     ['Trade', 16], ['Work Description', 40], ['Property Type', 14],
-    ['Years Experience', 10], ['Requested Start Date', 14], ['Work Injury (5 yrs)', 10],
-    ['Injury Details', 30], ['Health Coverage For', 20], ['Current Health Insurance', 20],
+    ['Years Experience', 10], ['Requested Start Date', 14], ['Health Coverage For', 20], ['Current Health Insurance', 20],
     ['Family Members Covered', 40], ['Form Signed', 13], ['Photo ID', PHOTO_W / 7],
   ]
   ws.columns = cols.map(([header, width]) => ({ header, width }))
@@ -68,8 +67,6 @@ export async function downloadWorkersCompExcel({ forms, missing }) {
       WC_PROPERTY_TYPE,
       d.years_experience ?? '',
       fmtDate(d.effective_date),
-      d.prior_injury === 'yes' ? 'Yes' : d.prior_injury === 'no' ? 'No' : '',
-      d.prior_injury_details ?? '',
       premium ? labelOf(WC_TIERS, d.health_tier ?? 'self').replace(/^Me/, 'Employee') : '',
       premium ? (d.current_insurance ?? '') : '',
       dependents,
