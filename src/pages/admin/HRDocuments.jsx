@@ -5,6 +5,7 @@ import Spinner from '../../components/ui/Spinner'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
+import WorkersCompPreview from '../../components/admin/WorkersCompPreview'
 import { listAgreements, getAgreement, resetAgreement, getWorkersCompExport } from '../../api/agreements'
 
 const ALL_TYPES = [
@@ -40,20 +41,29 @@ export default function HRDocuments() {
   const [viewModal, setViewModal]       = useState(null) // { emp, type, data }
   const [viewLoading, setViewLoading]   = useState(false)
   const [resetting, setResetting]       = useState(null)
-  const [exporting, setExporting]       = useState(false)
+  const [exporting, setExporting]       = useState(false)   // loading the preview
+  const [downloading, setDownloading]   = useState(false)   // building the .xlsx
   const [exportMsg, setExportMsg]       = useState('')
+  const [wcPreview, setWcPreview]       = useState(null)    // { forms, missing }
 
-  const handleExport = async () => {
+  // Step 1: load every form and show it in a table for review.
+  const openWcPreview = async () => {
     setExporting(true); setExportMsg('')
+    try { setWcPreview(await getWorkersCompExport()) }
+    catch (err) { setExportMsg(err?.response?.data?.error ?? 'Could not load the workers\' comp forms. Try again.') }
+    finally { setExporting(false) }
+  }
+
+  // Step 2: from the preview, build and download the Excel file.
+  const handleDownload = async () => {
+    setDownloading(true); setExportMsg('')
     try {
-      const data = await getWorkersCompExport()
-      if (!data.forms?.length) { setExportMsg('No workers\' comp forms have been submitted yet.'); return }
       const { downloadWorkersCompExcel } = await import('../../utils/workersCompExcel')
-      await downloadWorkersCompExcel(data)
-    } catch (err) {
-      setExportMsg(err?.response?.data?.error ?? 'Could not build the Excel file. Try again.')
+      await downloadWorkersCompExcel(wcPreview)
+    } catch {
+      setExportMsg('Could not build the Excel file. Try again.')
     } finally {
-      setExporting(false)
+      setDownloading(false)
     }
   }
 
@@ -104,8 +114,8 @@ export default function HRDocuments() {
         title="HR Compliance"
         subtitle="Track agreement and document signing status for every employee, past and present"
         actions={
-          <Button onClick={handleExport} loading={exporting}>
-            Workers' Comp → Excel
+          <Button onClick={openWcPreview} loading={exporting}>
+            Workers' Comp Report
           </Button>
         }
       />
@@ -192,6 +202,12 @@ export default function HRDocuments() {
           </table>
         </div>
       )}
+
+      {/* Workers' comp review table → Excel */}
+      <Modal isOpen={!!wcPreview} onClose={() => setWcPreview(null)} title="Workers' Compensation — All Employees" size="full">
+        {exportMsg && <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4">{exportMsg}</p>}
+        <WorkersCompPreview data={wcPreview} onDownload={handleDownload} downloading={downloading} />
+      </Modal>
 
       {/* View signed document modal */}
       <Modal
