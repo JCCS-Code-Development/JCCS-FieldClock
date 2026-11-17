@@ -1,9 +1,8 @@
 // Builds the insurance-agent spreadsheet from the workers' comp coverage forms.
 // exceljs is imported lazily so it's only downloaded when an admin exports.
 import { format, parseISO } from 'date-fns'
-import { WC_PLANS, WC_TRADES, WC_TIERS, WC_PROPERTY_TYPE, WC_DEPENDENT_SLOTS } from './workersComp'
+import { WC_DEPENDENT_SLOTS, wcReport } from './workersComp'
 
-const labelOf = (list, v) => list.find(([k]) => k === v)?.[1] ?? v ?? ''
 const fmtDate = (v) => {
   if (!v) return ''
   try { return format(parseISO(v), 'MM/dd/yyyy') } catch { return v }
@@ -20,20 +19,21 @@ const imageSize = (src) => new Promise((resolve) => {
 const PHOTO_W = 220   // px in the sheet
 const PHOTO_H = 140
 
-export async function downloadWorkersCompExcel({ forms, missing }) {
+export async function downloadWorkersCompExcel({ forms, missing }, lang = 'en') {
+  const R = wcReport(lang)
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
   wb.creator = 'JCCS FieldClock'
   wb.created = new Date()
 
   // ── Sheet 1: one row per signed form ─────────────────────────────────────
-  const ws = wb.addWorksheet("Workers' Comp", { views: [{ state: 'frozen', xSplit: 1, ySplit: 1 }] })
+  const ws = wb.addWorksheet(R.sheet, { views: [{ state: 'frozen', xSplit: 1, ySplit: 1 }] })
   const cols = [
-    ['Full Legal Name', 26], ['Coverage Plan', 30], ['Tax ID Type', 11], ['Tax ID / SSN', 16],
-    ['Date of Birth', 13], ['Phone', 16], ['Email', 28], ['Address', 30], ['City, State, ZIP', 24],
-    ['Trade', 16], ['Work Description', 40], ['Property Type', 14],
-    ['Years Experience', 10], ['Requested Start Date', 14], ['Health Coverage For', 20], ['Current Health Insurance', 20],
-    ['Family Members Covered', 40], ['Form Signed', 13], ['Photo ID', PHOTO_W / 7],
+    [R.name, 26], [R.plan, 30], [R.taxIdType, 11], [R.taxId, 16],
+    [R.dob, 13], [R.phone, 16], [R.email, 28], [R.address, 30], [R.cityStateZip, 24],
+    [R.trade, 16], [R.work, 40], [R.propertyType, 14],
+    [R.years, 10], [R.start, 14], [R.healthFor, 22], [R.currentIns, 20],
+    [R.family, 40], [R.signed, 13], [R.photo, PHOTO_W / 7],
   ]
   ws.columns = cols.map(([header, width]) => ({ header, width }))
   const head = ws.getRow(1)
@@ -49,12 +49,12 @@ export async function downloadWorkersCompExcel({ forms, missing }) {
     const dependents = premium && d.health_tier !== 'self'
       ? Array.from({ length: WC_DEPENDENT_SLOTS }, (_, k) => k + 1)
           .filter((n) => d[`dep${n}_name`]?.trim())
-          .map((n) => `${d[`dep${n}_name`]} (${d[`dep${n}_relationship`] ?? ''}, DOB ${fmtDate(d[`dep${n}_dob`])})`)
+          .map((n) => `${d[`dep${n}_name`]} (${R.relLabel(d[`dep${n}_relationship`])}, ${R.dobShort} ${fmtDate(d[`dep${n}_dob`])})`)
           .join('\n')
       : ''
     const row = ws.addRow([
       d.legal_name || f.name,
-      WC_PLANS[d.plan ?? 'ghost']?.en.replace(' (default)', '') ?? d.plan,
+      R.planLabel(d.plan),
       (d.tax_id_type ?? '').toUpperCase(),
       d.tax_id ?? '',
       fmtDate(d.dob),
@@ -62,16 +62,16 @@ export async function downloadWorkersCompExcel({ forms, missing }) {
       d.email || f.email || '',
       d.address ?? '',
       d.city_state_zip ?? '',
-      labelOf(WC_TRADES, d.trade),
+      R.tradeLabel(d.trade),
       d.job_duties ?? '',
-      WC_PROPERTY_TYPE,
+      R.commercial,
       d.years_experience ?? '',
       fmtDate(d.effective_date),
-      premium ? labelOf(WC_TIERS, d.health_tier ?? 'self').replace(/^Me/, 'Employee') : '',
+      premium ? R.tierLabel(d.health_tier) : '',
       premium ? (d.current_insurance ?? '') : '',
       dependents,
       fmtDate(f.signed_at),
-      d.id_photo ? '' : 'Not on file',
+      d.id_photo ? '' : R.notOnFile,
     ])
     row.alignment = { vertical: 'top', wrapText: true }
     ws.getCell(row.number, 4).numFmt = '@'   // keep leading zeros in SSNs
@@ -96,8 +96,8 @@ export async function downloadWorkersCompExcel({ forms, missing }) {
 
   // ── Sheet 2: who still hasn't filled it out ──────────────────────────────
   if (missing?.length) {
-    const ms = wb.addWorksheet('Not Yet Submitted')
-    ms.columns = [{ header: 'Name', width: 28 }, { header: 'Phone', width: 16 }, { header: 'Email', width: 30 }, { header: 'Pay Type', width: 10 }]
+    const ms = wb.addWorksheet(R.missingSheet)
+    ms.columns = [{ header: R.name, width: 28 }, { header: R.phone, width: 16 }, { header: R.email, width: 30 }, { header: R.payType, width: 12 }]
     ms.getRow(1).font = { bold: true }
     missing.forEach((m) => ms.addRow([m.name, m.phone ?? '', m.email ?? '', (m.pay_type ?? '').toUpperCase()]))
   }
@@ -107,7 +107,7 @@ export async function downloadWorkersCompExcel({ forms, missing }) {
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href = url
-  a.download = `JCCS Workers Comp - ${format(new Date(), 'yyyy-MM-dd')}.xlsx`
+  a.download = `${R.fileName} - ${format(new Date(), 'yyyy-MM-dd')}.xlsx`
   document.body.appendChild(a)
   a.click()
   a.remove()

@@ -63,6 +63,8 @@ const AGREEMENT_DEFS = [
     id: 'workers_comp',
     title: "Workers' Compensation Coverage",
     desc: 'Choose a ghost policy (default) or premium plan with health coverage.',
+    title_es: 'Cobertura de Compensación Laboral',
+    desc_es: 'Elija una póliza fantasma (predeterminada) o un plan premium con cobertura de salud.',
     required_for: ['all'],
     has_form: true,
   },
@@ -745,6 +747,10 @@ export default function MyDocuments() {
 
   useEffect(() => { load() }, [load])
 
+  // Documents with Spanish wording (title_es/desc_es) show it when the app is in Spanish.
+  const titleOf = (def) => (isEs && def?.title_es) || def?.title
+  const descOf  = (def) => (isEs && def?.desc_es)  || def?.desc
+
   const statusOf = (id) => agreements.find((a) => a.agreement_type === id)
 
   const signed  = requiredDefs.filter((d) => !!statusOf(d.id)?.signed_at).length
@@ -879,8 +885,8 @@ export default function MyDocuments() {
                     {isSigned ? '✓' : '○'}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">{def.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{def.desc}</p>
+                    <p className="text-sm font-semibold text-gray-900">{titleOf(def)}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{descOf(def)}</p>
                     {isSigned && ag.signed_at && (
                       <p className="text-xs text-green-600 mt-1 font-medium">
                         {t('docs.signedOn', { date: fmtDate(ag.signed_at) })}
@@ -951,7 +957,7 @@ export default function MyDocuments() {
           {/* Header bar */}
           <div className="no-print sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between z-10">
             <div>
-              <p className="text-sm font-bold text-gray-900">{activeType.title}</p>
+              <p className="text-sm font-bold text-gray-900">{titleOf(activeType)}</p>
               {signedData?.signed_at && (
                 <p className="text-xs text-green-600 font-medium">
                   {t('docs.signedOn', { date: fmtDate(signedData.signed_at) })}
@@ -981,13 +987,13 @@ export default function MyDocuments() {
             {/* Company header (visible in print) */}
             <div className="hidden print:block border-b-2 border-gray-800 pb-3 mb-4">
               <p className="font-bold text-lg">{COMPANY.name}</p>
-              <p className="text-sm text-gray-600">{activeType.title}</p>
+              <p className="text-sm text-gray-600">{titleOf(activeType)}</p>
             </div>
 
             {/* Employee + date info */}
             <div className="flex gap-6 text-sm">
-              <div><p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Employee</p><p className="font-semibold">{user?.name}</p></div>
-              <div><p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Date</p><p className="font-semibold">{format(new Date(), 'MMMM d, yyyy')}</p></div>
+              <div><p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">{isEs ? 'Empleado' : 'Employee'}</p><p className="font-semibold">{user?.name}</p></div>
+              <div><p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">{isEs ? 'Fecha' : 'Date'}</p><p className="font-semibold">{format(new Date(), 'MMMM d, yyyy', { locale: dfLocale })}</p></div>
             </div>
 
             {/* Legal text / form */}
@@ -1069,7 +1075,7 @@ export default function MyDocuments() {
             {!signedData?.signed_at && (
               <div className="no-print pb-6">
                 <Button fullWidth loading={saving} onClick={handleSign}>
-                  {t('docs.submitBtn', { title: activeType.title })}
+                  {t('docs.submitBtn', { title: titleOf(activeType) })}
                 </Button>
                 <p className="text-xs text-gray-400 text-center mt-2">
                   {t('docs.immutable')}

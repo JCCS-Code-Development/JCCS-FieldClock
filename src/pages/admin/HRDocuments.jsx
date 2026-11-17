@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { format, parseISO } from 'date-fns'
 import PageHeader from '../../components/admin/PageHeader'
 import Spinner from '../../components/ui/Spinner'
@@ -45,6 +46,8 @@ export default function HRDocuments() {
   const [downloading, setDownloading]   = useState(false)   // building the .xlsx
   const [exportMsg, setExportMsg]       = useState('')
   const [wcPreview, setWcPreview]       = useState(null)    // { forms, missing }
+  const { i18n } = useTranslation()
+  const [wcLang, setWcLang] = useState(i18n.language?.startsWith('es') ? 'es' : 'en')  // report + Excel language
 
   // Step 1: load every form and show it in a table for review.
   const openWcPreview = async () => {
@@ -59,7 +62,7 @@ export default function HRDocuments() {
     setDownloading(true); setExportMsg('')
     try {
       const { downloadWorkersCompExcel } = await import('../../utils/workersCompExcel')
-      await downloadWorkersCompExcel(wcPreview)
+      await downloadWorkersCompExcel(wcPreview, wcLang)
     } catch {
       setExportMsg('Could not build the Excel file. Try again.')
     } finally {
@@ -204,9 +207,9 @@ export default function HRDocuments() {
       )}
 
       {/* Workers' comp review table → Excel */}
-      <Modal isOpen={!!wcPreview} onClose={() => setWcPreview(null)} title="Workers' Compensation — All Employees" size="full">
+      <Modal isOpen={!!wcPreview} onClose={() => setWcPreview(null)} title={wcLang === 'es' ? 'Compensación Laboral — Todos los Empleados' : "Workers' Compensation — All Employees"} size="full">
         {exportMsg && <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4">{exportMsg}</p>}
-        <WorkersCompPreview data={wcPreview} onDownload={handleDownload} downloading={downloading} />
+        <WorkersCompPreview data={wcPreview} onDownload={handleDownload} downloading={downloading} lang={wcLang} onLangChange={setWcLang} />
       </Modal>
 
       {/* View signed document modal */}
