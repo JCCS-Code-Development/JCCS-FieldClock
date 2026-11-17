@@ -709,6 +709,7 @@ export default function MyDocuments() {
   const fmtDateTime = (iso) => format(parseISO(iso), "MMMM d, yyyy 'at' h:mm a", { locale: dfLocale })
   const [agreements, setAgreements]     = useState([])
   const [wcExempt, setWcExempt]         = useState(false)
+  const [hrExempt, setHrExempt]         = useState(false)
   const [loading, setLoading]           = useState(true)
   const [activeType, setActiveType]     = useState(null)
   const [signedData, setSignedData]     = useState(null)  // full signed doc for view mode
@@ -728,7 +729,7 @@ export default function MyDocuments() {
   }, [])
   useEffect(() => { loadNotes() }, [loadNotes])
 
-  const requiredDefs = AGREEMENT_DEFS.filter((d) =>
+  const requiredDefs = hrExempt ? [] : AGREEMENT_DEFS.filter((d) =>
     !(d.id === 'workers_comp' && wcExempt) &&
     (d.required_for.includes('all') || (d.required_for.includes('w2') && user?.pay_type === 'w2'))
   )
@@ -741,7 +742,7 @@ export default function MyDocuments() {
     if (!user?.id) return
     setLoading(true)
     listAgreements({ user_id: user.id })
-      .then((d) => { setAgreements(d.agreements ?? []); setWcExempt(!!d.wc_exempt) })
+      .then((d) => { setAgreements(d.agreements ?? []); setWcExempt(!!d.wc_exempt); setHrExempt(!!d.hr_exempt) })
       .finally(() => setLoading(false))
   }, [user?.id])
 
@@ -847,8 +848,14 @@ export default function MyDocuments() {
         <p className="text-sm text-gray-500 mt-1">{t('docs.subtitle')}</p>
       </div>
 
+      {!loading && hrExempt && (
+        <div className="rounded-2xl p-4 mb-6 border bg-green-50 border-green-200">
+          <p className="text-sm font-semibold text-green-700">{t('docs.hrExempt')}</p>
+        </div>
+      )}
+
       {/* Progress bar */}
-      {!loading && (
+      {!loading && !hrExempt && (
         <div className={`rounded-2xl p-4 mb-6 border ${allDone ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
           <div className="flex items-center justify-between mb-2">
             <p className={`text-sm font-semibold ${allDone ? 'text-green-700' : 'text-amber-700'}`}>

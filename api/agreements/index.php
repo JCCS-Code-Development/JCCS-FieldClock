@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         // login and have no path to sign any of these forms, so listing them
         // would just be a wall of permanently-pending rows.
         $users = $pdo->query(
-            "SELECT u.id, u.name, u.pay_type, u.pay_structure, u.is_active, u.wc_exempt,
+            "SELECT u.id, u.name, u.pay_type, u.pay_structure, u.is_active, u.wc_exempt, u.hr_exempt,
                     ea.agreement_type, ea.signed_at,
                     CASE WHEN ea.agreement_type = 'workers_comp'
                          THEN JSON_UNQUOTE(JSON_EXTRACT(ea.form_data, '$.plan')) END AS wc_plan
@@ -41,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     'pay_type'  => $row['pay_type'],
                     'is_active' => (bool)$row['is_active'],
                     'wc_exempt' => (bool)$row['wc_exempt'],
+                    'hr_exempt' => (bool)$row['hr_exempt'],
                     'agreements' => [],
                     'wc_plan'    => null,
                 ];
@@ -58,9 +59,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         );
         $stmt->execute([$uid]);
         $agreements = $stmt->fetchAll();
-        $ex = $pdo->prepare('SELECT wc_exempt FROM users WHERE id = ?');
+        $ex = $pdo->prepare('SELECT wc_exempt, hr_exempt FROM users WHERE id = ?');
         $ex->execute([$uid]);
-        echo json_encode(['agreements' => $agreements, 'wc_exempt' => (bool)$ex->fetchColumn()]);
+        $flags = $ex->fetch() ?: ['wc_exempt' => 0, 'hr_exempt' => 0];
+        echo json_encode([
+            'agreements' => $agreements,
+            'wc_exempt'  => (bool)$flags['wc_exempt'],
+            'hr_exempt'  => (bool)$flags['hr_exempt'],
+        ]);
     }
     exit;
 }

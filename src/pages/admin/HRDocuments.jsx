@@ -94,12 +94,13 @@ export default function HRDocuments() {
     load()
   }
 
-  const relevantTypes = (emp) =>
+  const relevantTypes = (emp) => emp.hr_exempt ? [] :
     ALL_TYPES.filter((t) =>
       (!W2_ONLY.includes(t.id) || emp.pay_type === 'w2') &&
       !(t.id === 'workers_comp' && emp.wc_exempt && !emp.agreements?.workers_comp))
 
   const statusFor = (emp, typeId) => {
+    if (emp.hr_exempt && !emp.agreements?.[typeId]) return 'exempt'
     if (W2_ONLY.includes(typeId) && emp.pay_type !== 'w2') return 'na'
     if (typeId === 'workers_comp' && emp.wc_exempt && !emp.agreements?.workers_comp) return 'exempt'
     return emp.agreements?.[typeId] ? 'signed' : 'pending'
@@ -147,10 +148,14 @@ export default function HRDocuments() {
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-gray-900">{emp.name}</p>
                         {!emp.is_active && <Badge variant="rejected">Inactive</Badge>}
+                        {emp.hr_exempt && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">HR exempt</span>}
                       </div>
                       <p className="text-xs text-gray-400">{emp.pay_type?.toUpperCase()}</p>
                     </td>
                     <td className="px-3 py-3">
+                      {total === 0 ? (
+                        <p className="text-center text-xs font-semibold text-gray-400">Exempt</p>
+                      ) : (
                       <div className="flex flex-col items-center gap-1">
                         <span className={`text-xs font-bold ${done === total ? 'text-green-600' : 'text-amber-600'}`}>
                           {done}/{total}
@@ -162,6 +167,7 @@ export default function HRDocuments() {
                           />
                         </div>
                       </div>
+                      )}
                     </td>
                     {ALL_TYPES.map((t) => {
                       const status = statusFor(emp, t.id)

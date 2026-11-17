@@ -38,7 +38,9 @@ export default function PendingDocsBanner() {
       listMyLoanNotes().catch(() => []),
     ]).then(([d, notes]) => {
       const signed = new Set((d.agreements ?? []).filter((a) => a.signed_at).map((a) => a.agreement_type))
-      const required = [
+      // hr_exempt people (set per employee by an admin) owe no onboarding
+      // documents at all — only loan pagarés can still make the banner show.
+      const required = d.hr_exempt ? [] : [
         ...REQUIRED_ALL,
         ...(user.pay_type === 'w2' ? REQUIRED_W2 : []),
         // Workers' comp coverage form — everyone except people flagged exempt

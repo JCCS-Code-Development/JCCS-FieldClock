@@ -39,7 +39,7 @@ if (!$existing) {
 if ($method === 'GET') {
     $stmt = $pdo->prepare(
         'SELECT u.id, u.name, u.email, u.phone, u.address, u.role, u.pay_type, u.pay_rate, u.pay_structure, u.overtime_rate,
-                u.gas_weekly_allowance, u.wc_exempt, u.is_active, u.deactivated_at, u.default_job_id, u.default_job_fixed, j.name as default_job_name
+                u.gas_weekly_allowance, u.wc_exempt, u.hr_exempt, u.is_active, u.deactivated_at, u.default_job_id, u.default_job_fixed, j.name as default_job_name
          FROM users u
          LEFT JOIN jobs j ON j.id = u.default_job_id
          WHERE u.id = ?'
@@ -65,7 +65,7 @@ if ($method === 'GET') {
     // whatever default job site they already had as an employee/admin.
     $becameContractor = $finalRole === 'contractor' && $existing['role'] !== 'contractor';
 
-    $allowed = ['name', 'email', 'phone', 'address', 'role', 'pay_type', 'pay_rate', 'pay_structure', 'overtime_rate', 'gas_weekly_allowance', 'is_active', 'default_job_id', 'default_job_fixed', 'wc_exempt'];
+    $allowed = ['name', 'email', 'phone', 'address', 'role', 'pay_type', 'pay_rate', 'pay_structure', 'overtime_rate', 'gas_weekly_allowance', 'is_active', 'default_job_id', 'default_job_fixed', 'wc_exempt', 'hr_exempt'];
     $sets = []; $params = [];
 
     foreach ($allowed as $f) {
@@ -75,7 +75,7 @@ if ($method === 'GET') {
             $params[] = ($body[$f] === null || $body[$f] === '') ? null : (float)$body[$f];
         } elseif ($f === 'default_job_id') {
             $params[] = ($body[$f] === null || $body[$f] === '') ? null : (int)$body[$f];
-        } elseif ($f === 'default_job_fixed' || $f === 'wc_exempt') {
+        } elseif (in_array($f, ['default_job_fixed', 'wc_exempt', 'hr_exempt'], true)) {
             $params[] = !empty($body[$f]) ? 1 : 0;
         } elseif (in_array($f, ['phone', 'email', 'address'])) {
             // Empty/null clears the field to NULL rather than storing '' — email

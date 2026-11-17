@@ -35,7 +35,7 @@ $missing = $pdo->query(
      FROM users u
      LEFT JOIN employee_agreements ea
             ON ea.user_id = u.id AND ea.agreement_type = 'workers_comp' AND ea.signed_at IS NOT NULL
-     WHERE u.is_active = 1 AND u.role != 'contractor' AND u.wc_exempt = 0 AND ea.id IS NULL
+     WHERE u.is_active = 1 AND u.role != 'contractor' AND u.wc_exempt = 0 AND u.hr_exempt = 0 AND ea.id IS NULL
      ORDER BY u.name"
 )->fetchAll();
 

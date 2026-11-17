@@ -397,7 +397,8 @@
     "submitBtn": "Firmar y Enviar — {{title}}",
     "immutable": "Una vez enviado, este documento no puede modificarse.",
     "agreeCheck": "He leído y entiendo completamente este documento. Acepto sus términos y condiciones.",
-    "pendingLabel": "Pendiente"
+    "pendingLabel": "Pendiente",
+    "hrExempt": "No tiene que firmar ningún documento de RRHH."
   },
   "pendingContractorDocs": {
     "banner_one": "{{count}} documento requerido pendiente",

@@ -397,7 +397,8 @@
     "submitBtn": "Sign & Submit — {{title}}",
     "immutable": "Once submitted, this document cannot be modified.",
     "agreeCheck": "I have read and fully understand this document. I agree to its terms and conditions.",
-    "pendingLabel": "Pending"
+    "pendingLabel": "Pending",
+    "hrExempt": "You're not required to sign any HR documents."
   },
   "pendingContractorDocs": {
     "banner_one": "{{count}} required document missing",

@@ -41,7 +41,7 @@ function annotateSalaryHistory(history) {
 const EMPTY = {
   name: '', email: '', phone: '', address: '', role: 'employee',
   pay_type: 'w2', pay_structure: 'hourly', pay_rate: '', gas_weekly_allowance: '',
-  default_job_id: '', default_job_fixed: false, wc_exempt: false,
+  default_job_id: '', default_job_fixed: false, wc_exempt: false, hr_exempt: false,
 }
 
 // A sensitive field (Tax ID, bank account #) the server sends back masked
@@ -232,6 +232,7 @@ export default function AdminEmployees() {
       default_job_id: emp.default_job_id ?? '',
       default_job_fixed: !!Number(emp.default_job_fixed),
       wc_exempt: !!Number(emp.wc_exempt),
+      hr_exempt: !!Number(emp.hr_exempt),
     })
     setError('')
     setModal(emp)
@@ -261,7 +262,10 @@ export default function AdminEmployees() {
         pay_rate:      parseFloat(form.pay_rate) || 0,
         gas_weekly_allowance: form.gas_weekly_allowance === '' ? 0 : (parseFloat(form.gas_weekly_allowance) || 0),
       }),
-      ...(modal !== 'create' && form.role !== 'contractor' && { wc_exempt: form.wc_exempt ? 1 : 0 }),
+      ...(modal !== 'create' && form.role !== 'contractor' && {
+        wc_exempt: form.wc_exempt ? 1 : 0,
+        hr_exempt: form.hr_exempt ? 1 : 0,
+      }),
       // Contractors invoice per job and never clock in, so they're never
       // assigned a default job site.
       ...(modal !== 'create' && form.role !== 'contractor' && {
@@ -491,6 +495,17 @@ export default function AdminEmployees() {
                   <span>
                     <span className="text-sm font-medium text-gray-700 block">Exempt from workers' comp form</span>
                     <span className="text-xs text-gray-400">Won't be asked to fill out the Workers' Compensation Coverage form (no orange banner).</span>
+                  </span>
+                </label>
+              )}
+
+              {modal !== 'create' && (
+                <label className="flex items-start gap-3 rounded-xl border border-gray-200 px-4 py-3 cursor-pointer hover:bg-gray-50">
+                  <input type="checkbox" className="mt-0.5" checked={!!form.hr_exempt}
+                    onChange={(e) => setForm((f) => ({ ...f, hr_exempt: e.target.checked }))} />
+                  <span>
+                    <span className="text-sm font-medium text-gray-700 block">Exempt from all HR documents</span>
+                    <span className="text-xs text-gray-400">Won't be asked to sign any onboarding document (At-Will, Non-Solicitation, COI, Emergency Contact, I-9, W-4, Workers' Comp). Loan pagarés still apply.</span>
                   </span>
                 </label>
               )}
