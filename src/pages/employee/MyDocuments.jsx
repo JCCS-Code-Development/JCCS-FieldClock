@@ -427,25 +427,43 @@ function W4Form({ data, onChange, disabled }) {
 // Bilingual inline since most of the crew reads Spanish; the other onboarding
 // forms are English-only.
 
-// Shrink a phone-camera ID photo to a JPEG data URL (~200–400 KB) so it can
-// travel inside the signed form's JSON — same as the signature image — rather
-// than as a file under the web-served uploads/ folder.
-function compressIdPhoto(file, maxDim = 1600, quality = 0.8) {
+// The production server rejects any request body over 1 MB (HTTP 413, before
+// PHP runs), and the ID photo travels inside the signed form's JSON along
+// with the signature. So shrink the photo — stepping down size/quality —
+// until it fits comfortably under that, leaving room for everything else.
+const ID_PHOTO_MAX_CHARS = 450_000          // data-URL length (~330 KB of JPEG)
+const SIGN_REQUEST_MAX_BYTES = 950_000      // keep under the server's 1 MB cap
+const ID_PHOTO_STEPS = [[1400, 0.75], [1200, 0.7], [1000, 0.65], [900, 0.6], [800, 0.55], [700, 0.5]]
+
+function loadImage(src) {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
     const img = new Image()
-    img.onload = () => {
+    img.onload  = () => resolve(img)
+    img.onerror = () => reject(new Error('unreadable'))
+    img.src = src
+  })
+}
+
+// `source` is a File (fresh pick) or a data URL (photo already in the form).
+async function compressIdPhoto(source) {
+  const isFile = typeof source !== 'string'
+  const url = isFile ? URL.createObjectURL(source) : source
+  try {
+    const img = await loadImage(url)
+    let out = null
+    for (const [maxDim, quality] of ID_PHOTO_STEPS) {
       const scale  = Math.min(1, maxDim / Math.max(img.width, img.height))
       const canvas = document.createElement('canvas')
       canvas.width  = Math.round(img.width * scale)
       canvas.height = Math.round(img.height * scale)
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-      URL.revokeObjectURL(url)
-      resolve(canvas.toDataURL('image/jpeg', quality))
+      out = canvas.toDataURL('image/jpeg', quality)
+      if (out.length <= ID_PHOTO_MAX_CHARS) break
     }
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable')) }
-    img.src = url
-  })
+    return out
+  } finally {
+    if (isFile) URL.revokeObjectURL(url)
+  }
 }
 
 function IdPhotoField({ value, onChange, disabled, L }) {
@@ -809,15 +827,35 @@ export default function MyDocuments() {
 
     setSaving(true); setError('')
     try {
-      await signAgreement({
+      let data = Object.keys(formData).length ? formData : { acknowledged: true }
+      // A photo picked before the size cap existed (or an unusually detailed
+      // one) can still be too big — shrink it again rather than make them retake.
+      if (activeType.id === 'workers_comp' && data.id_photo?.length > ID_PHOTO_MAX_CHARS) {
+        data = { ...data, id_photo: await compressIdPhoto(data.id_photo) }
+        setFormData(data)
+      }
+      const payload = {
         agreement_type: activeType.id,
-        form_data:      Object.keys(formData).length ? formData : { acknowledged: true },
+        form_data:      data,
         signature_data: sigRef.current.getDataURL(),
-      })
+      }
+      if (JSON.stringify(payload).length > SIGN_REQUEST_MAX_BYTES) {
+        setError(isEs
+          ? 'La foto de identificación es demasiado grande. Tome otra foto más de cerca, solo de la identificación.'
+          : 'The ID photo is too large. Retake it closer, showing only the ID.')
+        return
+      }
+      await signAgreement(payload)
       setActiveType(null)
       load()
     } catch (err) {
-      setError(err?.response?.data?.error ?? 'Could not save. Try again.')
+      if (err?.response?.status === 413) {
+        setError(isEs
+          ? 'El envío es demasiado grande. Toque “Tomar otra / cambiar foto” y vuelva a tomar la foto de su identificación.'
+          : 'The submission is too large. Tap “Retake / change photo” and take the ID photo again.')
+      } else {
+        setError(err?.response?.data?.error ?? (isEs ? 'No se pudo guardar. Intente de nuevo.' : 'Could not save. Try again.'))
+      }
     } finally {
       setSaving(false)
     }

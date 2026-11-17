@@ -54,7 +54,7 @@ if ($type === 'workers_comp') {
         echo json_encode(['error' => 'A photo of your ID is required.']);
         exit;
     }
-    if (strlen($photo) > 4 * 1024 * 1024) {
+    if (strlen($photo) > 1024 * 1024) {   // server caps whole requests at 1 MB anyway
         http_response_code(422);
         echo json_encode(['error' => 'ID photo is too large — please retake it.']);
         exit;
