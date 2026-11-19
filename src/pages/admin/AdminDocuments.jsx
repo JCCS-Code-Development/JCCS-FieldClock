@@ -679,7 +679,9 @@ function PayrollRegisterDoc({ summaryData, adjustments, loanDeductions, period, 
         </thead>
         <tbody>
           {summaryData.map((emp) => {
-            const gas  = (emp.gas_total ?? 0) + (gasByUser[emp.user_id] ?? 0)
+            // gas_total from summary.php already IS the sum of this period's approved
+            // gas_allowance adjustments — adding gasByUser on top double-counted it.
+            const gas  = emp.gas_total ?? gasByUser[emp.user_id] ?? 0
             const bon  = bonusByUser[emp.user_id] ?? 0
             const loan = loanDeductions[emp.user_id] ?? 0
             const gross = emp.estimated_total ?? 0

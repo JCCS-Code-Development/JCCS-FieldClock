@@ -110,7 +110,9 @@ export function Weekly1099ReportDoc({ summaryData, gasByUser = {}, bonusByUser =
             <tr><td colSpan={cols.length} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '20px 10px' }}>No 1099 employees with pay this period.</td></tr>
           )}
           {rows.map((emp, i) => {
-            const gas  = (emp.gas_total ?? 0) + (gasByUser[emp.user_id] ?? 0)
+            // gas_total from summary.php already IS the sum of this period's approved
+            // gas_allowance adjustments — adding gasByUser on top double-counted it.
+            const gas  = emp.gas_total ?? gasByUser[emp.user_id] ?? 0
             const bon  = bonusByUser[emp.user_id] ?? 0
             const loan = loanDeductions[emp.user_id] ?? 0
             const gross = emp.base_gross ?? 0
