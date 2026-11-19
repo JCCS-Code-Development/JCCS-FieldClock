@@ -126,6 +126,30 @@ function enforceMealCutoff(PDO $pdo, int $userId): void {
         ->execute([$cutoff, $entry['id'], $userId]);
 }
 
+// enforceMealCutoff normally only runs when the employee's OWN app talks to
+// the server. If their phone is closed, an overlong lunch/dinner stays open
+// ("Active" on the admin Timesheets page, still "on lunch" on the board)
+// until they reopen the app. This runs the same cutoff for every employee
+// with an overdue meal break, each under its own row lock + transaction
+// exactly like a self-service call. Called from admin-facing reads
+// (entries.php, board-active.php) and from cron-meal-cutoff.php.
+function enforceOverdueMealCutoffsForAll(PDO $pdo): void {
+    $ids = $pdo->query(
+        "SELECT DISTINCT user_id FROM time_entries
+         WHERE end_time IS NULL AND status_label IN ('lunch', 'dinner')
+           AND start_time <= (NOW() - INTERVAL " . LUNCH_CAP_MINUTES . " MINUTE)"
+    )->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($ids as $uid) {
+        try {
+            beginTimeclockTransaction($pdo, (int)$uid);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log('FieldClock: meal cutoff failed for user ' . $uid . ': ' . $e->getMessage());
+        }
+    }
+}
+
 // Defensive cleanup used by clear-lunch-lock.php: close any lunch/dinner
 // entry for this user that's still open, no matter how old. Normally
 // enforceMealCutoff already closes these the instant they pass the cap, but

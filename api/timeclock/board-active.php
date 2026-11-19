@@ -21,6 +21,7 @@ set_error_handler(function ($severity, $message, $file, $line) {
 
 require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/_helper.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
@@ -35,6 +36,10 @@ if ($expected === '' || $expected === 'CHANGE_ME' || !hash_equals($expected, $gi
 }
 
 $pdo = getPDO();
+
+// Close any lunch/dinner past the 1-hour cap first, so admins never see a
+// stale "Active" break just because the employee's app is closed.
+enforceOverdueMealCutoffsForAll($pdo);
 
 // The personnel column is about the crew that actually punches in and out —
 // hourly staff only. Salaried people and contractors are never listed, even

@@ -10,6 +10,7 @@ set_error_handler(function ($severity, $message, $file, $line) {
 });
 require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/_helper.php';
 require_once __DIR__ . '/../config/jwt.php';
 require_once __DIR__ . '/../middleware/auth.php';
 require_once __DIR__ . '/../middleware/validate.php';
@@ -17,6 +18,10 @@ require_once __DIR__ . '/../middleware/validate.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(405); exit; }
 $auth = requireAuth();
 $pdo  = getPDO();
+
+// Close any lunch/dinner past the 1-hour cap first, so admins never see a
+// stale "Active" break just because the employee's app is closed.
+enforceOverdueMealCutoffsForAll($pdo);
 
 $userId = $auth['role'] === 'admin' && isset($_GET['user_id']) ? (int)$_GET['user_id'] : $auth['user_id'];
 $start  = $_GET['start'] ?? date('Y-m-d', strtotime('-7 days'));
